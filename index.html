@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v44</title>
+    <title>Neon Blade: Melee Arena v44.5</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #ddeeff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; user-select: none; transition: background-color 0.5s; }
         
@@ -183,6 +184,13 @@
         .kill-msg.combo { border-left-color: #ffcc00; color: #ffcc00; font-size: 12px; }
         .kill-msg.achievement { border-left-color: #ff00ff; color: #ff00ff; font-size: 14px; text-shadow: 0 0 8px #ff00ff; }
 
+        .slick-streak {
+            font-family: 'Segoe UI', sans-serif;
+            font-weight: 300;
+            font-style: normal;
+            margin-left: 4px;
+        }
+
         @keyframes fadeOut { 0% { opacity: 1; transform: translateX(0); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(-30px); } }
 
         #combo-display {
@@ -190,7 +198,36 @@
             color: #ffcc00; font-family: 'Arial Black', sans-serif;
             text-shadow: 4px 4px 0px rgba(0,0,0,0.5); display: none; 
             text-align: center; font-style: italic; z-index: 5;
-            transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transition: all 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            white-space: nowrap; /* FIX: Prevent wrapping */
+        }
+
+        #meme-overlay {
+            position: absolute; 
+            top: -60px; left: 50%; transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            border-radius: 16px;
+            padding: 12px 24px;
+            color: #fff;
+            font-family: 'Segoe UI', sans-serif;
+            font-weight: 500;
+            font-size: 2rem;
+            white-space: nowrap;
+            display: none;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 10;
+        }
+
+        @keyframes popIn { 0% { transform: translateX(-50%) scale(0); opacity: 0; } 100% { transform: translateX(-50%) scale(1); opacity: 1; } }
+
+        #session-timer {
+            position: absolute; bottom: 15px; right: 20px;
+            font-family: monospace; font-size: 0.8rem; color: #666;
+            opacity: 0.5; display: none;
         }
 
         #damage-overlay {
@@ -220,7 +257,11 @@
             </div>
         </div>
         
-        <div id="combo-display">2 HITS</div>
+        <div id="combo-wrapper" style="position:absolute; top:10%; left:50%; width:0; height:0;">
+            <div id="meme-overlay">nice.</div>
+            <div id="combo-display">2 HITS</div>
+        </div>
+
         <div id="kill-feed"></div>
         
         <div id="crosshair">
@@ -277,11 +318,14 @@
                 </div>
             </div>
 
+            <div id="session-timer">Session Time: 00:00</div>
+
             <div class="btn-row" style="margin-top: 30px; gap: 15px;">
                 <button class="btn-secondary" id="tp-mode-btn">TP MODE: AIM</button>
                 <button class="btn-secondary" id="theme-btn">THEME: LIGHT</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v44.5</div>
         </div>
     </div>
 
@@ -296,7 +340,7 @@
             
             jumpForce: 24,
             wallJumpForce: 22,
-            wallPushForce: 20,
+            wallPushForce: 10, 
             gravity: 40,
             
             frictionGround: 6.0, 
@@ -304,7 +348,7 @@
             airControl: 1.0,  
             frictionSlide: 1.2, 
             slideBoost: 18, 
-            bunnyHopBoost: 15, 
+            bunnyHopBoost: 7.5,
             
             staminaMax: 100,
             staminaDrain: 25, 
@@ -325,11 +369,24 @@
             botAggroDuration: 10000, 
             botReactionDelay: 1000,
             
-            regenDelay: 4000,
+            regenDelay: 3000, // Reduced to 3s
             regenRate: 25
         };
 
         // --- GAME STATS ---
+        const MASTERY_RANKS = [
+            { count: 10, title: "NOVICE" },
+            { count: 25, title: "APPRENTICE" },
+            { count: 50, title: "ADEPT" },
+            { count: 75, title: "EXPERT" },
+            { count: 100, title: "MASTER" },
+            { count: 150, title: "GRANDMASTER" },
+            { count: 250, title: "LEGEND" },
+            { count: 400, title: "DEMIGOD" },
+            { count: 600, title: "GODLIKE" },
+            { count: 1000, title: "OMNIPOTENT" }
+        ];
+
         const GameStats = {
             highestCombo: 0,
             achievements: [],
@@ -346,29 +403,19 @@
                 for(let k in this.moves) this.moves[k] = 0;
             },
             addAchievement: function(name, color="#ff00ff") {
-                // No exclamation marks as requested
                 if(!this.achievements.includes(name)) {
                     this.achievements.push(name);
                     showKillMessage(name, "achievement", color);
                 } else {
-                    // Repeat achievements (like every 10 kills) just show up
                     showKillMessage(name, "achievement", color);
                 }
             },
             checkMoveMilestone: function(key, name, color="#00ffff") {
-                if (this.moves[key] > 0 && this.moves[key] % 10 === 0) {
-                    const total = this.moves[key];
-                    const rankIdx = (total / 10) - 1;
-                    
-                    const tiers = ["NOVICE", "ADEPT", "EXPERT", "MASTER", "GRANDMASTER", "LEGEND", "GOD", "ETERNAL", "INFINITE", "THE ONE"];
-                    const tierName = tiers[Math.floor(rankIdx / 3)] || "BEYOND";
-                    const level = (rankIdx % 3) + 1;
-                    
-                    let roman = "I";
-                    if(level === 2) roman = "II";
-                    if(level === 3) roman = "III";
-                    
-                    this.addAchievement(`${name} ${tierName} ${roman}`, color);
+                const count = this.moves[key];
+                const rank = MASTERY_RANKS.find(r => r.count === count);
+                
+                if (rank) {
+                    this.addAchievement(`${name} ${rank.title}`, color);
                 }
             }
         };
@@ -551,6 +598,7 @@
         let comboTimer = 0;
         let lastSlashID = 0; 
         let slashActive = false;
+        let sessionStartTime = 0;
 
         const materials = {};
 
@@ -567,6 +615,7 @@
             isDead: false,
             cameraHeightOffset: 0,
             lastDamageTime: 0,
+            isRegenerating: false,
             teleportActive: false,
             teleportTarget: null,
             airTimeStart: 0,
@@ -591,7 +640,7 @@
         const enemies = [];
         const particles = [];
         const decorations = [];
-        const leaves = [];
+        const weatherParticles = [];
 
         let teleportMarker;
         let slashGeometry; 
@@ -691,15 +740,18 @@
 
         function updatePauseScreenStats() {
             const h1 = document.querySelector('#start-screen h1');
+            const timerDisplay = document.getElementById('session-timer');
             
             if(player.isDead) {
                 h1.innerText = "TERMINATED";
                 h1.style.color = "#ff3333";
                 h1.style.textShadow = "4px 4px 0px #880000";
+                timerDisplay.style.display = "block";
             } else {
                 h1.innerText = "PAUSED";
                 h1.style.color = "#33ccff";
                 h1.style.textShadow = "4px 4px 0px #33ccff";
+                timerDisplay.style.display = "none";
             }
 
             // Render Stats
@@ -725,13 +777,15 @@
             statMoves.innerHTML = movesHtml;
         }
 
+        let ambientLight, hemiLight, dirLight;
+
         function setupLighting() {
-            const ambientLight = new THREE.AmbientLight(0x404040, 1.5);
+            ambientLight = new THREE.AmbientLight(0x404040, 1.5);
             scene.add(ambientLight);
-            const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+            hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
             hemiLight.position.set(0, 50, 0);
             scene.add(hemiLight);
-            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
             dirLight.position.set(50, 100, 50);
             dirLight.castShadow = true;
             dirLight.shadow.camera.left = -200;
@@ -775,19 +829,30 @@
             const ui = document.getElementById('ui-layer');
             const crosshair = document.getElementById('crosshair');
             
-            if (currentTheme === 0) { // LIGHT
-                scene.background = new THREE.Color(0xddeeff);
-                scene.fog = new THREE.FogExp2(0xddeeff, 0.003);
-                body.style.backgroundColor = "#ddeeff";
+            // Reset Lighting defaults
+            ambientLight.intensity = 1.5;
+            dirLight.intensity = 0.8;
+            dirLight.shadow.bias = 0;
+
+            if (currentTheme === 0) { // LIGHT (SNOW)
+                // Darker background to make snow visible
+                const bgCol = 0xaaccff; 
+                scene.background = new THREE.Color(bgCol);
+                scene.fog = new THREE.FogExp2(bgCol, 0.004); 
+                body.style.backgroundColor = "#aaccff";
                 ui.classList.add('light-theme');
                 if(materials.floor) materials.floor.color.setHex(0xffffff);
                 if(materials.wall) materials.wall.color.setHex(0xeeeeee);
-                if(materials.obstacle) materials.obstacle.color.setHex(0xcccccc);
+                // Obstacles handled in decorations
                 if(materials.grid) { materials.grid.color.setHex(0x000000); materials.grid.opacity = 0.2; }
                 currentSlashColor = 0x0088ff;
                 if(materials.marker) materials.marker.color.setHex(0x0088ff);
                 crosshair.style.color = "#0088ff";
                 updateGridHelper(0x888888, 0xcccccc);
+                
+                // Snowy lighting adjustments
+                ambientLight.intensity = 0.6; // Reduced from 1.0 to make snow pop
+                dirLight.intensity = 0.7; 
             } else if (currentTheme === 1) { // DARK
                 scene.background = new THREE.Color(0x151515);
                 scene.fog = new THREE.FogExp2(0x151515, 0.006);
@@ -885,11 +950,23 @@
             return mesh;
         }
 
+        // Gift Box Palettes
+        const GIFT_PALETTES = [
+            { box: 0xcc0000, ribbon: 0xffd700 }, // Red/Gold
+            { box: 0x006400, ribbon: 0xcc0000 }, // Green/Red
+            { box: 0x0044aa, ribbon: 0xc0c0c0 }, // Blue/Silver
+            { box: 0xffffff, ribbon: 0xcc0000 }, // White/Red
+            { box: 0x663399, ribbon: 0xffd700 }  // Purple/Gold
+        ];
+
         class Decoration {
             constructor(x, z, scale) {
                 this.scale = scale;
                 const size = 2;
                 
+                // Select random palette for gift mode
+                this.palette = GIFT_PALETTES[Math.floor(Math.random() * GIFT_PALETTES.length)];
+
                 // PHYSICS FIX: No rotation on visual mesh relative to collider
                 const colliderGeo = new THREE.BoxGeometry(size, size, size);
                 const colliderMat = new THREE.MeshBasicMaterial({ visible: false });
@@ -912,6 +989,7 @@
                 this.visualMesh.geometry.computeBoundingBox();
                 worldObjects.push(this.visualMesh);
                 
+                // HALLOWEEN FACES
                 this.faceGroup = new THREE.Group();
                 const faceMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
                 const eyeGeo = new THREE.ConeGeometry(0.3, 0.1, 3);
@@ -931,6 +1009,21 @@
                 this.stem.position.set(0, 1.2, 0);
                 this.faceGroup.add(this.stem);
                 this.visualMesh.add(this.faceGroup);
+
+                // GIFT BOX RIBBONS (LIGHT THEME)
+                this.ribbonGroup = new THREE.Group();
+                this.ribbonMat = new THREE.MeshBasicMaterial({ color: this.palette.ribbon });
+                // Fix Z-fighting: Taller ribbons (2.05 vs 2.0 box height)
+                const r1Geo = new THREE.BoxGeometry(2.05, 2.05, 0.4); 
+                const r1 = new THREE.Mesh(r1Geo, this.ribbonMat);
+                const r2Geo = new THREE.BoxGeometry(0.4, 2.05, 2.05); 
+                const r2 = new THREE.Mesh(r2Geo, this.ribbonMat);
+                const bowGeo = new THREE.SphereGeometry(0.4, 8, 8);
+                const bow = new THREE.Mesh(bowGeo, this.ribbonMat);
+                bow.position.y = 1.025; // Sit on top of the slightly taller ribbon
+                this.ribbonGroup.add(r1); this.ribbonGroup.add(r2); this.ribbonGroup.add(bow);
+                this.ribbonGroup.visible = false;
+                this.visualMesh.add(this.ribbonGroup);
                 
                 const edges = new THREE.EdgesGeometry(visualGeo);
                 this.edges = new THREE.LineSegments(edges, materials.grid);
@@ -946,49 +1039,158 @@
                     this.mat.color.setRGB(r, g, 0);
                     this.mat.emissive = new THREE.Color(r*0.1, g*0.1, 0);
                     this.faceGroup.visible = true;
+                    this.ribbonGroup.visible = false;
                     this.edges.visible = false;
+                } else if (t === 0) { // Light (Gifts)
+                    this.mat.color.setHex(this.palette.box);
+                    this.ribbonMat.color.setHex(this.palette.ribbon);
+                    this.mat.emissive.setHex(0x000000);
+                    this.faceGroup.visible = false;
+                    this.ribbonGroup.visible = true;
+                    this.edges.visible = true;
                 } else {
-                    if(t === 0) this.mat.color.setHex(0xcccccc);
                     if(t === 1) this.mat.color.setHex(0x444444);
                     if(t === 2) this.mat.color.setHex(0x400060);
                     this.mat.emissive.setHex(0x000000);
                     this.faceGroup.visible = false;
+                    this.ribbonGroup.visible = false;
                     this.edges.visible = true;
                 }
             }
         }
 
         function updateWeather(dt) {
-            if (currentTheme !== 3) {
-                if(leaves.length > 0) {
-                    leaves.forEach(l => scene.remove(l.mesh));
-                    leaves.length = 0;
-                }
+            const isHalloween = currentTheme === 3;
+            const isSnow = currentTheme === 0;
+
+            // Allow snow to linger even if theme switched rapidly (simplified: clear if not needed)
+            if (!isHalloween && !isSnow && weatherParticles.length === 0) {
                 return;
             }
-            if(leaves.length < 80 && Math.random() < 0.1) {
-                const geo = new THREE.PlaneGeometry(0.3, 0.3);
-                const mat = new THREE.MeshBasicMaterial({ color: Math.random() > 0.5 ? 0xffaa00 : 0x884400, side: THREE.DoubleSide });
-                const mesh = new THREE.Mesh(geo, mat);
+
+            // Cleanup wrong type if switched
+            if ((!isSnow && weatherParticles.some(p => p.type === 'snow')) || 
+                (!isHalloween && weatherParticles.some(p => p.type === 'leaf'))) {
+                 weatherParticles.forEach(l => scene.remove(l.mesh));
+                 weatherParticles.length = 0;
+                 if (!isHalloween && !isSnow) return;
+            }
+
+            const limit = isSnow ? 300 : 80;
+            const spawnRate = isSnow ? 0.4 : 0.1;
+
+            // Spawning
+            if(weatherParticles.length < limit && Math.random() < spawnRate) {
+                let mesh, vel, type;
                 const px = camera.position.x + (Math.random()-0.5)*50;
                 const pz = camera.position.z + (Math.random()-0.5)*50;
-                mesh.position.set(px, 30, pz);
-                mesh.rotation.set(Math.random(), Math.random(), Math.random());
-                scene.add(mesh);
-                leaves.push({ mesh: mesh, vel: new THREE.Vector3((Math.random()-0.5)*3, -3 - Math.random()*3, (Math.random()-0.5)*3), swayOffset: Math.random() * 100 });
-            }
-            for(let i=leaves.length-1; i>=0; i--) {
-                const l = leaves[i];
-                l.mesh.position.addScaledVector(l.vel, dt);
-                l.mesh.rotation.x += dt * 2;
-                l.mesh.rotation.y += dt;
-                l.mesh.position.x += Math.sin(performance.now() * 0.002 + l.swayOffset) * dt * 2;
-                if(l.mesh.position.y < 0) {
-                    scene.remove(l.mesh);
-                    l.mesh.geometry.dispose();
-                    l.mesh.material.dispose();
-                    leaves.splice(i, 1);
+
+                if (isSnow) {
+                    const geo = new THREE.PlaneGeometry(0.1, 0.1);
+                    const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
+                    mesh = new THREE.Mesh(geo, mat);
+                    mesh.position.set(px, 30, pz);
+                    mesh.lookAt(camera.position); 
+                    vel = new THREE.Vector3((Math.random()-0.5)*2, -4 - Math.random()*4, (Math.random()-0.5)*2);
+                    type = 'snow';
+                } else {
+                    const geo = new THREE.PlaneGeometry(0.3, 0.3);
+                    const mat = new THREE.MeshBasicMaterial({ color: Math.random() > 0.5 ? 0xffaa00 : 0x884400, side: THREE.DoubleSide });
+                    mesh = new THREE.Mesh(geo, mat);
+                    mesh.position.set(px, 30, pz);
+                    mesh.rotation.set(Math.random(), Math.random(), Math.random());
+                    vel = new THREE.Vector3((Math.random()-0.5)*3, -3 - Math.random()*3, (Math.random()-0.5)*3);
+                    type = 'leaf';
                 }
+
+                scene.add(mesh);
+                weatherParticles.push({ mesh: mesh, vel: vel, type: type, swayOffset: Math.random() * 100, landed: false, landTimer: 2.0 });
+            }
+
+            // Updating
+            for(let i=weatherParticles.length-1; i>=0; i--) {
+                const l = weatherParticles[i];
+
+                if (l.landed) {
+                    l.landTimer -= dt;
+                    l.mesh.material.opacity = (l.landTimer / 2.0) * 0.8;
+                    if (l.landTimer <= 0) {
+                        scene.remove(l.mesh);
+                        l.mesh.geometry.dispose();
+                        l.mesh.material.dispose();
+                        weatherParticles.splice(i, 1);
+                    }
+                    continue; 
+                }
+
+                l.mesh.position.addScaledVector(l.vel, dt);
+                
+                if (l.type === 'leaf') {
+                    l.mesh.rotation.x += dt * 2;
+                    l.mesh.rotation.y += dt;
+                    l.mesh.position.x += Math.sin(performance.now() * 0.002 + l.swayOffset) * dt * 2;
+                } else {
+                    // Snow slight drift
+                    l.mesh.position.x += Math.sin(performance.now() * 0.001 + l.swayOffset) * dt * 0.5;
+                    l.mesh.rotation.z += dt; 
+                }
+
+                // Floor collision check (Assume ground at 0 for weather radius)
+                if(l.mesh.position.y <= 0) {
+                    if (l.type === 'snow') {
+                        l.landed = true;
+                        l.mesh.position.y = 0.05; // Sit just above Z-fight level
+                        l.mesh.rotation.x = -Math.PI / 2;
+                        l.vel.set(0,0,0);
+                    } else {
+                        // Leaves just disappear
+                        scene.remove(l.mesh);
+                        l.mesh.geometry.dispose();
+                        l.mesh.material.dispose();
+                        weatherParticles.splice(i, 1);
+                    }
+                }
+            }
+        }
+
+        function spawnSnowTrail(pos) {
+            const geo = new THREE.PlaneGeometry(0.4, 0.4);
+            const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6, side: THREE.DoubleSide });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.copy(pos);
+            mesh.position.y = getGroundHeight(pos.x, pos.z) + 0.05;
+            mesh.rotation.x = -Math.PI/2;
+            mesh.rotation.z = Math.random() * Math.PI;
+            scene.add(mesh);
+            particles.push({
+                mesh: mesh,
+                vel: new THREE.Vector3(0,0,0),
+                life: 1.0, // 1s fade
+                isStatic: true
+            });
+        }
+
+        function spawnSnowKickup(pos) {
+            for(let i=0; i<2; i++) {
+                const geo = new THREE.PlaneGeometry(0.1, 0.1);
+                const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, side: THREE.DoubleSide });
+                const mesh = new THREE.Mesh(geo, mat);
+                // Spawn slightly behind player
+                mesh.position.copy(pos).add(new THREE.Vector3((Math.random()-0.5), 0.1, (Math.random()-0.5)));
+                
+                const vel = new THREE.Vector3(
+                    (Math.random()-0.5) * 2, 
+                    1 + Math.random() * 3, // Upward
+                    (Math.random()-0.5) * 2
+                );
+
+                scene.add(mesh);
+                particles.push({
+                    mesh: mesh,
+                    vel: vel,
+                    life: 0.5,
+                    isStatic: false
+                });
             }
         }
 
@@ -1146,9 +1348,18 @@
             }
 
             const now = performance.now();
-            if (now - player.lastDamageTime > CONFIG.regenDelay && player.health < 100) {
+            
+            // REGEN LOGIC
+            if (player.isRegenerating) {
                 player.health += CONFIG.regenRate * dt;
-                if (player.health > 100) player.health = 100;
+                if (player.health >= 100) {
+                    player.health = 100;
+                    player.isRegenerating = false;
+                }
+            } else {
+                if (now - player.lastDamageTime > CONFIG.regenDelay && player.health < 100) {
+                    player.isRegenerating = true;
+                }
             }
 
             const isMoving = (keys.w || keys.a || keys.s || keys.d);
@@ -1182,6 +1393,11 @@
                 player.isCrouching = false;
             }
             
+            if (player.isSliding && currentTheme === 0) {
+                if (Math.random() < 0.3) spawnSnowTrail(camera.position);
+                if (Math.random() < 0.5) spawnSnowKickup(camera.position);
+            }
+
             AudioSys.toggleSlideSound(player.isSliding && new THREE.Vector2(player.velocity.x, player.velocity.z).length() > 5);
             const targetHeight = (player.isSliding || player.isCrouching) ? -0.8 : 0;
             player.cameraHeightOffset = THREE.MathUtils.lerp(player.cameraHeightOffset, targetHeight, dt * 15);
@@ -1340,35 +1556,74 @@
 
         function updateComboUI() {
             const el = document.getElementById('combo-display');
+            const meme = document.getElementById('meme-overlay');
+            
+            // Meme Check
+            let memeText = "";
+            if (comboCount === 69) { memeText = "nice."; showKillMessage("YIKWIM ;)", "achievement", "#ff00ff"); }
+            else if (comboCount === 420) { memeText = "blaze it bruh"; }
+            else if (comboCount === 1000) { memeText = "go touch grass"; }
+            
+            if (memeText) {
+                meme.innerText = memeText;
+                meme.style.display = "block";
+                setTimeout(() => meme.style.display = "none", 3000);
+            }
+
             if(comboCount < 2) {
                 el.style.display = 'none';
             } else {
                 el.style.display = 'block';
                 el.innerText = comboCount + " HITS";
                 
-                el.style.transform = "translateX(-50%) scale(1) rotate(0deg)";
-                
+                // Default values
                 let fontSize = "2rem";
                 let color = "#ffcc00";
-                if(comboCount >= 5) fontSize = "4rem";
-                if(comboCount >= 10) { fontSize = "5rem"; color = "#ff0000"; }
+                let opacity = "1";
+                let blur = "none";
+                let textShadow = "4px 4px 0px rgba(0,0,0,0.5)";
                 
-                // 100 Hits Logic
-                if (comboCount % 100 === 0) {
+                if(comboCount >= 5) fontSize = "4rem";
+                
+                // --- NEW VISUAL LOGIC ---
+                // Fixed: use >= 10 to catch the 10 hit milestone properly
+                if (comboCount >= 10) {
+                    if (comboCount % 10 === 0) {
+                        // Milestone (10, 20, 30...)
+                        fontSize = "5rem";
+                        color = "#ff0000";
+                        textShadow = "0 0 20px #ff0000, 4px 4px 0px rgba(0,0,0,0.8)";
+                    } else {
+                        // Filler Hits (11-19, 21-29...)
+                        fontSize = "4rem"; 
+                        opacity = "0.8"; 
+                        blur = "none"; 
+                    }
+                }
+                
+                // 100 Hits Logic (Super Bloom)
+                if (comboCount % 100 === 0 && comboCount > 0) {
                     fontSize = "8rem"; 
                     color = "#ff00ff";
+                    textShadow = "0 0 50px #ff00ff, 0 0 20px #fff";
+                    blur = "none";
+                    opacity = "1";
                     spawnFirework(camera.position.clone().add(new THREE.Vector3(0,0,-5)));
                     GameStats.addAchievement(comboCount + " HITS LEGEND", "#ff00ff");
                 }
 
                 el.style.fontSize = fontSize;
                 el.style.color = color;
-
+                el.style.opacity = opacity;
+                el.style.filter = blur;
+                el.style.textShadow = textShadow;
+                
+                // Pop animation
+                el.style.transform = "translateX(-50%) scale(1.3) rotate(0deg)";
                 requestAnimationFrame(() => {
-                     el.style.transform = `translateX(-50%) scale(1.3) rotate(${Math.random()*10-5}deg)`;
                      setTimeout(() => {
                          el.style.transform = "translateX(-50%) scale(1) rotate(0deg)";
-                     }, 100);
+                     }, 50);
                 });
             }
             if(comboCount > GameStats.highestCombo) GameStats.highestCombo = comboCount;
@@ -1461,35 +1716,49 @@
                     GameStats.checkMoveMilestone('slideHit', "SLIDE", "#00ffff");
                 }
                 
-                // Aerial Logic
-                let isAerial = !player.onGround;
-                // Fix: Teleport must have been aerial to count as aerial strike
-                if (recentTeleport && player.lastTeleportWasAerial) {
-                    isAerial = true;
-                }
+                // Teleport Bonus (Merged Aerial/Phase)
+                // If recent teleport and bonus not consumed, prioritize this over standard aerial
+                const isTeleportHit = (recentTeleport && !player.hasPhaseStruck);
 
-                if (isAerial) {
-                     const airDuration = (now - player.airTimeStart) / 1000;
-                     if (airDuration > 1.0) {
-                        // Long Aerial: > 1.0s
-                        const extraTime = airDuration - 1.0;
-                        const extraTicks = Math.floor(extraTime / 0.1);
-                        let longAirBonus = 50 + (extraTicks * 10);
-                        
-                        longAirBonus = updateStreak('longAerial', longAirBonus);
-                        
-                        addedScore += longAirBonus;
-                        comboNames.push("LONG AERIAL");
-                        GameStats.moves.longAirHit++;
-                        GameStats.checkMoveMilestone('longAirHit', "SKY ASSASSIN", "#ff00aa");
-                     } else {
-                        // Standard Aerial
-                        const bonus = updateStreak('aerial', 25);
-                        addedScore += bonus;
-                        comboNames.push("AERIAL");
-                        GameStats.moves.midAirHit++;
-                        GameStats.checkMoveMilestone('midAirHit', "AERIAL", "#ff00aa");
-                     }
+                if (isTeleportHit) {
+                     const bonus = updateStreak('phase', 50);
+                     addedScore += bonus;
+                     comboNames.push("TELEPORT");
+                     player.hasPhaseStruck = true; // Consume phase bonus
+                     GameStats.moves.teleportHit++;
+                     GameStats.checkMoveMilestone('teleportHit', "VOID WALKER", "#aa00ff");
+                } else {
+                    // Aerial Logic
+                    let isAerial = !player.onGround;
+                    // Fix: Teleport must have been aerial to count as aerial strike
+                    // Only apply if we didn't just trigger the primary Teleport bonus
+                    if (recentTeleport && player.lastTeleportWasAerial) {
+                        isAerial = true;
+                    }
+
+                    if (isAerial) {
+                         const airDuration = (now - player.airTimeStart) / 1000;
+                         if (airDuration > 1.0) {
+                            // Long Aerial: > 1.0s
+                            const extraTime = airDuration - 1.0;
+                            const extraTicks = Math.floor(extraTime / 0.1);
+                            let longAirBonus = 50 + (extraTicks * 10);
+                            
+                            longAirBonus = updateStreak('longAerial', longAirBonus);
+                            
+                            addedScore += longAirBonus;
+                            comboNames.push("LONG AERIAL");
+                            GameStats.moves.longAirHit++;
+                            GameStats.checkMoveMilestone('longAirHit', "SKY ASSASSIN", "#ff00aa");
+                         } else {
+                            // Standard Aerial
+                            const bonus = updateStreak('aerial', 25);
+                            addedScore += bonus;
+                            comboNames.push("AERIAL");
+                            GameStats.moves.midAirHit++;
+                            GameStats.checkMoveMilestone('midAirHit', "AERIAL", "#ff00aa");
+                         }
+                    }
                 }
 
                 // Wall Jump Bonus
@@ -1501,16 +1770,6 @@
                     GameStats.checkMoveMilestone('wallJumpHit', "WALL RUNNER", "#00ffaa");
                 }
                 
-                // Phase (Teleport) Bonus - Single Hit Only
-                if (recentTeleport && !player.hasPhaseStruck) {
-                     const bonus = updateStreak('phase', 50);
-                     addedScore += bonus;
-                     comboNames.push("PHASE");
-                     player.hasPhaseStruck = true; // Consume phase bonus
-                     GameStats.moves.teleportHit++;
-                     GameStats.checkMoveMilestone('teleportHit', "VOID WALKER", "#aa00ff");
-                }
-
                 hitScore += addedScore;
                 
                 if (comboNames.length > 0) {
@@ -1520,8 +1779,15 @@
                         if(now - moveStreaks[k].lastTime < STREAK_WINDOW) totalStreak += moveStreaks[k].count;
                     }
                     
+                    // COLOR LOGIC FOR STREAK
+                    let streakColor = "#" + new THREE.Color(currentSlashColor).getHexString();
+                    if (currentTheme === 0) streakColor = "#001133"; // Dark Blue for Light
+                    if (currentTheme === 1) streakColor = "#E0FFFF"; // Cyan for Dark
+                    
                     let msg = comboNames.join(" ") + " +" + addedScore;
-                    if(totalStreak > 0) msg += ` (+${totalStreak} streak)`;
+                    if(totalStreak > 0) {
+                         msg += ` <span class="slick-streak" style="color:${streakColor}">+${totalStreak}</span>`;
+                    }
                     
                     showKillMessage(msg, "combo");
                 }
@@ -1870,7 +2136,10 @@
                         this.mesh.lookAt(dest.x, this.mesh.position.y, dest.z);
                     }
                     
-                    if (this.isSliding) this.mesh.rotation.x = 0.5;
+                    if (this.isSliding) {
+                        this.mesh.rotation.x = 0.5;
+                        if (currentTheme === 0 && Math.random() < 0.3) spawnSnowTrail(this.mesh.position);
+                    }
                     else this.mesh.rotation.x = 0;
                 }
 
@@ -1981,6 +2250,9 @@
             player.health -= amt;
             player.lastDamageTime = performance.now();
             
+            // Note: We do not reset player.isRegenerating here.
+            // If regenerating, it continues despite damage, unless health was already maxed.
+            
             const overlay = document.getElementById('damage-overlay');
             overlay.style.background = "radial-gradient(circle, transparent 20%, rgba(255,0,0,0.6) 100%)";
             setTimeout(() => {
@@ -1992,6 +2264,12 @@
                 player.isDead = true;
                 document.exitPointerLock();
                 showKillMessage("TERMINATED", "achievement");
+                
+                // Update Session Timer
+                const diff = Date.now() - sessionStartTime;
+                const mins = Math.floor(diff / 60000);
+                const secs = Math.floor((diff % 60000) / 1000);
+                document.getElementById('session-timer').innerText = `Session Time: ${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
             }
         }
         
@@ -2009,6 +2287,7 @@
             player.isCrouching = false;
             player.velocity.set(0,0,0);
             camera.position.set(0, 2, 0);
+            sessionStartTime = Date.now();
             
             // Clear entities
             for(let i=enemies.length-1; i>=0; i--) enemies[i].remove();
@@ -2032,7 +2311,7 @@
             const feed = document.getElementById('kill-feed');
             const msg = document.createElement('div');
             msg.className = "kill-msg " + type;
-            msg.innerText = text;
+            msg.innerHTML = text; // Changed to innerHTML to support spans
             if(color) {
                 msg.style.color = color;
                 msg.style.borderLeftColor = color;
@@ -2166,8 +2445,13 @@
                 for (let i = particles.length - 1; i >= 0; i--) {
                     const p = particles[i];
                     p.life -= dt;
-                    p.mesh.position.addScaledVector(p.vel, dt);
-                    p.mesh.scale.setScalar(p.life * 2); 
+                    if (p.isStatic) {
+                         p.mesh.material.opacity = p.life * 0.6;
+                    } else {
+                         p.mesh.position.addScaledVector(p.vel, dt);
+                         p.mesh.scale.setScalar(p.life * 2); 
+                    }
+                    
                     if (p.life <= 0) {
                         scene.remove(p.mesh);
                         p.mesh.geometry.dispose();
