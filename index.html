@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v44.22</title>
+    <title>Neon Blade: Melee Arena v44.22e</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #111; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; user-select: none; transition: background-color 0.5s; }
         
@@ -352,7 +351,7 @@
                 <button class="btn-secondary" id="theme-btn">THEME: LIGHT</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v44.22</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v44.22e</div>
         </div>
     </div>
 
@@ -710,11 +709,13 @@
                 ctx.strokeStyle = 'rgba(200, 220, 255, 0.2)'; 
                 ctx.lineWidth = 2;
             } else if (type === 'neon') {
-                // Simpler Neon Grid from v44
-                ctx.fillStyle = '#050505'; 
+                // New Tron-Style Neon Grid
+                ctx.fillStyle = '#000000'; 
                 ctx.fillRect(0,0,1024,1024);
                 ctx.strokeStyle = '#00ffff'; 
-                ctx.lineWidth = 4;
+                ctx.lineWidth = 2;
+                ctx.shadowBlur = 4;
+                ctx.shadowColor = '#00ffff';
             } else {
                 ctx.fillStyle = '#050505';
                 ctx.fillRect(0, 0, 1024, 1024);
@@ -732,8 +733,8 @@
 
             // Minor Grid
             if (type !== 'snow') {
-                ctx.lineWidth = 2;
-                ctx.strokeStyle = type === 'neon' ? 'rgba(0, 255, 255, 0.2)' : 'rgba(255,255,255,0.1)';
+                ctx.lineWidth = type === 'neon' ? 1 : 2;
+                ctx.strokeStyle = type === 'neon' ? 'rgba(0, 255, 255, 0.3)' : 'rgba(255,255,255,0.1)';
                 ctx.beginPath();
                 for(let i=0; i<=1024; i+=32) {
                     if(i % 128 === 0) continue;
@@ -1028,10 +1029,10 @@
                     scene.fog = new THREE.FogExp2(0x080808, 0.01);
                     body.style.backgroundColor = "#080808";
                     
-                    // Uses Neon Grid Texture for the Dark Theme now (Swap)
+                    // Dark Theme uses Neon Grid (Cyan)
                     materials.floor.map = textures.gridNeon;
                     materials.floor.map.repeat.set(400/32, 400/32);
-                    materials.floor.color.setHex(0x000000); 
+                    materials.floor.color.setHex(0xffffff); 
                     
                     materials.wall.color.setHex(0x444444); 
                     
@@ -1049,10 +1050,10 @@
                     scene.fog = new THREE.FogExp2(bgCol, 0.01);
                     body.style.backgroundColor = "#050505";
                     
-                    // Uses Default Grid Texture for Neon Theme now (Swap)
+                    // Neon Theme uses Default Grid (Grey)
                     materials.floor.map = textures.gridDefault;
                     materials.floor.map.repeat.set(400/32, 400/32);
-                    materials.floor.color.setHex(0x111111); // Dark greyish
+                    materials.floor.color.setHex(0x444444);
                     
                     materials.wall.color.setHex(0x001122); 
                     
@@ -1263,6 +1264,7 @@
                 this.edges.visible = true;
                 this.edges.material.opacity = 0.1;
                 this.edges.material.color.setHex(0xffffff);
+                this.edges.material.linewidth = 1;
                 this.visualMesh.rotation.y = 0; // Reset rotation
 
                 if (t === 3) { // Halloween
@@ -1279,13 +1281,14 @@
                     this.ribbonGroup.visible = true;
                     this.edges.material.color.setHex(0x000000);
                 } else {
-                    if(t === 1) { // Dark
+                    if(t === 1) { // Dark/Cyber (Actually uses Neon Grid)
                          this.mat.color.setHex(0x112233);
                          this.mat.emissive.setHex(0x001122);
                          this.edges.material.color.setHex(0x00ffff);
-                         this.edges.material.opacity = 0.2;
+                         this.edges.material.opacity = 0.8;
+                         this.edges.material.linewidth = 1;
                     }
-                    if(t === 2) { // Neon (Classic v44)
+                    if(t === 2) { // Neon (Uses Grey Grid, Dark Look)
                          this.mat.color.setHex(0x001122); // Dark Blueish
                          this.edges.material.color.setHex(0x00ffff); 
                          this.edges.material.opacity = 0.5; 
@@ -1751,9 +1754,6 @@
             // Auto-Hop Logic (Wall)
             else if (!player.onGround && touchingWall && wantsToJump && player.jumpsRemaining > 0) {
                  performWallJump();
-                 // Wall jump breaks aerial streak continuity for landing purposes logic, but awards Wall streak
-                 // However, we WANT to keep the AIR TIME for Long Aerials.
-                 // So we do NOT reset airTimeStart here.
             }
 
             if (wasOnGround && !player.onGround) {
@@ -1781,6 +1781,13 @@
                   forward.y=0; forward.normalize();
                   player.velocity.addScaledVector(forward, CONFIG.bunnyHopBoost);
              }
+             
+             // FIX: Reset air time start if we are launching from ground.
+             // This prevents the "Stacking Score" bug where airTimeStart remains old.
+             if(player.onGround) {
+                 player.airTimeStart = performance.now();
+             }
+             
              player.onGround = false;
              player.lastJumpTime = performance.now(); 
              AudioSys.playJump();
@@ -1806,8 +1813,10 @@
             if (hitWall) {
                 player.velocity.y = CONFIG.wallJumpForce;
                 player.jumpsRemaining--;
+                player.onGround = false;
                 player.lastJumpTime = performance.now();
                 player.lastWallJumpTime = performance.now(); 
+                // Note: We do NOT reset airTimeStart on wall jumps to allow Long Aerial combos.
                 AudioSys.playWallJump();
             }
         }
@@ -1841,8 +1850,6 @@
              player.jumpsRemaining = 1; 
              player.onGround = false; 
              
-             // If we were on ground, this starts air time.
-             // If we were already in air, we keep existing airTimeStart to allow huge long aerials.
              if(!startInAir) {
                  player.airTimeStart = performance.now();
              }
@@ -2254,11 +2261,11 @@
             }
 
             updateTheme(t) {
-                if(t === 2) { // Neon (Classic Simple)
+                if(t === 2) { // Neon
                     this.outline.material.color.setHex(0x00ffff);
-                    this.outline.material.opacity = 0.5;
-                    this.body.material.color.setHex(0x000510);
-                    this.body.material.emissive.setHex(0x000000); // Remove emissive glow on bots for simple look
+                    this.outline.material.opacity = 0.8;
+                    this.body.material.color.setHex(0x000000);
+                    this.body.material.emissive.setHex(0x000000); 
                     this.body.material.emissiveIntensity = 0;
                 } else {
                     this.outline.material.color.setHex(0xffffff);
@@ -2312,6 +2319,9 @@
                         this.state = this.hasAggroed ? 'AGGRO' : 'ROAM';
                         this.mesh.rotation.x = 0;
                     }
+                    
+                    // Fix HP Bar Position when Fallen
+                    this.healthBarGroup.position.copy(this.mesh.position).add(new THREE.Vector3(0, 0.5 * this.type.scale, 0));
                     return;
                 }
 
@@ -2323,10 +2333,10 @@
                 if (currentY > floorThreshold + 0.1) {
                     this.velocity.y -= CONFIG.gravity * dt;
                 } else {
-                    if (this.velocity.y < -15) { 
+                    if (this.velocity.y < -22) { // Increased threshold so they don't trip on jumps
                         this.state = 'CONFUSED';
                         const impactSpeed = Math.abs(this.velocity.y);
-                        this.confusedTimer = 3.0 + Math.min(2.0, (impactSpeed - 15) / 5.0);
+                        this.confusedTimer = 3.0 + Math.min(2.0, (impactSpeed - 22) / 5.0);
                         this.velocity.y = 0;
                         return;
                     }
@@ -2362,10 +2372,11 @@
                         this.pickRoamTarget();
                     }
                     
-                    // Roaming Jump Logic
-                    if (this.onGroundSafe(groundY) && Math.random() < 0.01) {
-                        this.velocity.y = 12;
+                    // Roaming Jump Logic - Reduced Frequency
+                    if (this.onGroundSafe(groundY) && Math.random() < 0.005) {
+                        this.velocity.y = 16; // Moderate jump
                         this.jumps = 1;
+                        this.mesh.position.y += 0.2; // Nudge
                     }
 
                 } else if (this.state === 'AGGRO') {
@@ -2441,6 +2452,7 @@
                              if (this.onGroundSafe(groundY)) {
                                  this.velocity.y = 18;
                                  this.jumps = 1;
+                                 this.mesh.position.y += 0.5;
                              }
                         }
                         this.lastX = this.mesh.position.x;
@@ -2454,10 +2466,11 @@
                             if (dist < 4 * this.type.scale) {
                                 dir.subVectors(this.mesh.position, playerPos).normalize().multiplyScalar(1.5);
                             }
-                            // Random Combat Jump
-                            if (this.onGroundSafe(groundY) && Math.random() < 0.02) {
-                                this.velocity.y = 18;
+                            // Random Combat Jump - Reduced Frequency
+                            if (this.onGroundSafe(groundY) && Math.random() < 0.01) {
+                                this.velocity.y = 16;
                                 this.jumps = 1;
+                                this.mesh.position.y += 0.2;
                             }
                         }
                         
@@ -2471,7 +2484,7 @@
                             let rotDiff = targetRot - this.mesh.rotation.y;
                             while (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
                             while (rotDiff < -Math.PI) rotDiff += Math.PI * 2;
-                            this.mesh.rotation.y += rotDiff * dt * 8; // Faster smooth
+                            this.mesh.rotation.y += rotDiff * dt * 8; 
                         }
                     }
                     
@@ -2484,7 +2497,6 @@
 
                 // Simple collision resolution with less jitter
                 const botBox = new THREE.Box3().setFromObject(this.body);
-                // Expand box slightly for checks
                 botBox.expandByScalar(-0.1); 
                 
                 for(const wall of walls) {
@@ -2493,7 +2505,6 @@
                          const xOverlap = Math.min(botBox.max.x - wb.min.x, wb.max.x - botBox.min.x);
                          const zOverlap = Math.min(botBox.max.z - wb.min.z, wb.max.z - botBox.min.z);
                          
-                         // Smooth push out
                          if(xOverlap < zOverlap) {
                              const sign = (this.mesh.position.x < wall.matrixWorld.elements[12]) ? -1 : 1;
                              this.mesh.position.x += xOverlap * sign;
@@ -2521,7 +2532,7 @@
                 setTimeout(() => { 
                     if(!this.isDeadCorpse && this.state !== 'CONFUSED') {
                         if (currentTheme === 2) { // Neon
-                            this.body.material.color.setHex(0x000510);
+                            this.body.material.color.setHex(0x000000);
                         } else {
                             if(this.state === 'SEARCH') this.body.material.color.setHex(0xffaa00);
                             else if(this.state === 'AGGRO') this.body.material.color.setHex(0x8b0000);
