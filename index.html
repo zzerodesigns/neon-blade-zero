@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v44.5</title>
+    <title>Neon Blade: Melee Arena v44.22</title>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #ddeeff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; user-select: none; transition: background-color 0.5s; }
+        body { margin: 0; overflow: hidden; background-color: #111; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; user-select: none; transition: background-color 0.5s; }
         
         /* --- CYBERPUNK HUD (Compact) --- */
         #ui-layer {
@@ -35,6 +35,7 @@
             font-style: italic;
             transform: skewX(-15deg);
             box-shadow: 0 0 5px rgba(51, 204, 255, 0.2);
+            backdrop-filter: blur(4px);
         }
         .hud-panel-content { transform: skewX(15deg); }
 
@@ -49,14 +50,20 @@
         .stat-group {
             display: flex; flex-direction: column; gap: 5px;
         }
+        .stat-header {
+            display: flex; align-items: center; gap: 10px; margin-left: 5px;
+        }
         .stat-label {
             font-family: 'Arial Black', sans-serif; font-size: 0.8rem; color: white;
-            text-transform: uppercase; letter-spacing: 1px; margin-left: 5px;
+            text-transform: uppercase; letter-spacing: 1px;
             text-shadow: 1px 1px 0 #000;
+        }
+        #lives-display {
+            color: #ff3333; font-size: 1rem; text-shadow: 0 0 5px #ff0000;
         }
         
         .bar-frame {
-            width: 250px; height: 18px; /* Increased size */
+            width: 250px; height: 18px;
             background: rgba(0,0,0,0.6);
             border: 1px solid rgba(255,255,255,0.2);
             transform: skewX(-20deg);
@@ -69,13 +76,22 @@
             transition: width 0.1s linear;
             box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
         }
-        #health-fill { background: linear-gradient(90deg, #cc0000, #ff3333); box-shadow: 0 0 10px #ff3333; }
+        #health-fill { background: linear-gradient(90deg, #cc0000, #ff3333); box-shadow: 0 0 10px #ff3333; transition: all 0.1s; }
         #stamina-fill { background: linear-gradient(90deg, #0066cc, #33ccff); box-shadow: 0 0 10px #33ccff; }
+        
+        .health-critical {
+            animation: pulse-red 0.5s infinite alternate;
+        }
+        
+        @keyframes pulse-red {
+            from { box-shadow: 0 0 10px #ff0000; filter: brightness(1); }
+            to { box-shadow: 0 0 25px #ff0000; filter: brightness(1.5); }
+        }
 
         /* Ability Icon */
         .ability-group { margin-left: auto; transform: skewX(-10deg); }
         .ability-icon { 
-            width: 60px; height: 60px; /* Increased size */
+            width: 60px; height: 60px;
             border: 1px solid #fff; 
             background: rgba(0,0,0,0.6);
             display: flex; flex-direction: column; 
@@ -117,7 +133,6 @@
             max-width: 900px; width: 80%;
             box-shadow: 0 0 50px rgba(0,0,0,0.8);
         }
-        /* Fake border for clipped element */
         #start-content::after {
             content: ''; position: absolute; top:0; left:0; width:100%; height:100%;
             box-shadow: inset 0 0 0 2px rgba(51, 204, 255, 0.3);
@@ -126,17 +141,23 @@
         }
 
         h1 { 
-            font-size: 5rem; margin: 0 0 20px 0; color: #fff; 
+            font-size: 5rem; margin: 0 0 10px 0; color: #fff; 
             text-shadow: 4px 4px 0px #33ccff; 
             font-style: italic; text-transform: uppercase; letter-spacing: -2px;
             font-family: 'Arial Black', sans-serif;
+        }
+
+        #player-title-display {
+            font-size: 2rem; color: #aaa; margin-bottom: 20px;
+            text-transform: uppercase; letter-spacing: 4px; font-weight: 300;
+            text-shadow: 0 0 10px rgba(255,255,255,0.3);
+            text-align: center;
         }
         
         p { font-size: 1.1rem; color: #aaa; margin-top: 5px; text-align: center; line-height: 1.5; font-family: monospace; }
         
         .btn-row { display: flex; gap: 20px; margin-top: 40px; width: 100%; justify-content: center; }
         
-        /* PRESERVED BUTTON STYLE FROM FIRST CODE */
         .btn {
             padding: 25px 60px; background: #33ccff; border: none;
             color: #000; font-size: 2rem; cursor: pointer; transition: all 0.5s; 
@@ -185,10 +206,7 @@
         .kill-msg.achievement { border-left-color: #ff00ff; color: #ff00ff; font-size: 14px; text-shadow: 0 0 8px #ff00ff; }
 
         .slick-streak {
-            font-family: 'Segoe UI', sans-serif;
-            font-weight: 300;
-            font-style: normal;
-            margin-left: 4px;
+            font-family: 'Segoe UI', sans-serif; font-weight: 300; font-style: normal; margin-left: 4px;
         }
 
         @keyframes fadeOut { 0% { opacity: 1; transform: translateX(0); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(-30px); } }
@@ -199,24 +217,18 @@
             text-shadow: 4px 4px 0px rgba(0,0,0,0.5); display: none; 
             text-align: center; font-style: italic; z-index: 5;
             transition: all 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            white-space: nowrap; /* FIX: Prevent wrapping */
+            white-space: nowrap; 
         }
 
         #meme-overlay {
-            position: absolute; 
-            top: -60px; left: 50%; transform: translateX(-50%);
+            position: absolute; top: -60px; left: 50%; transform: translateX(-50%);
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(20px) saturate(180%);
             -webkit-backdrop-filter: blur(20px) saturate(180%);
             border: 1px solid rgba(255, 255, 255, 0.18);
-            border-radius: 16px;
-            padding: 12px 24px;
-            color: #fff;
-            font-family: 'Segoe UI', sans-serif;
-            font-weight: 500;
-            font-size: 2rem;
-            white-space: nowrap;
-            display: none;
+            border-radius: 16px; padding: 12px 24px;
+            color: #fff; font-family: 'Segoe UI', sans-serif; font-weight: 500; font-size: 2rem;
+            white-space: nowrap; display: none;
             box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
             animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             z-index: 10;
@@ -236,6 +248,13 @@
             pointer-events: none; transition: background 0.1s;
         }
 
+        #low-health-vignette {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            box-shadow: inset 0 0 100px rgba(255, 0, 0, 0);
+            pointer-events: none;
+            transition: box-shadow 0.3s ease-in-out;
+        }
+
         /* Light Theme Adjustments for HUD */
         .light-theme .hud-panel { background: rgba(255,255,255,0.7); border-color: #0088ff; color: #000; }
         .light-theme #score-display { color: #0066cc; text-shadow: none; }
@@ -247,10 +266,14 @@
 <body>
 
     <div id="damage-overlay"></div>
+    <div id="low-health-vignette"></div>
+
     <div id="ui-layer" class="light-theme">
         <div id="hud-top">
             <div class="hud-panel">
-                <div class="hud-panel-content" id="score-display">SCORE: 0</div>
+                <div class="hud-panel-content">
+                    <span id="score-display">SCORE: 0</span>
+                </div>
             </div>
             <div class="hud-panel" style="border-color: #aaa;">
                 <div class="hud-panel-content" id="mode-display">PRESS 'T' TO CYCLE THEME</div>
@@ -272,7 +295,10 @@
         
         <div id="hud-bottom">
             <div class="stat-group">
-                <span class="stat-label">HEALTH</span>
+                <div class="stat-header">
+                    <span class="stat-label">HEALTH</span>
+                    <span id="lives-display"></span>
+                </div>
                 <div class="bar-frame"><div id="health-fill" class="bar-fill"></div></div>
             </div>
             <div class="stat-group">
@@ -292,9 +318,10 @@
 
     <div id="start-screen">
         <div id="start-content">
-            <h1>NEON BLADE</h1>
+            <h1 id="game-title">NEON BLADE</h1>
+            <div id="player-title-display"></div>
             <p>
-                <strong>WASD</strong> Move | <strong>SPACE</strong> Jump / Wall Jump | <strong>SHIFT</strong> Sprint<br>
+                <strong>WASD</strong> Move | <strong>SPACE</strong> Jump | <strong>SHIFT</strong> Sprint<br>
                 <strong>C</strong> Slide/Crouch | <strong>Q</strong> Teleport | <strong>HOLD M1</strong> Auto Strike
             </p>
             
@@ -325,7 +352,7 @@
                 <button class="btn-secondary" id="theme-btn">THEME: LIGHT</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v44.5</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v44.22</div>
         </div>
     </div>
 
@@ -353,6 +380,7 @@
             staminaMax: 100,
             staminaDrain: 25, 
             staminaRegen: 15,
+            teleportCost: 10,
             
             attackRange: 8,
             attackCooldown: 250,
@@ -369,7 +397,7 @@
             botAggroDuration: 10000, 
             botReactionDelay: 1000,
             
-            regenDelay: 3000, // Reduced to 3s
+            regenDelay: 3000, 
             regenRate: 25
         };
 
@@ -386,6 +414,9 @@
             { count: 600, title: "GODLIKE" },
             { count: 1000, title: "OMNIPOTENT" }
         ];
+
+        const MEME_TEXTS_69 = ["nice.", "yikwim ;)", "cultured.", "smooth.", "wink wink"];
+        const MEME_TEXTS_420 = ["blaze it", "high score?", "chilled.", "smoke 'em", "cloud 9"];
 
         const GameStats = {
             highestCombo: 0,
@@ -420,7 +451,7 @@
             }
         };
 
-        // --- AUDIO SYSTEM (Arcade Style from First Code) ---
+        // --- AUDIO SYSTEM ---
         const AudioSys = {
             ctx: null,
             slideOsc: null,
@@ -580,6 +611,22 @@
                 osc.stop(t + 0.2);
             },
             
+            playHeartbeat: function(speed) {
+                if(!this.ctx) return;
+                const t = this.ctx.currentTime;
+                const osc = this.ctx.createOscillator();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(60, t);
+                osc.frequency.exponentialRampToValueAtTime(1, t + 0.1);
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(0.5, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(t + 0.15);
+            },
+            
             playUI: function(active) { this.playTone(active ? 800 : 400, 'sine', 0.05, 0.05); },
             stopAll: function() { this.toggleSlideSound(false); }
         };
@@ -588,7 +635,8 @@
         let scene, camera, renderer;
         let isLocked = false;
         let lastTime = performance.now();
-        const keys = { w: false, a: false, s: false, d: false, space: false, shift: false, c: false };
+        const keys = { w: false, a: false, s: false, d: false, space: false, shift: false, c: false, q: false };
+        let wantsToJump = false; 
         let mouseDown = false;
         let lastUnlockTime = 0; 
         
@@ -599,8 +647,10 @@
         let lastSlashID = 0; 
         let slashActive = false;
         let sessionStartTime = 0;
+        let lastHeartbeatTime = 0;
 
         const materials = {};
+        const textures = {};
 
         const player = {
             velocity: new THREE.Vector3(),
@@ -612,6 +662,7 @@
             health: 100,
             stamina: 100,
             score: 0,
+            extraLives: 0,
             isDead: false,
             cameraHeightOffset: 0,
             lastDamageTime: 0,
@@ -645,19 +696,82 @@
         let teleportMarker;
         let slashGeometry; 
         let lastAttackTime = 0;
-        let gridHelper;
         let currentSlashColor = 0x0088ff;
+
+        // --- PROCEDURAL TEXTURES ---
+        function createGridTexture(type) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 1024; canvas.height = 1024;
+            const ctx = canvas.getContext('2d');
+            
+            if (type === 'snow') {
+                ctx.fillStyle = '#ffffff'; 
+                ctx.fillRect(0,0,1024,1024);
+                ctx.strokeStyle = 'rgba(200, 220, 255, 0.2)'; 
+                ctx.lineWidth = 2;
+            } else if (type === 'neon') {
+                // Simpler Neon Grid from v44
+                ctx.fillStyle = '#050505'; 
+                ctx.fillRect(0,0,1024,1024);
+                ctx.strokeStyle = '#00ffff'; 
+                ctx.lineWidth = 4;
+            } else {
+                ctx.fillStyle = '#050505';
+                ctx.fillRect(0, 0, 1024, 1024);
+                ctx.strokeStyle = '#333333';
+                ctx.lineWidth = 4;
+            }
+            
+            // Grid Lines
+            ctx.beginPath();
+            for(let i=0; i<=1024; i+=128) {
+                ctx.moveTo(i,0); ctx.lineTo(i,1024);
+                ctx.moveTo(0,i); ctx.lineTo(1024,i);
+            }
+            ctx.stroke();
+
+            // Minor Grid
+            if (type !== 'snow') {
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = type === 'neon' ? 'rgba(0, 255, 255, 0.2)' : 'rgba(255,255,255,0.1)';
+                ctx.beginPath();
+                for(let i=0; i<=1024; i+=32) {
+                    if(i % 128 === 0) continue;
+                    ctx.moveTo(i,0); ctx.lineTo(i,1024);
+                    ctx.moveTo(0,i); ctx.lineTo(1024,i);
+                }
+                ctx.stroke();
+            }
+
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            tex.minFilter = THREE.LinearMipMapLinearFilter;
+            tex.anisotropy = 16;
+            return tex;
+        }
+
+        function createGlowTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            const grad = ctx.createRadialGradient(32,32,0, 32,32,32);
+            grad.addColorStop(0, 'rgba(255,255,255,1)');
+            grad.addColorStop(0.4, 'rgba(255,255,255,0.5)');
+            grad.addColorStop(1, 'rgba(255,255,255,0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0,0,64,64);
+            const tex = new THREE.CanvasTexture(canvas);
+            return tex;
+        }
 
         // --- SETUP ---
         function init() {
-            // Initialize lastUnlockTime such that the first click always works
             lastUnlockTime = performance.now() - 5000;
 
             const btn = document.getElementById('start-btn');
             btn.addEventListener('click', () => {
                 AudioSys.init(); 
-                
-                // "Breathe" Delay Logic
                 const now = performance.now();
                 if (now - lastUnlockTime < 1300) {
                     btn.innerText = "b r e a t h e";
@@ -670,7 +784,6 @@
                     }, 800);
                     return;
                 }
-
                 document.body.requestPointerLock().catch(e => {
                     console.warn("Pointer lock failed:", e);
                 });
@@ -680,15 +793,24 @@
 
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.rotation.order = 'YXZ'; // FIX: Prevent gimbal lock/roll for FPS
+            camera.rotation.order = 'YXZ'; 
             camera.position.set(0, 2, 0);
             scene.add(camera);
 
-            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.0;
             document.body.appendChild(renderer.domElement);
+
+            // Generate Textures
+            textures.gridDefault = createGridTexture('default');
+            textures.gridSnow = createGridTexture('snow');
+            textures.gridNeon = createGridTexture('neon');
+            textures.glow = createGlowTexture();
 
             setupLighting();
             createLevel();
@@ -703,7 +825,7 @@
                 if(isLocked && e.button === 0) {
                     if (teleportMode === 'AIM' && player.teleportActive) {
                         tryAimTeleport();
-                        slash(); // Trigger Phase Strike
+                        slash(); 
                     } else {
                         slash();
                     }
@@ -738,23 +860,67 @@
             animate();
         }
 
+        function generatePlayerTitle() {
+            let core = "NOVICE";
+            const m = GameStats.moves;
+            const c = GameStats.highestCombo;
+            const totalStyle = m.slideHit + m.midAirHit + m.teleportHit + m.wallJumpHit + m.longAirHit;
+
+            // Titles based on Achievement/Style Mastery, NOT Score.
+            if (totalStyle > 1000) core = "OMNIPOTENT";
+            else if (totalStyle > 600) core = "LEGEND";
+            else if (totalStyle > 300) core = "MASTER";
+            else if (totalStyle > 150) core = "ELITE";
+            else if (totalStyle > 75) core = "VETERAN";
+            else if (totalStyle > 25) core = "SOLDIER";
+            
+            let prefix = "";
+            let suffix = "";
+
+            if (c > 300) prefix = "MYTHIC ";
+            else if (c > 150) prefix = "UNSTOPPABLE ";
+            else if (c > 50) prefix = "RELENTLESS ";
+            
+            if (m.teleportHit > 50) suffix = " VOID WALKER";
+            else if (m.midAirHit > 100) suffix = " SKY ASSASSIN";
+            else if (m.slideHit > 100) suffix = " DRIFTER";
+            else if (m.wallJumpHit > 50) suffix = " WALL RUNNER";
+            else if (totalStyle > 200) suffix = " STYLIST";
+            
+            return (prefix + core + suffix).trim();
+        }
+
         function updatePauseScreenStats() {
-            const h1 = document.querySelector('#start-screen h1');
+            const h1 = document.getElementById('game-title');
             const timerDisplay = document.getElementById('session-timer');
+            const playerTitleDisplay = document.getElementById('player-title-display');
             
             if(player.isDead) {
-                h1.innerText = "TERMINATED";
-                h1.style.color = "#ff3333";
-                h1.style.textShadow = "4px 4px 0px #880000";
+                let termStatus = "TERMINATED";
+                let color = "#ff3333";
+                
+                // Significantly increased Score thresholds
+                if (player.score > 500000) { termStatus = "TRANSCENDED"; color = "#aa00ff"; }
+                else if (player.score > 250000) { termStatus = "ASCENDED"; color = "#00ffff"; }
+                else if (player.score > 100000) { termStatus = "VANQUISHED"; color = "#ffff00"; }
+                else if (player.score > 50000) { termStatus = "ELIMINATED"; color = "#ff8800"; }
+                
+                h1.innerText = termStatus;
+                h1.style.color = color;
+                h1.style.textShadow = `4px 4px 0px ${color}44`;
+                
+                playerTitleDisplay.innerText = generatePlayerTitle();
+                playerTitleDisplay.style.display = "block";
+                
                 timerDisplay.style.display = "block";
             } else {
                 h1.innerText = "PAUSED";
                 h1.style.color = "#33ccff";
                 h1.style.textShadow = "4px 4px 0px #33ccff";
+                playerTitleDisplay.style.display = "none";
                 timerDisplay.style.display = "none";
             }
 
-            // Render Stats
             let achStr = GameStats.achievements.join(', ');
             if(!achStr) achStr = "None yet";
 
@@ -780,20 +946,23 @@
         let ambientLight, hemiLight, dirLight;
 
         function setupLighting() {
-            ambientLight = new THREE.AmbientLight(0x404040, 1.5);
+            ambientLight = new THREE.AmbientLight(0x404040, 0.5);
             scene.add(ambientLight);
+            
             hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
             hemiLight.position.set(0, 50, 0);
             scene.add(hemiLight);
-            dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            dirLight.position.set(50, 100, 50);
+            
+            dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+            dirLight.position.set(80, 120, 80);
             dirLight.castShadow = true;
+            dirLight.shadow.bias = -0.0001;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
             dirLight.shadow.camera.left = -200;
             dirLight.shadow.camera.right = 200;
             dirLight.shadow.camera.top = 200;
             dirLight.shadow.camera.bottom = -200;
-            dirLight.shadow.mapSize.width = 2048;
-            dirLight.shadow.mapSize.height = 2048;
             scene.add(dirLight);
         }
 
@@ -814,98 +983,151 @@
             document.getElementById('tp-label').innerText = teleportMode;
         }
 
-        function updateGridHelper(c1, c2) {
-            if(gridHelper) {
-                scene.remove(gridHelper);
-                gridHelper.geometry.dispose();
-                gridHelper.material.dispose();
-            }
-            gridHelper = new THREE.GridHelper(400, 50, c1, c2);
-            scene.add(gridHelper);
-        }
-
         function applyTheme() {
             const body = document.body;
             const ui = document.getElementById('ui-layer');
             const crosshair = document.getElementById('crosshair');
             
-            // Reset Lighting defaults
-            ambientLight.intensity = 1.5;
-            dirLight.intensity = 0.8;
-            dirLight.shadow.bias = 0;
+            // Reset common props
+            materials.floor.roughness = 0.5;
+            materials.floor.metalness = 0.1;
+            materials.floor.emissiveIntensity = 0;
+            materials.floor.emissiveMap = null;
+            materials.wall.emissiveIntensity = 0;
+            materials.wall.emissiveMap = null;
 
             if (currentTheme === 0) { // LIGHT (SNOW)
-                // Darker background to make snow visible
-                const bgCol = 0xaaccff; 
+                const bgCol = 0x667788; 
                 scene.background = new THREE.Color(bgCol);
-                scene.fog = new THREE.FogExp2(bgCol, 0.004); 
-                body.style.backgroundColor = "#aaccff";
+                scene.fog = new THREE.FogExp2(bgCol, 0.008); 
+                body.style.backgroundColor = "#667788";
                 ui.classList.add('light-theme');
-                if(materials.floor) materials.floor.color.setHex(0xffffff);
-                if(materials.wall) materials.wall.color.setHex(0xeeeeee);
-                // Obstacles handled in decorations
-                if(materials.grid) { materials.grid.color.setHex(0x000000); materials.grid.opacity = 0.2; }
-                currentSlashColor = 0x0088ff;
-                if(materials.marker) materials.marker.color.setHex(0x0088ff);
-                crosshair.style.color = "#0088ff";
-                updateGridHelper(0x888888, 0xcccccc);
                 
-                // Snowy lighting adjustments
-                ambientLight.intensity = 0.6; // Reduced from 1.0 to make snow pop
-                dirLight.intensity = 0.7; 
-            } else if (currentTheme === 1) { // DARK
-                scene.background = new THREE.Color(0x151515);
-                scene.fog = new THREE.FogExp2(0x151515, 0.006);
-                body.style.backgroundColor = "#151515";
+                materials.floor.map = textures.gridSnow;
+                materials.floor.map.repeat.set(400/64, 400/64); 
+                materials.floor.color.setHex(0x556677); 
+                materials.floor.roughness = 0.9;
+                
+                materials.wall.color.setHex(0xdddddd);
+                materials.wall.roughness = 0.5;
+                
+                currentSlashColor = 0x0088ff;
+                materials.marker.color.setHex(0x003366); // Darker blue for visibility on white
+                crosshair.style.color = "#0088ff";
+                
+                ambientLight.intensity = 0.6; 
+                hemiLight.intensity = 0.6;
+                dirLight.intensity = 0.8; 
+                dirLight.color.setHex(0xffffff);
+
+            } else {
                 ui.classList.remove('light-theme');
-                if(materials.floor) materials.floor.color.setHex(0x222222);
-                if(materials.wall) materials.wall.color.setHex(0x555555);
-                if(materials.obstacle) materials.obstacle.color.setHex(0x444444);
-                if(materials.grid) { materials.grid.color.setHex(0x00ffff); materials.grid.opacity = 0.3; }
-                currentSlashColor = 0x00aaff; 
-                if(materials.marker) materials.marker.color.setHex(0x00ffaa);
-                crosshair.style.color = "#00aaff";
-                updateGridHelper(0xffffff, 0x444444);
-            } else if (currentTheme === 2) { // NEON
-                scene.background = new THREE.Color(0x050010);
-                scene.fog = new THREE.FogExp2(0x050010, 0.006);
-                body.style.backgroundColor = "#050010";
-                ui.classList.remove('light-theme');
-                if(materials.floor) materials.floor.color.setHex(0x100020);
-                if(materials.wall) materials.wall.color.setHex(0x400080);
-                if(materials.obstacle) materials.obstacle.color.setHex(0x400060);
-                if(materials.grid) { materials.grid.color.setHex(0x00ffff); materials.grid.opacity = 0.8; }
-                currentSlashColor = 0xff00ff; 
-                if(materials.marker) materials.marker.color.setHex(0xff00ff);
-                crosshair.style.color = "#ff00ff";
-                updateGridHelper(0xff00ff, 0x00ffff);
-            } else { // HALLOWEEN
-                scene.background = new THREE.Color(0x100500); 
-                scene.fog = new THREE.FogExp2(0x100500, 0.005);
-                body.style.backgroundColor = "#100500";
-                ui.classList.remove('light-theme');
-                if(materials.floor) materials.floor.color.setHex(0x4a2500); 
-                if(materials.wall) materials.wall.color.setHex(0x663311);   
-                if(materials.obstacle) materials.obstacle.color.setHex(0xff6600);
-                if(materials.grid) { materials.grid.color.setHex(0xff6600); materials.grid.opacity = 0.3; }
-                currentSlashColor = 0xff8800; 
-                if(materials.marker) materials.marker.color.setHex(0xff4400);
-                crosshair.style.color = "#ff8800";
-                updateGridHelper(0xffaa00, 0x662200);
+                
+                if (currentTheme === 1) { // DARK (CYBER)
+                    scene.background = new THREE.Color(0x080808);
+                    scene.fog = new THREE.FogExp2(0x080808, 0.01);
+                    body.style.backgroundColor = "#080808";
+                    
+                    // Uses Neon Grid Texture for the Dark Theme now (Swap)
+                    materials.floor.map = textures.gridNeon;
+                    materials.floor.map.repeat.set(400/32, 400/32);
+                    materials.floor.color.setHex(0x000000); 
+                    
+                    materials.wall.color.setHex(0x444444); 
+                    
+                    currentSlashColor = 0x00aaff; 
+                    materials.marker.color.setHex(0x00ffaa);
+                    crosshair.style.color = "#00aaff";
+                    
+                    ambientLight.intensity = 1.0; 
+                    hemiLight.intensity = 0.6;
+                    dirLight.intensity = 0.6;
+
+                } else if (currentTheme === 2) { // NEON (Classic v44)
+                    const bgCol = 0x050505;
+                    scene.background = new THREE.Color(bgCol);
+                    scene.fog = new THREE.FogExp2(bgCol, 0.01);
+                    body.style.backgroundColor = "#050505";
+                    
+                    // Uses Default Grid Texture for Neon Theme now (Swap)
+                    materials.floor.map = textures.gridDefault;
+                    materials.floor.map.repeat.set(400/32, 400/32);
+                    materials.floor.color.setHex(0x111111); // Dark greyish
+                    
+                    materials.wall.color.setHex(0x001122); 
+                    
+                    currentSlashColor = 0x00ffff; 
+                    materials.marker.color.setHex(0x00ffff);
+                    crosshair.style.color = "#00ffff";
+                    
+                    ambientLight.intensity = 0.8;
+                    hemiLight.intensity = 0.5;
+                    dirLight.intensity = 0.8;
+                    dirLight.color.setHex(0x00ffff);
+
+                } else { // HALLOWEEN
+                    scene.background = new THREE.Color(0x150500); 
+                    scene.fog = new THREE.FogExp2(0x150500, 0.008);
+                    body.style.backgroundColor = "#150500";
+                    
+                    materials.floor.map = textures.gridDefault;
+                    materials.floor.map.repeat.set(400/32, 400/32);
+                    materials.floor.color.setHex(0x2a1100); 
+                    
+                    materials.wall.color.setHex(0x332200); 
+                    
+                    currentSlashColor = 0xff8800; 
+                    materials.marker.color.setHex(0xff4400);
+                    crosshair.style.color = "#ff8800";
+                    
+                    ambientLight.intensity = 1.0; 
+                    hemiLight.intensity = 0.7;
+                    dirLight.intensity = 0.8;
+                    dirLight.color.setHex(0xffaa00);
+                }
             }
             
             if(materials.slash) materials.slash.color.setHex(currentSlashColor);
+            
+            // Update decorations and enemies for theme specific styles
             decorations.forEach(d => d.updateTheme(currentTheme));
+            enemies.forEach(e => e.updateTheme(currentTheme));
         }
 
         // --- LEVEL GENERATION ---
         function createLevel() {
-            materials.floor = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.1 });
-            materials.wall = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.2 });
-            materials.obstacle = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.2 });
-            materials.grid = new THREE.LineBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.3 });
+            // PBR Materials
+            materials.floor = new THREE.MeshPhysicalMaterial({ 
+                map: textures.gridDefault, 
+                color: 0xffffff, 
+                roughness: 0.5,
+                metalness: 0.1 
+            });
+            
+            materials.wall = new THREE.MeshPhysicalMaterial({ 
+                color: 0xeeeeee, 
+                roughness: 0.2, 
+                metalness: 0.1 
+            });
+            
+            materials.obstacle = new THREE.MeshPhysicalMaterial({ 
+                color: 0xcccccc, 
+                roughness: 0.3,
+                clearcoat: 0.5,
+                clearcoatRoughness: 0.1
+            });
+            
             materials.slash = new THREE.MeshBasicMaterial({ color: 0x0088ff, transparent: true, opacity: 0, side: THREE.DoubleSide, depthTest: false });
-            materials.marker = new THREE.MeshBasicMaterial({ color: 0x0088ff, transparent: true, opacity: 0.5 });
+            materials.marker = new THREE.MeshStandardMaterial({ 
+                color: 0x0088ff, 
+                emissive: 0x0088ff,
+                emissiveIntensity: 2.0,
+                transparent: true, 
+                opacity: 0.9,
+                roughness: 0.2,
+                metalness: 0.8,
+                wireframe: true // Revert to wireframe look
+            });
 
             createBox(0, -1, 0, 400, 2, 400, materials.floor, true);
             createBox(0, 50, -200, 400, 100, 2, materials.wall, false, true);
@@ -940,9 +1162,13 @@
             mesh.position.set(x, y, z);
             mesh.castShadow = true;
             mesh.receiveShadow = true;
-            const edges = new THREE.EdgesGeometry(geo);
-            const line = new THREE.LineSegments(edges, materials.grid);
-            mesh.add(line);
+            
+            if (isWall || !isFloor) {
+                 const edges = new THREE.EdgesGeometry(geo);
+                 const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.05 }));
+                 mesh.add(line);
+            }
+
             scene.add(mesh);
             mesh.geometry.computeBoundingBox();
             if (isFloor || !isWall) worldObjects.push(mesh);
@@ -950,7 +1176,6 @@
             return mesh;
         }
 
-        // Gift Box Palettes
         const GIFT_PALETTES = [
             { box: 0xcc0000, ribbon: 0xffd700 }, // Red/Gold
             { box: 0x006400, ribbon: 0xcc0000 }, // Green/Red
@@ -963,11 +1188,8 @@
             constructor(x, z, scale) {
                 this.scale = scale;
                 const size = 2;
-                
-                // Select random palette for gift mode
                 this.palette = GIFT_PALETTES[Math.floor(Math.random() * GIFT_PALETTES.length)];
 
-                // PHYSICS FIX: No rotation on visual mesh relative to collider
                 const colliderGeo = new THREE.BoxGeometry(size, size, size);
                 const colliderMat = new THREE.MeshBasicMaterial({ visible: false });
                 this.colliderMesh = new THREE.Mesh(colliderGeo, colliderMat);
@@ -986,9 +1208,13 @@
                 this.visualMesh.scale.setScalar(scale);
                 
                 this.visualMesh.updateMatrixWorld();
-                this.visualMesh.geometry.computeBoundingBox();
                 worldObjects.push(this.visualMesh);
                 
+                // Tech Wireframe Overlay
+                const edges = new THREE.EdgesGeometry(visualGeo);
+                this.edges = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.15 }));
+                this.visualMesh.add(this.edges);
+
                 // HALLOWEEN FACES
                 this.faceGroup = new THREE.Group();
                 const faceMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
@@ -1010,51 +1236,60 @@
                 this.faceGroup.add(this.stem);
                 this.visualMesh.add(this.faceGroup);
 
-                // GIFT BOX RIBBONS (LIGHT THEME)
+                // GIFT BOX RIBBONS
                 this.ribbonGroup = new THREE.Group();
                 this.ribbonMat = new THREE.MeshBasicMaterial({ color: this.palette.ribbon });
-                // Fix Z-fighting: Taller ribbons (2.05 vs 2.0 box height)
                 const r1Geo = new THREE.BoxGeometry(2.05, 2.05, 0.4); 
                 const r1 = new THREE.Mesh(r1Geo, this.ribbonMat);
                 const r2Geo = new THREE.BoxGeometry(0.4, 2.05, 2.05); 
                 const r2 = new THREE.Mesh(r2Geo, this.ribbonMat);
                 const bowGeo = new THREE.SphereGeometry(0.4, 8, 8);
                 const bow = new THREE.Mesh(bowGeo, this.ribbonMat);
-                bow.position.y = 1.025; // Sit on top of the slightly taller ribbon
+                bow.position.y = 1.025; 
                 this.ribbonGroup.add(r1); this.ribbonGroup.add(r2); this.ribbonGroup.add(bow);
                 this.ribbonGroup.visible = false;
                 this.visualMesh.add(this.ribbonGroup);
                 
-                const edges = new THREE.EdgesGeometry(visualGeo);
-                this.edges = new THREE.LineSegments(edges, materials.grid);
-                this.visualMesh.add(this.edges);
-
                 scene.add(this.visualMesh);
             }
 
             updateTheme(t) {
+                // Reset common props
+                this.mat.color.setHex(0xcccccc);
+                this.mat.emissive.setHex(0x000000);
+                this.mat.wireframe = false;
+                this.faceGroup.visible = false;
+                this.ribbonGroup.visible = false;
+                this.edges.visible = true;
+                this.edges.material.opacity = 0.1;
+                this.edges.material.color.setHex(0xffffff);
+                this.visualMesh.rotation.y = 0; // Reset rotation
+
                 if (t === 3) { // Halloween
                     const r = 0.8 + Math.random()*0.2;
                     const g = 0.3 + Math.random()*0.3;
-                    this.mat.color.setRGB(r, g, 0);
+                    this.mat.color.setRGB(r, g, 0); // Random orange
                     this.mat.emissive = new THREE.Color(r*0.1, g*0.1, 0);
                     this.faceGroup.visible = true;
-                    this.ribbonGroup.visible = false;
                     this.edges.visible = false;
+                    this.visualMesh.rotation.y = (Math.PI / 2) * Math.floor(Math.random() * 4);
                 } else if (t === 0) { // Light (Gifts)
                     this.mat.color.setHex(this.palette.box);
                     this.ribbonMat.color.setHex(this.palette.ribbon);
-                    this.mat.emissive.setHex(0x000000);
-                    this.faceGroup.visible = false;
                     this.ribbonGroup.visible = true;
-                    this.edges.visible = true;
+                    this.edges.material.color.setHex(0x000000);
                 } else {
-                    if(t === 1) this.mat.color.setHex(0x444444);
-                    if(t === 2) this.mat.color.setHex(0x400060);
-                    this.mat.emissive.setHex(0x000000);
-                    this.faceGroup.visible = false;
-                    this.ribbonGroup.visible = false;
-                    this.edges.visible = true;
+                    if(t === 1) { // Dark
+                         this.mat.color.setHex(0x112233);
+                         this.mat.emissive.setHex(0x001122);
+                         this.edges.material.color.setHex(0x00ffff);
+                         this.edges.material.opacity = 0.2;
+                    }
+                    if(t === 2) { // Neon (Classic v44)
+                         this.mat.color.setHex(0x001122); // Dark Blueish
+                         this.edges.material.color.setHex(0x00ffff); 
+                         this.edges.material.opacity = 0.5; 
+                    }
                 }
             }
         }
@@ -1063,12 +1298,8 @@
             const isHalloween = currentTheme === 3;
             const isSnow = currentTheme === 0;
 
-            // Allow snow to linger even if theme switched rapidly (simplified: clear if not needed)
-            if (!isHalloween && !isSnow && weatherParticles.length === 0) {
-                return;
-            }
+            if (!isHalloween && !isSnow && weatherParticles.length === 0) return;
 
-            // Cleanup wrong type if switched
             if ((!isSnow && weatherParticles.some(p => p.type === 'snow')) || 
                 (!isHalloween && weatherParticles.some(p => p.type === 'leaf'))) {
                  weatherParticles.forEach(l => scene.remove(l.mesh));
@@ -1079,7 +1310,6 @@
             const limit = isSnow ? 300 : 80;
             const spawnRate = isSnow ? 0.4 : 0.1;
 
-            // Spawning
             if(weatherParticles.length < limit && Math.random() < spawnRate) {
                 let mesh, vel, type;
                 const px = camera.position.x + (Math.random()-0.5)*50;
@@ -1107,7 +1337,6 @@
                 weatherParticles.push({ mesh: mesh, vel: vel, type: type, swayOffset: Math.random() * 100, landed: false, landTimer: 2.0 });
             }
 
-            // Updating
             for(let i=weatherParticles.length-1; i>=0; i--) {
                 const l = weatherParticles[i];
 
@@ -1130,20 +1359,17 @@
                     l.mesh.rotation.y += dt;
                     l.mesh.position.x += Math.sin(performance.now() * 0.002 + l.swayOffset) * dt * 2;
                 } else {
-                    // Snow slight drift
                     l.mesh.position.x += Math.sin(performance.now() * 0.001 + l.swayOffset) * dt * 0.5;
                     l.mesh.rotation.z += dt; 
                 }
 
-                // Floor collision check (Assume ground at 0 for weather radius)
                 if(l.mesh.position.y <= 0) {
                     if (l.type === 'snow') {
                         l.landed = true;
-                        l.mesh.position.y = 0.05; // Sit just above Z-fight level
+                        l.mesh.position.y = 0.05; 
                         l.mesh.rotation.x = -Math.PI / 2;
                         l.vel.set(0,0,0);
                     } else {
-                        // Leaves just disappear
                         scene.remove(l.mesh);
                         l.mesh.geometry.dispose();
                         l.mesh.material.dispose();
@@ -1154,43 +1380,33 @@
         }
 
         function spawnSnowTrail(pos) {
-            const geo = new THREE.PlaneGeometry(0.4, 0.4);
-            const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6, side: THREE.DoubleSide });
-            const mesh = new THREE.Mesh(geo, mat);
+            const mat = new THREE.SpriteMaterial({ map: textures.glow, color: 0xffffff, transparent: true, opacity: 0.8 }); // Prominent snow
+            const mesh = new THREE.Sprite(mat);
+            mesh.scale.set(0.8, 0.8, 0.8);
             mesh.position.copy(pos);
-            mesh.position.y = getGroundHeight(pos.x, pos.z) + 0.05;
-            mesh.rotation.x = -Math.PI/2;
-            mesh.rotation.z = Math.random() * Math.PI;
+            mesh.position.y = getGroundHeight(pos.x, pos.z) + 0.1;
             scene.add(mesh);
             particles.push({
                 mesh: mesh,
                 vel: new THREE.Vector3(0,0,0),
-                life: 1.0, // 1s fade
+                life: 1.5, 
                 isStatic: true
             });
         }
 
         function spawnSnowKickup(pos) {
-            for(let i=0; i<2; i++) {
-                const geo = new THREE.PlaneGeometry(0.1, 0.1);
-                const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, side: THREE.DoubleSide });
-                const mesh = new THREE.Mesh(geo, mat);
-                // Spawn slightly behind player
+            for(let i=0; i<3; i++) {
+                const mat = new THREE.SpriteMaterial({ map: textures.glow, color: 0xffffff, transparent: true, opacity: 0.8 });
+                const mesh = new THREE.Sprite(mat);
+                mesh.scale.set(0.3, 0.3, 0.3);
                 mesh.position.copy(pos).add(new THREE.Vector3((Math.random()-0.5), 0.1, (Math.random()-0.5)));
-                
                 const vel = new THREE.Vector3(
                     (Math.random()-0.5) * 2, 
-                    1 + Math.random() * 3, // Upward
+                    1 + Math.random() * 3, 
                     (Math.random()-0.5) * 2
                 );
-
                 scene.add(mesh);
-                particles.push({
-                    mesh: mesh,
-                    vel: vel,
-                    life: 0.5,
-                    isStatic: false
-                });
+                particles.push({ mesh: mesh, vel: vel, life: 0.5, isStatic: false });
             }
         }
 
@@ -1239,9 +1455,6 @@
                 progress += mesh.userData.fadeSpeed;
                 if (progress < 1) {
                     mesh.material.opacity = 1 - progress;
-                    if(parent === camera && mySlashID === lastSlashID) {
-                        // Keep opacity 0 while slash is active
-                    }
                     requestAnimationFrame(animateSlash);
                 } else {
                     mesh.visible = false;
@@ -1261,16 +1474,16 @@
         }
 
         function spawnImpact(pos) {
-            const geo = new THREE.SphereGeometry(0.5, 8, 8);
-            const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 1 });
-            const mesh = new THREE.Mesh(geo, mat);
+            const mat = new THREE.SpriteMaterial({ map: textures.glow, color: 0xffffff, transparent: true, opacity: 1, blending: THREE.AdditiveBlending });
+            const mesh = new THREE.Sprite(mat);
+            mesh.scale.set(2, 2, 2);
             mesh.position.copy(pos);
             scene.add(mesh);
             let life = 1.0;
             function animateImpact() {
                 life -= 0.15;
-                mesh.scale.setScalar(1 + (1-life)*2);
                 mesh.material.opacity = life;
+                mesh.scale.setScalar(2 + (1-life)*2);
                 if(life > 0) requestAnimationFrame(animateImpact);
                 else { scene.remove(mesh); }
             }
@@ -1281,20 +1494,31 @@
             spawnParticles(pos, 0xffcc00, 30);
             spawnParticles(pos, 0x00ffff, 30);
             spawnParticles(pos, 0xff00ff, 30);
-            AudioSys.playTeleport(); // Use tp sound as placeholder
+            AudioSys.playTeleport(); 
         }
 
         function createTeleportMarker() {
-            const geo = new THREE.OctahedronGeometry(0.4); 
             teleportMarker = new THREE.Group();
-            const core = new THREE.Mesh(geo, materials.marker);
-            core.scale.set(0.8, 2.5, 0.8); core.position.y = 2.0; teleportMarker.add(core);
-            const ringGeo = new THREE.RingGeometry(1.4, 1.6, 32);
+            
+            // Revert to Wireframe Octahedron/Diamond (Simpler style)
+            const geo = new THREE.OctahedronGeometry(0.8, 0);
+            const diamond = new THREE.Mesh(geo, materials.marker);
+            diamond.position.y = 1.5;
+            teleportMarker.add(diamond);
+
+            // Bottom Ring
+            const ringGeo = new THREE.RingGeometry(0.8, 1.0, 32);
             const ringMat = materials.marker.clone();
             ringMat.side = THREE.DoubleSide;
-            const ring = new THREE.Mesh(ringGeo, ringMat);
-            ring.rotation.x = -Math.PI/2; ring.position.y = 0.1; teleportMarker.add(ring);
-            teleportMarker.userData = { core: core, ring: ring };
+            ringMat.opacity = 0.5;
+            ringMat.emissiveIntensity = 1;
+            
+            const ring1 = new THREE.Mesh(ringGeo, ringMat);
+            ring1.rotation.x = -Math.PI/2; 
+            ring1.position.y = 0.1; 
+            teleportMarker.add(ring1);
+
+            teleportMarker.userData = { diamond: diamond, rings: [ring1] };
             teleportMarker.visible = false;
             scene.add(teleportMarker);
         }
@@ -1314,6 +1538,31 @@
             if (player.isDead) return;
             camera.position.y -= player.cameraHeightOffset;
 
+            // Low Health Effects
+            const vignette = document.getElementById('low-health-vignette');
+            const healthFill = document.getElementById('health-fill');
+            
+            if (player.health < 40) {
+                if (!healthFill.classList.contains('health-critical')) healthFill.classList.add('health-critical');
+                
+                if (player.health < 25) vignette.style.boxShadow = "inset 0 0 150px rgba(255, 0, 0, 0.6)";
+                else vignette.style.boxShadow = "inset 0 0 100px rgba(255, 0, 0, 0.3)";
+                
+                // Heartbeat Audio
+                let hbInterval = 1.0;
+                if(player.health < 20) hbInterval = 0.4;
+                else if(player.health < 40) hbInterval = 0.8;
+                
+                const now = performance.now() / 1000;
+                if(now - lastHeartbeatTime > hbInterval) {
+                    AudioSys.playHeartbeat();
+                    lastHeartbeatTime = now;
+                }
+            } else {
+                 if (healthFill.classList.contains('health-critical')) healthFill.classList.remove('health-critical');
+                 vignette.style.boxShadow = "inset 0 0 100px rgba(255, 0, 0, 0)";
+            }
+
             if (teleportMode === 'AIM' && player.teleportActive) {
                 const raycaster = new THREE.Raycaster();
                 raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
@@ -1330,9 +1579,13 @@
                     player.teleportTarget = target;
                 }
                 teleportMarker.visible = true;
-                teleportMarker.userData.core.rotation.y += dt * 2;
-                teleportMarker.userData.core.position.y = 2.0 + Math.sin(performance.now() * 0.005) * 0.2;
-                teleportMarker.userData.ring.rotation.z -= dt;
+                
+                // Animate Marker
+                const t = performance.now();
+                teleportMarker.userData.diamond.rotation.y += dt * 3;
+                teleportMarker.userData.diamond.position.y = 1.5 + Math.sin(t * 0.005) * 0.2;
+                teleportMarker.userData.rings[0].scale.setScalar(1 + Math.sin(t * 0.01)*0.1);
+
                 document.getElementById('icon-q').classList.add('active');
             } else {
                 teleportMarker.visible = false;
@@ -1372,13 +1625,14 @@
                 if (player.stamina > 100) player.stamina = 100;
             }
 
+            // SLIDE & CROUCH
             if (keys.c) {
                 if (player.onGround) {
                     const speed = new THREE.Vector2(player.velocity.x, player.velocity.z).length();
                     if ((player.isSprinting || player.isSliding || speed > CONFIG.baseSpeed) && !player.isCrouching) {
                         if (!player.isSliding) {
                             player.isSliding = true;
-                            player.lastSlideTime = performance.now(); // Mark slide time
+                            player.lastSlideTime = performance.now(); 
                             const forward = new THREE.Vector3();
                             camera.getWorldDirection(forward);
                             forward.y = 0; forward.normalize();
@@ -1438,11 +1692,14 @@
             playerBox.min.set(nextPos.x - radius, nextPos.y - 1.5, nextPos.z - radius);
             playerBox.max.set(nextPos.x + radius, nextPos.y + 0.5, nextPos.z + radius);
 
+            // WALL COLLISION
+            let touchingWall = false;
             for (const wall of walls) {
                 const box = wall.geometry.boundingBox.clone();
                 box.applyMatrix4(wall.matrixWorld);
                 
                 if (playerBox.intersectsBox(box)) {
+                    touchingWall = true;
                     const xOverlap = Math.min(playerBox.max.x - box.min.x, box.max.x - playerBox.min.x);
                     const zOverlap = Math.min(playerBox.max.z - box.min.z, box.max.z - playerBox.min.z);
                     
@@ -1460,11 +1717,13 @@
                 }
             }
 
+            // GROUND DETECTION
             const rayOrigin = nextPos.clone();
             const raycaster = new THREE.Raycaster(rayOrigin, new THREE.Vector3(0, -1, 0), 0, 5); 
             const intersects = raycaster.intersectObjects(worldObjects);
             const wasOnGround = player.onGround;
             player.onGround = false;
+            
             if (intersects.length > 0) {
                 const dist = intersects[0].distance;
                 const desiredHeight = 1.6; 
@@ -1473,16 +1732,32 @@
                     player.velocity.y = 0;
                     player.onGround = true;
                     player.jumpsRemaining = 2; 
+                    
+                    if(!wasOnGround) {
+                        moveStreaks.longAerial.count = 0; 
+                        moveStreaks.aerial.count = 0;
+                        player.lastTeleportWasAerial = false; // Reset state on land
+                    }
                 }
             }
 
-            // Air time tracking
+            // Auto-Hop Logic (Ground)
+            if (player.onGround && wantsToJump) {
+                 performJump();
+                 // Reset streaks immediately to prevent stacking bug on bunnyhops
+                 moveStreaks.longAerial.count = 0;
+                 moveStreaks.aerial.count = 0;
+            }
+            // Auto-Hop Logic (Wall)
+            else if (!player.onGround && touchingWall && wantsToJump && player.jumpsRemaining > 0) {
+                 performWallJump();
+                 // Wall jump breaks aerial streak continuity for landing purposes logic, but awards Wall streak
+                 // However, we WANT to keep the AIR TIME for Long Aerials.
+                 // So we do NOT reset airTimeStart here.
+            }
+
             if (wasOnGround && !player.onGround) {
                 player.airTimeStart = performance.now();
-            }
-            // Safe reset on landing
-            if (player.onGround) {
-                 player.airTimeStart = performance.now(); // Reset clock while on ground so airDuration is 0
             }
 
             camera.position.copy(nextPos);
@@ -1497,36 +1772,85 @@
             }
         }
 
+        function performJump() {
+             player.velocity.y = CONFIG.jumpForce;
+             if(player.isSliding) {
+                  player.velocity.y = 15; 
+                  const forward = new THREE.Vector3();
+                  camera.getWorldDirection(forward);
+                  forward.y=0; forward.normalize();
+                  player.velocity.addScaledVector(forward, CONFIG.bunnyHopBoost);
+             }
+             player.onGround = false;
+             player.lastJumpTime = performance.now(); 
+             AudioSys.playJump();
+        }
+        
+        function performWallJump() {
+            const ray = new THREE.Raycaster(camera.position, new THREE.Vector3(0,0,0), 0, 1.5);
+            const dirs = [
+                new THREE.Vector3(1,0,0), new THREE.Vector3(-1,0,0),
+                new THREE.Vector3(0,0,1), new THREE.Vector3(0,0,-1)
+            ];
+            let hitWall = false;
+            for(let d of dirs) {
+                d.applyQuaternion(camera.quaternion);
+                ray.set(camera.position, d);
+                if(ray.intersectObjects(walls).length > 0) {
+                    hitWall = true;
+                    player.velocity.addScaledVector(d, -CONFIG.wallPushForce);
+                    break;
+                }
+            }
+            
+            if (hitWall) {
+                player.velocity.y = CONFIG.wallJumpForce;
+                player.jumpsRemaining--;
+                player.lastJumpTime = performance.now();
+                player.lastWallJumpTime = performance.now(); 
+                AudioSys.playWallJump();
+            }
+        }
+
         function executeTeleport(target) {
+             if (player.stamina < CONFIG.teleportCost) {
+                 // Not enough stamina
+                 AudioSys.playMiss();
+                 return;
+             }
+             player.stamina -= CONFIG.teleportCost;
+
              let yOffset = 0;
-             
-             // FIXED: Ground-to-ground detection
              const currentGroundY = getGroundHeight(camera.position.x, camera.position.z);
-             const startInAir = (camera.position.y - currentGroundY) > 1.0; // 1.0 tolerance
+             const startInAir = (camera.position.y - currentGroundY) > 1.0; 
 
              const ray = new THREE.Raycaster(target.clone().add(new THREE.Vector3(0,1,0)), new THREE.Vector3(0,-1,0), 0, 2);
              const hits = ray.intersectObjects(worldObjects);
              if(hits.length > 0) yOffset = 1.6;
 
-             // Check if end position is aerial (target Y significantly above ground)
              const groundAtTarget = getGroundHeight(target.x, target.z);
              const endInAir = (target.y - groundAtTarget) > 0.5;
 
-             // Phase Strike Logic: If Start OR End is air, it's an aerial teleport
              player.lastTeleportWasAerial = startInAir || endInAir;
-             player.hasPhaseStruck = false; // Reset phase strike capability
+             player.hasPhaseStruck = false; 
 
-             spawnParticles(camera.position, 0x00ffaa, 10); 
+             spawnParticles(camera.position, 0x00ffaa, 20); 
+             
              camera.position.set(target.x, target.y + yOffset, target.z);
              player.velocity.y = 2; 
              player.jumpsRemaining = 1; 
-             player.onGround = false; // Force airborne state
+             player.onGround = false; 
              
-             player.airTimeStart = performance.now();
+             // If we were on ground, this starts air time.
+             // If we were already in air, we keep existing airTimeStart to allow huge long aerials.
+             if(!startInAir) {
+                 player.airTimeStart = performance.now();
+             }
              
-             player.lastTeleportTime = performance.now(); // Mark TP time
+             player.lastTeleportTime = performance.now(); 
+             
              AudioSys.playTeleport();
-             spawnParticles(target, 0x00ffaa, 15);
+             spawnParticles(target, 0x00ffaa, 30);
         }
 
         function tryAimTeleport() {
@@ -1560,8 +1884,15 @@
             
             // Meme Check
             let memeText = "";
-            if (comboCount === 69) { memeText = "nice."; showKillMessage("YIKWIM ;)", "achievement", "#ff00ff"); }
-            else if (comboCount === 420) { memeText = "blaze it bruh"; }
+            const ccStr = comboCount.toString();
+            
+            if (ccStr.includes('69')) { 
+                memeText = MEME_TEXTS_69[Math.floor(Math.random() * MEME_TEXTS_69.length)];
+                showKillMessage("YIKWIM ;)", "achievement", "#ff00ff"); 
+            }
+            else if (ccStr.includes('420')) { 
+                memeText = MEME_TEXTS_420[Math.floor(Math.random() * MEME_TEXTS_420.length)];
+            }
             else if (comboCount === 1000) { memeText = "go touch grass"; }
             
             if (memeText) {
@@ -1585,23 +1916,18 @@
                 
                 if(comboCount >= 5) fontSize = "4rem";
                 
-                // --- NEW VISUAL LOGIC ---
-                // Fixed: use >= 10 to catch the 10 hit milestone properly
                 if (comboCount >= 10) {
                     if (comboCount % 10 === 0) {
-                        // Milestone (10, 20, 30...)
                         fontSize = "5rem";
                         color = "#ff0000";
                         textShadow = "0 0 20px #ff0000, 4px 4px 0px rgba(0,0,0,0.8)";
                     } else {
-                        // Filler Hits (11-19, 21-29...)
                         fontSize = "4rem"; 
                         opacity = "0.8"; 
                         blur = "none"; 
                     }
                 }
                 
-                // 100 Hits Logic (Super Bloom)
                 if (comboCount % 100 === 0 && comboCount > 0) {
                     fontSize = "8rem"; 
                     color = "#ff00ff";
@@ -1618,7 +1944,6 @@
                 el.style.filter = blur;
                 el.style.textShadow = textShadow;
                 
-                // Pop animation
                 el.style.transform = "translateX(-50%) scale(1.3) rotate(0deg)";
                 requestAnimationFrame(() => {
                      setTimeout(() => {
@@ -1669,34 +1994,29 @@
                 if (dist < CONFIG.attackRange) {
                     toEnemy.normalize();
                     const angle = camDir.angleTo(toEnemy);
-                    if (angle < 0.5) { // Approx 30 degrees
+                    if (angle < 0.5) { 
                         uniqueHitEnemies.add(e);
                     }
                 }
             });
 
             if (uniqueHitEnemies.size > 0) {
-                // Check for Multi-Hit Achievements
                 const hitCount = uniqueHitEnemies.size;
                 if (hitCount >= 10) GameStats.addAchievement("SLAUGHTERHOUSE", "#ff0000");
                 else if (hitCount >= 5) GameStats.addAchievement("CROWD CONTROL", "#ff8800");
                 else if (hitCount >= 3) GameStats.addAchievement("TRIPLE THREAT", "#ffff00");
 
-                // --- SCORING SYSTEM REWORK ---
-                // Base Hit: 10
-                // Additive Bonuses: Flat points instead of %
                 let hitScore = 10;
                 let addedScore = 0;
                 let comboNames = [];
 
-                const COMBO_WINDOW = 1000; // 1s tolerance
-                const STREAK_WINDOW = 1500; // 1.5s to maintain streak
+                const COMBO_WINDOW = 1000; 
+                const STREAK_WINDOW = 1500; 
 
                 const recentSlide = (now - player.lastSlideTime < COMBO_WINDOW) || player.isSliding;
                 const recentTeleport = (now - player.lastTeleportTime < COMBO_WINDOW);
                 const recentWallJump = (now - player.lastWallJumpTime < COMBO_WINDOW);
 
-                // --- STREAK HELPER ---
                 function updateStreak(type, baseBonus) {
                     if (now - moveStreaks[type].lastTime < STREAK_WINDOW) {
                         moveStreaks[type].count++;
@@ -1707,7 +2027,6 @@
                     return baseBonus + moveStreaks[type].count;
                 }
 
-                // Slide Bonus
                 if (recentSlide) {
                     const bonus = updateStreak('slide', 25);
                     addedScore += bonus;
@@ -1716,52 +2035,38 @@
                     GameStats.checkMoveMilestone('slideHit', "SLIDE", "#00ffff");
                 }
                 
-                // Teleport Bonus (Merged Aerial/Phase)
-                // If recent teleport and bonus not consumed, prioritize this over standard aerial
-                const isTeleportHit = (recentTeleport && !player.hasPhaseStruck);
-
-                if (isTeleportHit) {
+                // --- NEW AERIAL LOGIC (v44.22) ---
+                if (!player.onGround) {
+                     // Check flight duration
+                     const airDuration = (now - player.airTimeStart) / 1000;
+                     
+                     if (airDuration > 0.8) {
+                        // LONG AERIAL
+                        const extraTicks = Math.floor((airDuration - 0.8) / 0.2); 
+                        const longAirBonus = 50 + (extraTicks * 10);
+                        addedScore += longAirBonus;
+                        comboNames.push("LONG AERIAL");
+                        GameStats.moves.longAirHit++;
+                        GameStats.checkMoveMilestone('longAirHit', "SKY ASSASSIN", "#ff00aa");
+                     } else {
+                        // NORMAL AERIAL
+                        const bonus = updateStreak('aerial', 25);
+                        addedScore += bonus;
+                        comboNames.push("AERIAL");
+                        GameStats.moves.midAirHit++;
+                        GameStats.checkMoveMilestone('midAirHit', "AERIAL", "#ff00aa");
+                     }
+                }
+                
+                if (recentTeleport && !player.hasPhaseStruck) {
                      const bonus = updateStreak('phase', 50);
                      addedScore += bonus;
                      comboNames.push("TELEPORT");
-                     player.hasPhaseStruck = true; // Consume phase bonus
+                     player.hasPhaseStruck = true; 
                      GameStats.moves.teleportHit++;
                      GameStats.checkMoveMilestone('teleportHit', "VOID WALKER", "#aa00ff");
-                } else {
-                    // Aerial Logic
-                    let isAerial = !player.onGround;
-                    // Fix: Teleport must have been aerial to count as aerial strike
-                    // Only apply if we didn't just trigger the primary Teleport bonus
-                    if (recentTeleport && player.lastTeleportWasAerial) {
-                        isAerial = true;
-                    }
-
-                    if (isAerial) {
-                         const airDuration = (now - player.airTimeStart) / 1000;
-                         if (airDuration > 1.0) {
-                            // Long Aerial: > 1.0s
-                            const extraTime = airDuration - 1.0;
-                            const extraTicks = Math.floor(extraTime / 0.1);
-                            let longAirBonus = 50 + (extraTicks * 10);
-                            
-                            longAirBonus = updateStreak('longAerial', longAirBonus);
-                            
-                            addedScore += longAirBonus;
-                            comboNames.push("LONG AERIAL");
-                            GameStats.moves.longAirHit++;
-                            GameStats.checkMoveMilestone('longAirHit', "SKY ASSASSIN", "#ff00aa");
-                         } else {
-                            // Standard Aerial
-                            const bonus = updateStreak('aerial', 25);
-                            addedScore += bonus;
-                            comboNames.push("AERIAL");
-                            GameStats.moves.midAirHit++;
-                            GameStats.checkMoveMilestone('midAirHit', "AERIAL", "#ff00aa");
-                         }
-                    }
                 }
 
-                // Wall Jump Bonus
                 if (recentWallJump) {
                     const bonus = updateStreak('wall', 30);
                     addedScore += bonus;
@@ -1773,16 +2078,14 @@
                 hitScore += addedScore;
                 
                 if (comboNames.length > 0) {
-                    // Check total streak points
                     let totalStreak = 0;
                     for(let k in moveStreaks) {
                         if(now - moveStreaks[k].lastTime < STREAK_WINDOW) totalStreak += moveStreaks[k].count;
                     }
                     
-                    // COLOR LOGIC FOR STREAK
                     let streakColor = "#" + new THREE.Color(currentSlashColor).getHexString();
-                    if (currentTheme === 0) streakColor = "#001133"; // Dark Blue for Light
-                    if (currentTheme === 1) streakColor = "#E0FFFF"; // Cyan for Dark
+                    if (currentTheme === 0) streakColor = "#001133"; 
+                    if (currentTheme === 1) streakColor = "#00ffff"; 
                     
                     let msg = comboNames.join(" ") + " +" + addedScore;
                     if(totalStreak > 0) {
@@ -1792,7 +2095,6 @@
                     showKillMessage(msg, "combo");
                 }
                 
-                // Multi-Hit Damage Falloff
                 const hitList = Array.from(uniqueHitEnemies).map(e => ({
                     enemy: e,
                     dist: e.mesh.position.distanceTo(camera.position)
@@ -1853,7 +2155,6 @@
                         this.type = BOT_TYPES.NORMAL;
                     }
                 } else {
-                    // Height-Based Spawn
                     let x, z;
                     do {
                         x = (Math.random() - 0.5) * 200;
@@ -1887,14 +2188,19 @@
                 }
                 
                 const bodyGeo = new THREE.BoxGeometry(1, 2, 1);
-                const bodyMat = new THREE.MeshStandardMaterial({ color: this.type.color });
+                const bodyMat = new THREE.MeshPhysicalMaterial({ 
+                    color: this.type.color,
+                    metalness: 0.1,
+                    roughness: 0.2,
+                    clearcoat: 0.5
+                });
                 this.body = new THREE.Mesh(bodyGeo, bodyMat);
                 this.mesh.add(this.body);
 
-                const outlineGeo = new THREE.BoxGeometry(1, 2, 1);
-                const outlineMat = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.BackSide });
-                this.outline = new THREE.Mesh(outlineGeo, outlineMat);
-                this.outline.scale.setScalar(1.05); 
+                // Wireframe Overlay
+                const edges = new THREE.EdgesGeometry(bodyGeo);
+                this.outline = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3 }));
+                this.outline.scale.setScalar(1.02);
                 this.mesh.add(this.outline);
                 
                 const eyeGeo = new THREE.SphereGeometry(0.1, 8, 8);
@@ -1942,12 +2248,27 @@
                 this.corpseTimer = 0;
                 this.confusedTimer = 0; 
                 
+                this.updateTheme(currentTheme);
                 scene.add(this.mesh);
                 enemies.push(this);
             }
 
+            updateTheme(t) {
+                if(t === 2) { // Neon (Classic Simple)
+                    this.outline.material.color.setHex(0x00ffff);
+                    this.outline.material.opacity = 0.5;
+                    this.body.material.color.setHex(0x000510);
+                    this.body.material.emissive.setHex(0x000000); // Remove emissive glow on bots for simple look
+                    this.body.material.emissiveIntensity = 0;
+                } else {
+                    this.outline.material.color.setHex(0xffffff);
+                    this.outline.material.opacity = 0.3;
+                    this.body.material.color.setHex(this.type.color);
+                    this.body.material.emissiveIntensity = 0;
+                }
+            }
+
             pickRoamTarget() {
-                // Reverted "Follow Leader" logic to pure random roam
                 this.targetPos.set(
                     (Math.random() - 0.5) * 150,
                     this.mesh.position.y,
@@ -1957,20 +2278,15 @@
 
             canSeePlayer(playerPos) {
                 if (this.isDeadCorpse || this.state === 'CONFUSED') return false;
-                if (this.mesh.position.distanceTo(playerPos) > 50) return false;
+                if (this.mesh.position.distanceTo(playerPos) > 60) return false; 
                 const toPlayer = playerPos.clone().sub(this.mesh.position).normalize();
-                const facing = new THREE.Vector3(0,0,1);
-                facing.applyQuaternion(this.mesh.quaternion);
-                const dot = facing.dot(toPlayer);
-                if (dot > 0.5) { 
-                    const ray = new THREE.Raycaster(this.mesh.position, toPlayer, 0, 50);
-                    const hits = ray.intersectObjects(walls);
-                    if (hits.length > 0 && hits[0].distance < this.mesh.position.distanceTo(playerPos)) {
-                        return false; 
-                    }
-                    return true;
+                
+                const ray = new THREE.Raycaster(this.mesh.position, toPlayer, 0, 60);
+                const hits = ray.intersectObjects(walls);
+                if (hits.length > 0 && hits[0].distance < this.mesh.position.distanceTo(playerPos)) {
+                    return false; 
                 }
-                return false;
+                return true;
             }
 
             update(dt, playerPos) {
@@ -1999,7 +2315,7 @@
                     return;
                 }
 
-                // GRAVITY & GROUND DETECTION
+                // GRAVITY
                 const groundY = getGroundHeight(this.mesh.position.x, this.mesh.position.z);
                 const currentY = this.mesh.position.y;
                 const floorThreshold = groundY + (1 * this.type.scale);
@@ -2010,18 +2326,17 @@
                     if (this.velocity.y < -15) { 
                         this.state = 'CONFUSED';
                         const impactSpeed = Math.abs(this.velocity.y);
-                        this.confusedTimer = 3.0 + Math.min(2.0, (impactSpeed - 15) / 5.0); // 3s to 5s duration
+                        this.confusedTimer = 3.0 + Math.min(2.0, (impactSpeed - 15) / 5.0);
                         this.velocity.y = 0;
                         return;
                     }
-                    
                     this.velocity.y = 0;
                     this.mesh.position.y = floorThreshold;
                     this.jumps = 0;
                 }
                 this.mesh.position.y += this.velocity.y * dt;
 
-                this.healthBarGroup.position.copy(this.mesh.position).add(new THREE.Vector3(0, 1.8 * this.type.scale, 0));
+                this.healthBarGroup.position.copy(this.mesh.position).add(new THREE.Vector3(0, 1.3 * this.type.scale, 0));
                 this.healthBarGroup.lookAt(camera.position);
 
                 if (this.hasAggroed) {
@@ -2040,16 +2355,34 @@
 
                 let dest = this.targetPos;
                 let speed = (this.isSprinting ? CONFIG.botSprintSpeed : CONFIG.botSpeed) * this.type.speedMod;
+                
                 if (this.state === 'ROAM') {
                     speed = CONFIG.botRoamSpeed * this.type.speedMod;
                     if (new THREE.Vector2(this.mesh.position.x - dest.x, this.mesh.position.z - dest.z).length() < 3) {
                         this.pickRoamTarget();
                     }
+                    
+                    // Roaming Jump Logic
+                    if (this.onGroundSafe(groundY) && Math.random() < 0.01) {
+                        this.velocity.y = 12;
+                        this.jumps = 1;
+                    }
+
                 } else if (this.state === 'AGGRO') {
                     if (this.canSeePlayer(playerPos)) {
                         this.lastKnownPos.copy(playerPos);
                         dest = playerPos;
                         const dist = this.mesh.position.distanceTo(playerPos);
+                        
+                        // Smart Retreat
+                        if (this.health < this.maxHealth * 0.3) {
+                            const retreatDir = this.mesh.position.clone().sub(playerPos).normalize();
+                            dest = this.mesh.position.clone().addScaledVector(retreatDir, 30);
+                            speed *= 1.2;
+                            this.targetPos.copy(dest);
+                        }
+
+                        // Attack Logic
                         if (dist < 4 * this.type.scale) {
                             const now = performance.now();
                             if (now - this.lastAttack > CONFIG.botAttackCooldown) {
@@ -2074,7 +2407,9 @@
                 } else if (this.state === 'SEARCH') {
                     speed = 0; 
                     this.searchTimer -= dt * 1000;
-                    this.mesh.rotation.y += Math.sin(performance.now() * 0.01) * 0.1; 
+                    const lookTime = performance.now() * 0.002;
+                    this.mesh.rotation.y = Math.sin(lookTime) * Math.PI;
+                    
                     if (this.canSeePlayer(playerPos)) {
                         this.state = 'AGGRO';
                         this.body.material.color.setHex(0x8b0000);
@@ -2090,21 +2425,6 @@
                     this.actionTimer = 0.5 + Math.random() * 1.5; 
                     this.isSprinting = Math.random() < (this.type.skill >= 2 ? 0.7 : 0.3);
                     this.isSliding = this.isSprinting && Math.random() < (this.type.skill >= 2 ? 0.4 : 0.1);
-                    
-                    // Jump Logic (Normal & Double Jump)
-                    if (this.type.skill >= 1) {
-                        if (this.onGroundSafe(groundY)) {
-                            if (Math.random() < 0.5) { // Increased jump chance
-                                this.velocity.y = 18; 
-                                this.jumps = 1;
-                            }
-                        } else if (this.jumps === 1 && this.type.skill >= 2 && Math.random() < 0.4) {
-                             // Double Jump
-                             this.velocity.y = 18;
-                             this.jumps = 2;
-                             spawnParticles(this.mesh.position, 0xffffff, 5);
-                        }
-                    }
                 }
 
                 if(this.type.speedMod === 0) {
@@ -2114,26 +2434,45 @@
                         const dir = new THREE.Vector3().subVectors(dest, this.mesh.position);
                         dir.y = 0; dir.normalize();
                         
-                        if (this.state === 'AGGRO' && this.canSeePlayer(playerPos)) {
-                            const perp = new THREE.Vector3(-dir.z, 0, dir.x);
-                            const noise = Math.sin(performance.now() * 0.005 + this.id * 10) * 0.8;
-                            dir.addScaledVector(perp, noise).normalize();
-                        }
-                        
-                        if (this.onGroundSafe(groundY)) {
-                             const nextPos = this.mesh.position.clone().addScaledVector(dir, 2);
-                             const nextGroundY = getGroundHeight(nextPos.x, nextPos.z);
-                             if (nextGroundY < groundY - 5) {
-                                 if (Math.random() < 0.95) {
-                                     speed = 0;
-                                     if(this.state === 'ROAM') this.pickRoamTarget();
-                                 }
+                        // COMBAT JUMPING - FORCE JUMP IF STUCK OR AGGRESSIVE
+                        const isMovingHorizontal = dir.lengthSq() > 0.1;
+                        if (isMovingHorizontal && Math.abs(this.mesh.position.x - (this.lastX || 0)) < 0.01 && this.state !== 'SEARCH') {
+                             // Stuck? Force Jump
+                             if (this.onGroundSafe(groundY)) {
+                                 this.velocity.y = 18;
+                                 this.jumps = 1;
                              }
                         }
-
+                        this.lastX = this.mesh.position.x;
+                        
+                        // AGGRO DODGING
+                        if (this.state === 'AGGRO' && this.canSeePlayer(playerPos)) {
+                            const dist = this.mesh.position.distanceTo(playerPos);
+                            const perp = new THREE.Vector3(-dir.z, 0, dir.x);
+                            const noise = Math.sin(performance.now() * 0.005 + this.id * 10) * 0.8;
+                            dir.addScaledVector(perp, noise);
+                            if (dist < 4 * this.type.scale) {
+                                dir.subVectors(this.mesh.position, playerPos).normalize().multiplyScalar(1.5);
+                            }
+                            // Random Combat Jump
+                            if (this.onGroundSafe(groundY) && Math.random() < 0.02) {
+                                this.velocity.y = 18;
+                                this.jumps = 1;
+                            }
+                        }
+                        
+                        dir.normalize();
                         if (this.isSliding) speed *= 1.5;
                         this.mesh.position.addScaledVector(dir, speed * dt);
-                        this.mesh.lookAt(dest.x, this.mesh.position.y, dest.z);
+                        
+                        // Smooth Rotation to fix jitter
+                        if (dir.lengthSq() > 0.1) {
+                            const targetRot = Math.atan2(dir.x, dir.z);
+                            let rotDiff = targetRot - this.mesh.rotation.y;
+                            while (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
+                            while (rotDiff < -Math.PI) rotDiff += Math.PI * 2;
+                            this.mesh.rotation.y += rotDiff * dt * 8; // Faster smooth
+                        }
                     }
                     
                     if (this.isSliding) {
@@ -2143,12 +2482,18 @@
                     else this.mesh.rotation.x = 0;
                 }
 
+                // Simple collision resolution with less jitter
                 const botBox = new THREE.Box3().setFromObject(this.body);
+                // Expand box slightly for checks
+                botBox.expandByScalar(-0.1); 
+                
                 for(const wall of walls) {
                     const wb = wall.geometry.boundingBox.clone().applyMatrix4(wall.matrixWorld);
                     if(botBox.intersectsBox(wb)) {
                          const xOverlap = Math.min(botBox.max.x - wb.min.x, wb.max.x - botBox.min.x);
                          const zOverlap = Math.min(botBox.max.z - wb.min.z, wb.max.z - botBox.min.z);
+                         
+                         // Smooth push out
                          if(xOverlap < zOverlap) {
                              const sign = (this.mesh.position.x < wall.matrixWorld.elements[12]) ? -1 : 1;
                              this.mesh.position.x += xOverlap * sign;
@@ -2161,7 +2506,7 @@
             }
 
             onGroundSafe(groundY) {
-                 return Math.abs(this.mesh.position.y - (groundY + this.type.scale)) < 0.2;
+                 return Math.abs(this.mesh.position.y - (groundY + this.type.scale)) < 0.5;
             }
 
             takeHit(amt) {
@@ -2172,15 +2517,16 @@
                 amt *= this.type.dmgRed;
                 this.health -= amt;
                 this.body.material.color.setHex(0xffffff); 
-                const toPlayer = camera.position.clone().sub(this.mesh.position);
-                toPlayer.y = 0;
-                this.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0,0,1), toPlayer.normalize());
-
+                
                 setTimeout(() => { 
                     if(!this.isDeadCorpse && this.state !== 'CONFUSED') {
-                        if(this.state === 'SEARCH') this.body.material.color.setHex(0xffaa00);
-                        else if(this.state === 'AGGRO') this.body.material.color.setHex(0x8b0000);
-                        else this.body.material.color.setHex(this.type.color);
+                        if (currentTheme === 2) { // Neon
+                            this.body.material.color.setHex(0x000510);
+                        } else {
+                            if(this.state === 'SEARCH') this.body.material.color.setHex(0xffaa00);
+                            else if(this.state === 'AGGRO') this.body.material.color.setHex(0x8b0000);
+                            else this.body.material.color.setHex(this.type.color);
+                        }
                     }
                 }, 100);
 
@@ -2235,13 +2581,21 @@
 
         function spawnParticles(pos, col, count) {
             for(let i=0; i<count; i++) {
-                const m = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.2,0.2), new THREE.MeshBasicMaterial({color: col}));
+                const mat = new THREE.SpriteMaterial({ 
+                    map: textures.glow, 
+                    color: col, 
+                    transparent: true, 
+                    blending: THREE.AdditiveBlending 
+                });
+                const m = new THREE.Sprite(mat);
+                m.scale.set(0.5, 0.5, 0.5);
                 m.position.copy(pos);
                 scene.add(m);
                 particles.push({
                     mesh: m, 
                     vel: new THREE.Vector3((Math.random()-0.5)*10, (Math.random()-0.5)*10, (Math.random()-0.5)*10),
-                    life: 0.5
+                    life: 0.5,
+                    isStatic: false
                 });
             }
         }
@@ -2250,9 +2604,6 @@
             player.health -= amt;
             player.lastDamageTime = performance.now();
             
-            // Note: We do not reset player.isRegenerating here.
-            // If regenerating, it continues despite damage, unless health was already maxed.
-            
             const overlay = document.getElementById('damage-overlay');
             overlay.style.background = "radial-gradient(circle, transparent 20%, rgba(255,0,0,0.6) 100%)";
             setTimeout(() => {
@@ -2260,28 +2611,59 @@
             }, 200);
             
             if(player.health <= 0) {
-                player.health = 0;
-                player.isDead = true;
-                document.exitPointerLock();
-                showKillMessage("TERMINATED", "achievement");
-                
-                // Update Session Timer
-                const diff = Date.now() - sessionStartTime;
-                const mins = Math.floor(diff / 60000);
-                const secs = Math.floor((diff % 60000) / 1000);
-                document.getElementById('session-timer').innerText = `Session Time: ${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+                if (player.extraLives > 0) {
+                    // Use Extra Life
+                    player.extraLives--;
+                    player.health = 100;
+                    showKillMessage("EXTRA LIFE USED!", "achievement", "#00ff00");
+                    AudioSys.playTeleport(); // Sound effect for revive
+                    // Update Lives UI
+                    updateLivesDisplay();
+                } else {
+                    player.health = 0;
+                    player.isDead = true;
+                    document.exitPointerLock();
+                    showKillMessage("TERMINATED", "achievement");
+                    
+                    const diff = Date.now() - sessionStartTime;
+                    const mins = Math.floor(diff / 60000);
+                    const secs = Math.floor((diff % 60000) / 1000);
+                    document.getElementById('session-timer').innerText = `Session Time: ${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+                }
+            }
+        }
+        
+        function updateLivesDisplay() {
+            const el = document.getElementById('lives-display');
+            if (player.extraLives > 0) {
+                let hearts = "";
+                for(let i=0; i<player.extraLives; i++) hearts += "♥ ";
+                el.innerText = hearts;
+            } else {
+                el.innerText = "";
             }
         }
         
         function addScore(amt) {
+            const oldScore = player.score;
             player.score += amt;
             document.getElementById('score-display').innerText = "SCORE: " + player.score;
+            
+            // Extra Life Check (Every 10,000)
+            if (Math.floor(player.score / 10000) > Math.floor(oldScore / 10000)) {
+                if (player.extraLives < 3) {
+                    player.extraLives++;
+                    showKillMessage("EXTRA LIFE EARNED!", "achievement", "#00ff00");
+                    updateLivesDisplay();
+                }
+            }
         }
 
         function resetGame() {
             player.health = 100;
             player.stamina = 100;
             player.score = 0;
+            player.extraLives = 0;
             player.isDead = false;
             player.isSliding = false;
             player.isCrouching = false;
@@ -2289,11 +2671,11 @@
             camera.position.set(0, 2, 0);
             sessionStartTime = Date.now();
             
-            // Clear entities
+            updateLivesDisplay();
+            
             for(let i=enemies.length-1; i>=0; i--) enemies[i].remove();
             enemies.length = 0;
             
-            // Clear particles
             particles.forEach(p => {
                 scene.remove(p.mesh);
                 p.mesh.geometry.dispose();
@@ -2305,13 +2687,17 @@
             comboCount = 0;
             updateComboUI();
             document.getElementById('score-display').innerText = "SCORE: 0";
+            
+            // Clear critical effects
+            document.getElementById('health-fill').classList.remove('health-critical');
+            document.getElementById('low-health-vignette').style.boxShadow = "inset 0 0 100px rgba(255, 0, 0, 0)";
         }
         
         function showKillMessage(text, type="", color=null) {
             const feed = document.getElementById('kill-feed');
             const msg = document.createElement('div');
             msg.className = "kill-msg " + type;
-            msg.innerHTML = text; // Changed to innerHTML to support spans
+            msg.innerHTML = text; 
             if(color) {
                 msg.style.color = color;
                 msg.style.borderLeftColor = color;
@@ -2327,47 +2713,50 @@
                 case 's': keys.s = true; break;
                 case 'd': keys.d = true; break;
                 case ' ': 
-                    if(!keys.space && !isLocked) return;
-                    keys.space = true; 
+                    keys.space = true;
+                    if (!isLocked) return;
+                    
                     if(player.onGround) {
-                        player.velocity.y = CONFIG.jumpForce;
-                        if(player.isSliding) {
-                             player.velocity.y = 15; 
-                             const forward = new THREE.Vector3();
-                             camera.getWorldDirection(forward);
-                             forward.y=0; forward.normalize();
-                             player.velocity.addScaledVector(forward, CONFIG.bunnyHopBoost);
-                        }
-                        player.onGround = false;
-                        player.lastJumpTime = performance.now(); // Mark Jump
-                        AudioSys.playJump();
-                    } else if(player.jumpsRemaining > 0) {
-                        // Wall Jump Check
-                        const ray = new THREE.Raycaster(camera.position, new THREE.Vector3(0,0,0), 0, 1.5);
-                        const dirs = [
-                            new THREE.Vector3(1,0,0), new THREE.Vector3(-1,0,0),
-                            new THREE.Vector3(0,0,1), new THREE.Vector3(0,0,-1)
-                        ];
-                        let hitWall = false;
-                        for(let d of dirs) {
-                            d.applyQuaternion(camera.quaternion);
-                            ray.set(camera.position, d);
-                            if(ray.intersectObjects(walls).length > 0) {
-                                hitWall = true;
-                                player.velocity.addScaledVector(d, -CONFIG.wallPushForce);
-                                break;
-                            }
-                        }
-                        
-                        player.velocity.y = hitWall ? CONFIG.wallJumpForce : CONFIG.jumpForce;
-                        player.jumpsRemaining--;
-                        player.lastJumpTime = performance.now();
-                        if(hitWall) {
-                            player.lastWallJumpTime = performance.now(); // Mark Wall Jump
-                            AudioSys.playWallJump();
-                        } else {
-                            AudioSys.playJump();
-                        }
+                        // Immediate Ground Jump
+                        performJump();
+                        // Also set flag to auto-hop if held on landing later
+                        wantsToJump = true;
+                        // Reset streaks
+                        moveStreaks.longAerial.count = 0;
+                        moveStreaks.aerial.count = 0;
+                    } else {
+                         // Mid-Air Logic
+                         if (!e.repeat) { // Only first press triggers double jump
+                             if(player.jumpsRemaining > 0) {
+                                // Manual Wall Jump Check first if pressing jump mid-air
+                                // Wait, simple logic: Try Wall Jump, else Double Jump
+                                performWallJump(); // Will fail if no wall
+                                
+                                // If wall jump didn't trigger (velocity.y not reset to wallJumpForce), try double jump
+                                // This is tricky without return values. Let's rely on standard flow.
+                                // Actually, simpler: Double Jump logic is specific.
+                                
+                                const ray = new THREE.Raycaster(camera.position, new THREE.Vector3(0,0,0), 0, 1.5);
+                                const dirs = [new THREE.Vector3(1,0,0), new THREE.Vector3(-1,0,0), new THREE.Vector3(0,0,1), new THREE.Vector3(0,0,-1)];
+                                let hitWall = false;
+                                for(let d of dirs) {
+                                    d.applyQuaternion(camera.quaternion);
+                                    ray.set(camera.position, d);
+                                    if(ray.intersectObjects(walls).length > 0) { hitWall = true; break; }
+                                }
+                                
+                                if (!hitWall && player.jumpsRemaining > 0) {
+                                    player.velocity.y = CONFIG.jumpForce;
+                                    player.jumpsRemaining--;
+                                    AudioSys.playJump();
+                                } else if (hitWall) {
+                                    // Wall jump handled in performWallJump usually, but here for manual single press:
+                                    performWallJump();
+                                }
+                             }
+                         }
+                         // Holding triggers auto-hop on next landing OR wall touch
+                         wantsToJump = true;
                     }
                     break;
                 case 'shift': keys.shift = true; break;
@@ -2391,7 +2780,10 @@
                 case 'a': keys.a = false; break;
                 case 's': keys.s = false; break;
                 case 'd': keys.d = false; break;
-                case ' ': keys.space = false; break;
+                case ' ': 
+                    keys.space = false; 
+                    wantsToJump = false; 
+                    break;
                 case 'shift': keys.shift = false; break;
                 case 'c': keys.c = false; break;
                 case 'q': keys.q = false; break;
@@ -2419,21 +2811,17 @@
             lastTime = now;
             
             if (isLocked && !player.isDead) {
-                // SPAWN LOGIC (Rate: 0.05)
                 if (Math.random() < 0.05 && enemies.length < 60) {
                     new Enemy();
                 }
                 
-                // AUTO STRIKE
                 if (mouseDown) {
                      if (teleportMode === 'AIM' && player.teleportActive) {
-                        // Wait for explicit click
                      } else {
                         slash();
                      }
                 }
                 
-                // Update Entities
                 updatePlayer(dt);
                 updateWeather(dt);
                 
@@ -2441,12 +2829,11 @@
                     enemies[i].update(dt, camera.position);
                 }
 
-                // Particles
                 for (let i = particles.length - 1; i >= 0; i--) {
                     const p = particles[i];
                     p.life -= dt;
                     if (p.isStatic) {
-                         p.mesh.material.opacity = p.life * 0.6;
+                         p.mesh.material.opacity = p.life * 0.4; // Slightly lower opacity for trails
                     } else {
                          p.mesh.position.addScaledVector(p.vel, dt);
                          p.mesh.scale.setScalar(p.life * 2); 
@@ -2460,7 +2847,6 @@
                     }
                 }
                 
-                // Combo Decay
                 if (comboCount > 0) {
                     comboTimer -= dt;
                     if (comboTimer <= 0) {
@@ -2469,13 +2855,11 @@
                     }
                 }
                 
-                // Health/Stamina Bar UI
                 const hpPct = Math.max(0, player.health);
                 const stPct = Math.max(0, player.stamina);
                 document.getElementById('health-fill').style.width = hpPct + '%';
                 document.getElementById('stamina-fill').style.width = stPct + '%';
                 
-                // Breathe Effect Reset if user successfully enters
                 const btn = document.getElementById('start-btn');
                 if (btn.innerText === "b r e a t h e" && isLocked) {
                      btn.innerText = "ENTER ARENA";
@@ -2487,7 +2871,6 @@
             renderer.render(scene, camera);
         }
 
-        // START
         init();
     </script>
 </body>
