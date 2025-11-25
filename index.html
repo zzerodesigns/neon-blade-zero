@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v44.22e</title>
+    <title>Neon Blade: Melee Arena v44.22k</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #111; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; user-select: none; transition: background-color 0.5s; }
         
@@ -125,8 +125,7 @@
             background: linear-gradient(135deg, rgba(10,20,30,0.95), rgba(5,10,15,0.95));
             clip-path: polygon(
                 30px 0, 100% 0, 
-                100% calc(100% - 30px), calc(100% - 30px) 100%, 
-                0 100%, 0 30px
+                100% calc(100% - 30px), calc(100% - 30px) 100%, 0 100%, 0 30px
             );
             position: relative;
             max-width: 900px; width: 80%;
@@ -351,7 +350,7 @@
                 <button class="btn-secondary" id="theme-btn">THEME: LIGHT</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v44.22e</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v44.22k</div>
         </div>
     </div>
 
@@ -647,6 +646,7 @@
         let slashActive = false;
         let sessionStartTime = 0;
         let lastHeartbeatTime = 0;
+        let lastHoveredEnemy = null;
 
         const materials = {};
         const textures = {};
@@ -1567,10 +1567,14 @@
             }
 
             if (teleportMode === 'AIM' && player.teleportActive) {
+                // V44.22k FIX:
+                // 1. Raycast ONLY against world objects for marker placement (prevents snapping to enemies)
                 const raycaster = new THREE.Raycaster();
                 raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
                 raycaster.far = CONFIG.teleportRange;
+                
                 const intersects = raycaster.intersectObjects(worldObjects);
+                
                 if (intersects.length > 0) {
                     teleportMarker.position.copy(intersects[0].point);
                     player.teleportTarget = intersects[0].point;
@@ -1582,6 +1586,33 @@
                     player.teleportTarget = target;
                 }
                 teleportMarker.visible = true;
+
+                // 2. Proximity Check for Highlighting (Decoupled from Camera Raycast)
+                let closestEnemy = null;
+                let closestDist = 999;
+                
+                for (const enemy of enemies) {
+                    if (enemy.isDeadCorpse) continue;
+                    // Calculate distance from marker to enemy
+                    const dist = player.teleportTarget.distanceTo(enemy.mesh.position);
+                    // Threshold: Base (2.5) + Enemy Scale. If marker is within this radius, glow.
+                    const threshold = 2.5 + (enemy.type.scale || 1);
+                    
+                    if (dist < threshold && dist < closestDist) {
+                        closestDist = dist;
+                        closestEnemy = enemy;
+                    }
+                }
+
+                if (lastHoveredEnemy && lastHoveredEnemy !== closestEnemy) {
+                    lastHoveredEnemy.setHighlight(false);
+                }
+                if (closestEnemy) {
+                    closestEnemy.setHighlight(true);
+                    lastHoveredEnemy = closestEnemy;
+                } else {
+                    lastHoveredEnemy = null;
+                }
                 
                 // Animate Marker
                 const t = performance.now();
@@ -1593,6 +1624,10 @@
             } else {
                 teleportMarker.visible = false;
                 document.getElementById('icon-q').classList.remove('active');
+                if (lastHoveredEnemy) {
+                    lastHoveredEnemy.setHighlight(false);
+                    lastHoveredEnemy = null;
+                }
             }
 
             // Handle Crosshair Visibility
@@ -1830,8 +1865,9 @@
              player.stamina -= CONFIG.teleportCost;
 
              let yOffset = 0;
-             const currentGroundY = getGroundHeight(camera.position.x, camera.position.z);
-             const startInAir = (camera.position.y - currentGroundY) > 1.0; 
+             // V44.22h FIX: Use strict physics state for startInAir detection
+             // If player was on ground physically, startInAir is false, regardless of camera height.
+             const startInAir = !player.onGround;
 
              const ray = new THREE.Raycaster(target.clone().add(new THREE.Vector3(0,1,0)), new THREE.Vector3(0,-1,0), 0, 2);
              const hits = ray.intersectObjects(worldObjects);
@@ -1871,7 +1907,10 @@
             const raycaster = new THREE.Raycaster();
             raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
             raycaster.far = CONFIG.teleportRange;
-            const intersects = raycaster.intersectObjects(worldObjects);
+            const targetables = [...worldObjects];
+            enemies.forEach(e => targetables.push(e.mesh));
+            
+            const intersects = raycaster.intersectObjects(targetables, true);
             let target;
             if (intersects.length > 0) {
                  target = intersects[0].point;
@@ -2042,8 +2081,11 @@
                     GameStats.checkMoveMilestone('slideHit', "SLIDE", "#00ffff");
                 }
                 
-                // --- NEW AERIAL LOGIC (v44.22) ---
-                if (!player.onGround) {
+                // --- NEW AERIAL LOGIC (v44.22h) ---
+                // Filter out Ground Teleports from aerial scoring
+                const isGroundTeleport = recentTeleport && !player.lastTeleportWasAerial;
+                
+                if (!player.onGround && !isGroundTeleport) {
                      // Check flight duration
                      const airDuration = (now - player.airTimeStart) / 1000;
                      
@@ -2065,11 +2107,15 @@
                      }
                 }
                 
-                if (recentTeleport && !player.hasPhaseStruck) {
-                     const bonus = updateStreak('phase', 50);
+                if (recentTeleport) {
+                     let base = 0;
+                     if (!player.hasPhaseStruck) {
+                         base = 50;
+                         player.hasPhaseStruck = true; // Only grant base score once per teleport
+                     }
+                     const bonus = updateStreak('phase', base);
                      addedScore += bonus;
                      comboNames.push("TELEPORT");
-                     player.hasPhaseStruck = true; 
                      GameStats.moves.teleportHit++;
                      GameStats.checkMoveMilestone('teleportHit', "VOID WALKER", "#aa00ff");
                 }
@@ -2258,6 +2304,19 @@
                 this.updateTheme(currentTheme);
                 scene.add(this.mesh);
                 enemies.push(this);
+            }
+
+            setHighlight(active) {
+                if(active) {
+                    // V44.22i: Proper surface glow using emissive channel
+                    this.body.material.emissive.setHex(0xff0000); 
+                    this.body.material.emissiveIntensity = 1.0;
+                    this.outline.material.color.setHex(0xffffff);
+                    this.outline.material.opacity = 0.8;
+                } else {
+                    this.updateTheme(currentTheme); 
+                    this.outline.scale.setScalar(1.02);
+                }
             }
 
             updateTheme(t) {
