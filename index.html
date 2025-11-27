@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v44.22k</title>
+    <title>Neon Blade: Melee Arena v45.5</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #111; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; user-select: none; transition: background-color 0.5s; }
         
@@ -350,7 +350,7 @@
                 <button class="btn-secondary" id="theme-btn">THEME: LIGHT</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v44.22k</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v45.5</div>
         </div>
     </div>
 
@@ -613,6 +613,7 @@
                 if(!this.ctx) return;
                 const t = this.ctx.currentTime;
                 const osc = this.ctx.createOscillator();
+                const osc2 = this.ctx.createOscillator();
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(60, t);
                 osc.frequency.exponentialRampToValueAtTime(1, t + 0.1);
@@ -647,6 +648,10 @@
         let sessionStartTime = 0;
         let lastHeartbeatTime = 0;
         let lastHoveredEnemy = null;
+        let windTimer = 0;
+        let windActive = false;
+        const windTarget = new THREE.Vector3();
+        const currentWind = new THREE.Vector3();
 
         const materials = {};
         const textures = {};
@@ -703,11 +708,22 @@
             canvas.width = 1024; canvas.height = 1024;
             const ctx = canvas.getContext('2d');
             
-            if (type === 'snow') {
+            if (type === 'solid') {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, 1024, 1024);
+                // No grid lines for solid matte texture
+            } else if (type === 'snow') {
                 ctx.fillStyle = '#ffffff'; 
                 ctx.fillRect(0,0,1024,1024);
                 ctx.strokeStyle = 'rgba(200, 220, 255, 0.2)'; 
                 ctx.lineWidth = 2;
+                // Grid Lines
+                ctx.beginPath();
+                for(let i=0; i<=1024; i+=128) {
+                    ctx.moveTo(i,0); ctx.lineTo(i,1024);
+                    ctx.moveTo(0,i); ctx.lineTo(1024,i);
+                }
+                ctx.stroke();
             } else if (type === 'neon') {
                 // New Tron-Style Neon Grid
                 ctx.fillStyle = '#000000'; 
@@ -716,25 +732,38 @@
                 ctx.lineWidth = 2;
                 ctx.shadowBlur = 4;
                 ctx.shadowColor = '#00ffff';
+                // Grid Lines
+                ctx.beginPath();
+                for(let i=0; i<=1024; i+=128) {
+                    ctx.moveTo(i,0); ctx.lineTo(i,1024);
+                    ctx.moveTo(0,i); ctx.lineTo(1024,i);
+                }
+                ctx.stroke();
+                // Minor Grid
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = 'rgba(0, 255, 255, 0.3)';
+                ctx.beginPath();
+                for(let i=0; i<=1024; i+=32) {
+                    if(i % 128 === 0) continue;
+                    ctx.moveTo(i,0); ctx.lineTo(i,1024);
+                    ctx.moveTo(0,i); ctx.lineTo(1024,i);
+                }
+                ctx.stroke();
             } else {
                 ctx.fillStyle = '#050505';
                 ctx.fillRect(0, 0, 1024, 1024);
                 ctx.strokeStyle = '#333333';
                 ctx.lineWidth = 4;
-            }
-            
-            // Grid Lines
-            ctx.beginPath();
-            for(let i=0; i<=1024; i+=128) {
-                ctx.moveTo(i,0); ctx.lineTo(i,1024);
-                ctx.moveTo(0,i); ctx.lineTo(1024,i);
-            }
-            ctx.stroke();
-
-            // Minor Grid
-            if (type !== 'snow') {
-                ctx.lineWidth = type === 'neon' ? 1 : 2;
-                ctx.strokeStyle = type === 'neon' ? 'rgba(0, 255, 255, 0.3)' : 'rgba(255,255,255,0.1)';
+                // Grid Lines
+                ctx.beginPath();
+                for(let i=0; i<=1024; i+=128) {
+                    ctx.moveTo(i,0); ctx.lineTo(i,1024);
+                    ctx.moveTo(0,i); ctx.lineTo(1024,i);
+                }
+                ctx.stroke();
+                // Minor Grid
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = 'rgba(255,255,255,0.1)';
                 ctx.beginPath();
                 for(let i=0; i<=1024; i+=32) {
                     if(i % 128 === 0) continue;
@@ -743,7 +772,7 @@
                 }
                 ctx.stroke();
             }
-
+            
             const tex = new THREE.CanvasTexture(canvas);
             tex.wrapS = THREE.RepeatWrapping;
             tex.wrapT = THREE.RepeatWrapping;
@@ -811,6 +840,7 @@
             textures.gridDefault = createGridTexture('default');
             textures.gridSnow = createGridTexture('snow');
             textures.gridNeon = createGridTexture('neon');
+            textures.solid = createGridTexture('solid');
             textures.glow = createGlowTexture();
 
             setupLighting();
@@ -1024,36 +1054,44 @@
             } else {
                 ui.classList.remove('light-theme');
                 
-                if (currentTheme === 1) { // DARK (CYBER)
-                    scene.background = new THREE.Color(0x080808);
-                    scene.fog = new THREE.FogExp2(0x080808, 0.01);
-                    body.style.backgroundColor = "#080808";
+                if (currentTheme === 1) { // DARK (GLOSSY COLD) v45.3
+                    // Colder, dark background (Visible Blue-Grey)
+                    const bgCol = 0x20242a; 
+                    scene.background = new THREE.Color(bgCol);
+                    scene.fog = new THREE.FogExp2(bgCol, 0.007); // v45.3 Reduced fog density for better visibility
+                    body.style.backgroundColor = "#20242a";
                     
-                    // Dark Theme uses Neon Grid (Cyan)
-                    materials.floor.map = textures.gridNeon;
-                    materials.floor.map.repeat.set(400/32, 400/32);
-                    materials.floor.color.setHex(0xffffff); 
+                    // Glossy solid texture, no grid
+                    materials.floor.map = textures.solid;
+                    materials.floor.color.setHex(0x1a1e26); // v45.3 Darker Slate Floor
+                    materials.floor.roughness = 0.4; // v45.3 Glossy Reflection
+                    materials.floor.metalness = 0.1;
                     
-                    materials.wall.color.setHex(0x444444); 
+                    materials.wall.color.setHex(0x3b4252); // Blue-grey walls
+                    materials.wall.roughness = 1.0;
+                    materials.wall.metalness = 0.0;
                     
-                    currentSlashColor = 0x00aaff; 
-                    materials.marker.color.setHex(0x00ffaa);
-                    crosshair.style.color = "#00aaff";
+                    currentSlashColor = 0xffaa00; 
+                    materials.marker.color.setHex(0xff8800);
+                    crosshair.style.color = "#ffaa00";
                     
-                    ambientLight.intensity = 1.0; 
-                    hemiLight.intensity = 0.6;
-                    dirLight.intensity = 0.6;
+                    // v45.3 Brighter lighting (+20%)
+                    ambientLight.intensity = 2.2; 
+                    hemiLight.intensity = 1.2;
+                    dirLight.intensity = 1.5;
+                    dirLight.color.setHex(0xddddff); // Cold light
 
                 } else if (currentTheme === 2) { // NEON (Classic v44)
                     const bgCol = 0x050505;
                     scene.background = new THREE.Color(bgCol);
-                    scene.fog = new THREE.FogExp2(bgCol, 0.01);
+                    scene.fog = new THREE.FogExp2(bgCol, 0.007); // v45.3 Reduced fog density
                     body.style.backgroundColor = "#050505";
                     
                     // Neon Theme uses Default Grid (Grey)
                     materials.floor.map = textures.gridDefault;
                     materials.floor.map.repeat.set(400/32, 400/32);
                     materials.floor.color.setHex(0x444444);
+                    materials.floor.roughness = 0.5; // Ensure glossiness
                     
                     materials.wall.color.setHex(0x001122); 
                     
@@ -1061,29 +1099,36 @@
                     materials.marker.color.setHex(0x00ffff);
                     crosshair.style.color = "#00ffff";
                     
-                    ambientLight.intensity = 0.8;
-                    hemiLight.intensity = 0.5;
-                    dirLight.intensity = 0.8;
+                    // v45.3 Brighter lighting (+20%)
+                    ambientLight.intensity = 1.2;
+                    hemiLight.intensity = 0.8;
+                    dirLight.intensity = 1.2;
                     dirLight.color.setHex(0x00ffff);
 
-                } else { // HALLOWEEN
-                    scene.background = new THREE.Color(0x150500); 
-                    scene.fog = new THREE.FogExp2(0x150500, 0.008);
-                    body.style.backgroundColor = "#150500";
+                } else { // HALLOWEEN v45.3 (NEUTRAL/BRIGHT/GLOSSY)
+                    // Brighter Background (Brown/Orange)
+                    const bgCol = 0x663311;
+                    scene.background = new THREE.Color(bgCol); 
+                    scene.fog = new THREE.FogExp2(bgCol, 0.008);
+                    body.style.backgroundColor = "#663311";
                     
-                    materials.floor.map = textures.gridDefault;
-                    materials.floor.map.repeat.set(400/32, 400/32);
-                    materials.floor.color.setHex(0x2a1100); 
+                    // Fix: Use SOLID texture, no grid
+                    materials.floor.map = textures.solid;
+                    materials.floor.color.setHex(0x3d1f00); // v45.3 Deepened Dark Brown (Contrast against wall)
+                    materials.floor.roughness = 0.4; // v45.3 Glossy Reflection
+                    materials.floor.metalness = 0.1;
                     
-                    materials.wall.color.setHex(0x332200); 
+                    materials.wall.color.setHex(0x7a3e00); // Lighter orange-brown
+                    materials.wall.roughness = 1.0;
                     
                     currentSlashColor = 0xff8800; 
                     materials.marker.color.setHex(0xff4400);
                     crosshair.style.color = "#ff8800";
                     
-                    ambientLight.intensity = 1.0; 
-                    hemiLight.intensity = 0.7;
-                    dirLight.intensity = 0.8;
+                    // Significantly brighter lighting
+                    ambientLight.intensity = 2.0; 
+                    hemiLight.intensity = 1.2;
+                    dirLight.intensity = 1.5;
                     dirLight.color.setHex(0xffaa00);
                 }
             }
@@ -1184,12 +1229,22 @@
             { box: 0xffffff, ribbon: 0xcc0000 }, // White/Red
             { box: 0x663399, ribbon: 0xffd700 }  // Purple/Gold
         ];
+        
+        // Warm earth tones for Dark theme accents
+        const WARM_PALETTES = [
+             0x8B4513, // SaddleBrown
+             0xA0522D, // Sienna
+             0xCD853F, // Peru
+             0xD2691E, // Chocolate
+             0xBC8F8F  // RosyBrown
+        ];
 
         class Decoration {
             constructor(x, z, scale) {
                 this.scale = scale;
                 const size = 2;
                 this.palette = GIFT_PALETTES[Math.floor(Math.random() * GIFT_PALETTES.length)];
+                this.warmColor = WARM_PALETTES[Math.floor(Math.random() * WARM_PALETTES.length)];
 
                 const colliderGeo = new THREE.BoxGeometry(size, size, size);
                 const colliderMat = new THREE.MeshBasicMaterial({ visible: false });
@@ -1268,9 +1323,10 @@
                 this.visualMesh.rotation.y = 0; // Reset rotation
 
                 if (t === 3) { // Halloween
-                    const r = 0.8 + Math.random()*0.2;
-                    const g = 0.3 + Math.random()*0.3;
-                    this.mat.color.setRGB(r, g, 0); // Random orange
+                    // More Orange/Red, less green (v45.2)
+                    const r = 0.9 + Math.random()*0.1; 
+                    const g = 0.05 + Math.random()*0.15; // Low G for Red/Orange
+                    this.mat.color.setRGB(r, g, 0); 
                     this.mat.emissive = new THREE.Color(r*0.1, g*0.1, 0);
                     this.faceGroup.visible = true;
                     this.edges.visible = false;
@@ -1281,12 +1337,10 @@
                     this.ribbonGroup.visible = true;
                     this.edges.material.color.setHex(0x000000);
                 } else {
-                    if(t === 1) { // Dark/Cyber (Actually uses Neon Grid)
-                         this.mat.color.setHex(0x112233);
-                         this.mat.emissive.setHex(0x001122);
-                         this.edges.material.color.setHex(0x00ffff);
-                         this.edges.material.opacity = 0.8;
-                         this.edges.material.linewidth = 1;
+                    if(t === 1) { // Dark (Warm Matte Accents)
+                         this.mat.color.setHex(this.warmColor);
+                         this.mat.emissive.setHex(0x000000);
+                         this.edges.visible = false; // Smooth look
                     }
                     if(t === 2) { // Neon (Uses Grey Grid, Dark Look)
                          this.mat.color.setHex(0x001122); // Dark Blueish
@@ -1309,9 +1363,26 @@
                  weatherParticles.length = 0;
                  if (!isHalloween && !isSnow) return;
             }
+            
+            // Wind Logic
+            windTimer += dt;
+            if (windTimer > 8.0 && !windActive) {
+                windActive = true;
+                // Random wind direction
+                windTarget.set((Math.random()-0.5)*25, 5 + Math.random()*5, (Math.random()-0.5)*25); // Stronger wind (v45.1)
+            }
+            if (windTimer > 12.0 && windActive) {
+                windActive = false;
+                windTarget.set(0,0,0);
+                windTimer = 0;
+            }
 
-            const limit = isSnow ? 300 : 80;
-            const spawnRate = isSnow ? 0.4 : 0.1;
+            // Smoothly interpolate current wind force (v45.1 fix)
+            currentWind.lerp(windTarget, dt * 1.0); 
+
+            // v45.4 Increased Snow Limit
+            const limit = isSnow ? 600 : 80;
+            const spawnRate = isSnow ? 0.8 : 0.1;
 
             if(weatherParticles.length < limit && Math.random() < spawnRate) {
                 let mesh, vel, type;
@@ -1327,7 +1398,9 @@
                     vel = new THREE.Vector3((Math.random()-0.5)*2, -4 - Math.random()*4, (Math.random()-0.5)*2);
                     type = 'snow';
                 } else {
-                    const geo = new THREE.PlaneGeometry(0.3, 0.3);
+                    // Random Leaf scale (v45)
+                    const s = 0.2 + Math.random() * 0.3;
+                    const geo = new THREE.PlaneGeometry(s, s);
                     const mat = new THREE.MeshBasicMaterial({ color: Math.random() > 0.5 ? 0xffaa00 : 0x884400, side: THREE.DoubleSide });
                     mesh = new THREE.Mesh(geo, mat);
                     mesh.position.set(px, 30, pz);
@@ -1353,6 +1426,23 @@
                         weatherParticles.splice(i, 1);
                     }
                     continue; 
+                }
+                
+                // v45.4 Apply Wind to both Snow and Leaves
+                if (l.type === 'leaf' || l.type === 'snow') {
+                    // Wind adds to velocity
+                    l.mesh.position.addScaledVector(currentWind, dt);
+                    
+                    // Add turbulence if wind is strong
+                    if(currentWind.lengthSq() > 1) {
+                         if (l.type === 'leaf') {
+                             l.mesh.rotation.z += dt * 5;
+                             l.mesh.rotation.x += dt * 5;
+                         } else {
+                             // Snow turbulence
+                             l.mesh.position.x += (Math.random()-0.5) * dt * 5;
+                         }
+                    }
                 }
 
                 l.mesh.position.addScaledVector(l.vel, dt);
@@ -1537,6 +1627,23 @@
         }
 
         // --- GAME LOGIC ---
+        function getTeleportTarget() {
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+            raycaster.far = CONFIG.teleportRange;
+            
+            // Aimed Marker & Instant TP logic is identical: Target only World Objects (walls/floors), ignore enemies
+            const intersects = raycaster.intersectObjects(worldObjects);
+            
+            if (intersects.length > 0) {
+                return { point: intersects[0].point, hit: true };
+            } else {
+                const dir = new THREE.Vector3();
+                camera.getWorldDirection(dir);
+                return { point: camera.position.clone().addScaledVector(dir, CONFIG.teleportRange), hit: false };
+            }
+        }
+
         function updatePlayer(dt) {
             if (player.isDead) return;
             camera.position.y -= player.cameraHeightOffset;
@@ -1567,24 +1674,10 @@
             }
 
             if (teleportMode === 'AIM' && player.teleportActive) {
-                // V44.22k FIX:
-                // 1. Raycast ONLY against world objects for marker placement (prevents snapping to enemies)
-                const raycaster = new THREE.Raycaster();
-                raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-                raycaster.far = CONFIG.teleportRange;
-                
-                const intersects = raycaster.intersectObjects(worldObjects);
-                
-                if (intersects.length > 0) {
-                    teleportMarker.position.copy(intersects[0].point);
-                    player.teleportTarget = intersects[0].point;
-                } else {
-                    const dir = new THREE.Vector3();
-                    camera.getWorldDirection(dir);
-                    const target = camera.position.clone().addScaledVector(dir, CONFIG.teleportRange);
-                    teleportMarker.position.copy(target);
-                    player.teleportTarget = target;
-                }
+                // v45.5: Use unified helper logic
+                const result = getTeleportTarget();
+                teleportMarker.position.copy(result.point);
+                player.teleportTarget = result.point;
                 teleportMarker.visible = true;
 
                 // 2. Proximity Check for Highlighting (Decoupled from Camera Raycast)
@@ -1782,7 +1875,7 @@
             // Auto-Hop Logic (Ground)
             if (player.onGround && wantsToJump) {
                  performJump();
-                 // Reset streaks immediately to prevent stacking bug on bunnyhops
+                 // FIX: Reset streaks immediately to prevent stacking bug on bunnyhops
                  moveStreaks.longAerial.count = 0;
                  moveStreaks.aerial.count = 0;
             }
@@ -1904,22 +1997,10 @@
         }
 
         function tryInstantTeleport() {
-            const raycaster = new THREE.Raycaster();
-            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-            raycaster.far = CONFIG.teleportRange;
-            const targetables = [...worldObjects];
-            enemies.forEach(e => targetables.push(e.mesh));
+            // v45.5: Unified logic via helper
+            const result = getTeleportTarget();
+            executeTeleport(result.point);
             
-            const intersects = raycaster.intersectObjects(targetables, true);
-            let target;
-            if (intersects.length > 0) {
-                 target = intersects[0].point;
-            } else {
-                 const dir = new THREE.Vector3();
-                 camera.getWorldDirection(dir);
-                 target = camera.position.clone().addScaledVector(dir, CONFIG.teleportRange);
-            }
-            executeTeleport(target);
             document.getElementById('icon-q').classList.add('active');
             setTimeout(() => document.getElementById('icon-q').classList.remove('active'), 200);
         }
@@ -2209,10 +2290,26 @@
                     }
                 } else {
                     let x, z;
-                    do {
-                        x = (Math.random() - 0.5) * 200;
-                        z = (Math.random() - 0.5) * 200;
-                    } while (Math.abs(x) < 20 && Math.abs(z) < 20);
+                    
+                    // v45.5: Chance to spawn on a platform center
+                    let validSpawn = false;
+                    if (Math.random() < 0.4 && decorations.length > 0) {
+                         const dec = decorations[Math.floor(Math.random() * decorations.length)];
+                         // Constrain spawn to 60% of the surface area to avoid edges
+                         const range = (dec.scale - 2) * 0.6; 
+                         if(range > 2) {
+                             x = dec.visualMesh.position.x + (Math.random() - 0.5) * 2 * range;
+                             z = dec.visualMesh.position.z + (Math.random() - 0.5) * 2 * range;
+                             validSpawn = true;
+                         }
+                    }
+
+                    if(!validSpawn) {
+                         do {
+                            x = (Math.random() - 0.5) * 200;
+                            z = (Math.random() - 0.5) * 200;
+                        } while (Math.abs(x) < 20 && Math.abs(z) < 20);
+                    }
                     
                     const groundY = getGroundHeight(x, z);
                     spawnY = groundY;
@@ -2335,6 +2432,25 @@
             }
 
             pickRoamTarget() {
+                // v45.4: Improved platform logic to prevent bots constantly falling off
+                const myGround = getGroundHeight(this.mesh.position.x, this.mesh.position.z);
+                
+                // If on a platform (height > 2), try to find a target on similar height
+                if (myGround > 2) {
+                    for(let i=0; i<10; i++) {
+                         const tx = this.mesh.position.x + (Math.random() - 0.5) * 60;
+                         const tz = this.mesh.position.z + (Math.random() - 0.5) * 60;
+                         // Keep within bounds roughly
+                         if (Math.abs(tx) > 150 || Math.abs(tz) > 150) continue;
+                         
+                         const tGround = getGroundHeight(tx, tz);
+                         if (Math.abs(tGround - myGround) < 1.0) {
+                             this.targetPos.set(tx, this.mesh.position.y, tz);
+                             return;
+                         }
+                    }
+                }
+
                 this.targetPos.set(
                     (Math.random() - 0.5) * 150,
                     this.mesh.position.y,
@@ -2427,6 +2543,21 @@
                 
                 if (this.state === 'ROAM') {
                     speed = CONFIG.botRoamSpeed * this.type.speedMod;
+                    
+                    // v45.5: Check for Ledge ahead
+                    if (this.onGroundSafe(groundY)) {
+                        const forward = new THREE.Vector3(0,0,1).applyAxisAngle(new THREE.Vector3(0,1,0), this.mesh.rotation.y);
+                        const lookAheadPos = this.mesh.position.clone().addScaledVector(forward, 2.0); 
+                        const aheadHeight = getGroundHeight(lookAheadPos.x, lookAheadPos.z);
+                        
+                        // If drop is significant > 3 units
+                        if (groundY - aheadHeight > 3.0) {
+                            if (Math.random() > 0.1) { // 90% chance to turn (10% clumsy)
+                                this.pickRoamTarget();
+                            }
+                        }
+                    }
+
                     if (new THREE.Vector2(this.mesh.position.x - dest.x, this.mesh.position.z - dest.z).length() < 3) {
                         this.pickRoamTarget();
                     }
@@ -2556,7 +2687,8 @@
 
                 // Simple collision resolution with less jitter
                 const botBox = new THREE.Box3().setFromObject(this.body);
-                botBox.expandByScalar(-0.1); 
+                // v45.4: Reverted collision shrink for strictly accurate physics
+                // botBox.expandByScalar(-0.1); 
                 
                 for(const wall of walls) {
                     const wb = wall.geometry.boundingBox.clone().applyMatrix4(wall.matrixWorld);
@@ -2570,6 +2702,11 @@
                          } else {
                              const sign = (this.mesh.position.z < wall.matrixWorld.elements[14]) ? -1 : 1;
                              this.mesh.position.z += zOverlap * sign;
+                         }
+
+                         // v45.5: Wall Avoidance while Roaming
+                         if (this.state === 'ROAM' && Math.random() > 0.1) {
+                             this.pickRoamTarget();
                          }
                     }
                 }
