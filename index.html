@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v45.7.6</title>
+    <title>Neon Blade: Melee Arena v45.7.9</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -398,7 +398,7 @@
                 <button class="btn-secondary" id="fps-btn">SHOW FPS: OFF</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v45.7.6</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v45.7.9</div>
         </div>
     </div>
 
@@ -418,9 +418,10 @@
             
             frictionGround: 6.0, 
             frictionAir: 0.02, 
-            airControl: 1.0,  
-            frictionSlide: 0.6, // v45.7.6 Buffed Slide (Halved friction = Double distance)
-            slideBoost: 18, 
+            airControl: 2.0,  
+            frictionSlide: 0.8, // v45.7.8 Buffed Slide (Less friction = More distance)
+            frictionWall: 0.5, // v45.7.7 Wall Slide Friction
+            slideBoost: 15, 
             bunnyHopBoost: 0, 
             
             staminaMax: 100,
@@ -435,7 +436,7 @@
             teleportRange: 20,
 
             // v45.6.5 Balance Changes
-            playerMaxHP: 500, 
+            playerMaxHP: 250, 
 
             botBaseHP: 200, 
             botDamage: 2,   
@@ -815,7 +816,8 @@
             lastTeleportWasAerial: false,
             hasPhaseStruck: false,
             totalHits: 0, // v45.6.5 Track total hits for Crit Scaling
-            tpAimStartTime: 0 // v45.7.3
+            tpAimStartTime: 0, // v45.7.3
+            wallImpactVelocity: 0 // v45.7.9
         };
 
         const moveStreaks = {
@@ -950,6 +952,8 @@
                     }, 800);
                     return;
                 }
+                // v45.7.7 Session Timer Fix: Initialize time only on successful entry
+                sessionStartTime = Date.now();
                 document.body.requestPointerLock().catch(e => {
                     console.warn("Pointer lock failed:", e);
                 });
@@ -1834,6 +1838,45 @@
             animateImpact();
         }
 
+        function spawnRipple(pos, normal, baseColor=0x00ffff) {
+            // v45.7.8 Multi-layer Ripple Visuals
+            const layers = 3;
+            const colorObj = new THREE.Color(baseColor);
+            
+            for(let i=0; i<layers; i++) {
+                // Vary scale or color per layer
+                let layerColor = colorObj.clone();
+                if(i===1) layerColor.lerp(new THREE.Color(0xffffff), 0.6); // Inner layer is whiter/brighter
+                if(i===2) layerColor.lerp(new THREE.Color(0x000088), 0.4); // Outer layer is deeper blue
+                
+                const geo = new THREE.RingGeometry(0.5, 0.8 + (i*0.1), 32); 
+                const mat = new THREE.MeshBasicMaterial({ 
+                    color: layerColor, 
+                    transparent: true, 
+                    opacity: 0.8, 
+                    side: THREE.DoubleSide, 
+                    depthWrite: false,
+                    blending: THREE.AdditiveBlending
+                });
+                
+                const mesh = new THREE.Mesh(geo, mat);
+                // Offset layers slightly along normal to prevent z-fighting
+                mesh.position.copy(pos).addScaledVector(normal, 0.05 + (i * 0.2)); 
+                mesh.lookAt(pos.clone().add(normal)); 
+                
+                scene.add(mesh);
+                
+                particles.push({
+                    mesh: mesh,
+                    vel: new THREE.Vector3(0,0,0),
+                    life: 0.8, // v45.7.8 Increased duration (was 0.4)
+                    maxLife: 0.8,
+                    isStatic: false,
+                    type: 'ripple'
+                });
+            }
+        }
+
         function spawnFirework(pos) {
             spawnParticles(pos, 0xffcc00, 30);
             spawnParticles(pos, 0x00ffff, 30);
@@ -2132,7 +2175,9 @@
             
             if (player.isSliding) { 
                 if (player.onGround) {
-                    friction = CONFIG.frictionSlide; drive = 0; targetSpeed = 0; 
+                    friction = CONFIG.frictionSlide; 
+                    drive = 1; // v45.7.9: Allow steering while sliding (Low Control)
+                    targetSpeed = CONFIG.sprintSpeed; // Allow input magnitude to matter
                 } else {
                     // v45.7.5: Allow sliding off ledges to keep momentum (use Air Friction)
                     friction = CONFIG.frictionAir; 
@@ -2140,7 +2185,8 @@
                 }
             }
 
-            if (inputDir.length() > 0 && (!player.isSliding || !player.onGround)) {
+            if (inputDir.length() > 0) {
+                // v45.7.9: Allow input while sliding (removed restriction)
                 player.velocity.addScaledVector(inputDir, targetSpeed * drive * dt);
             }
 
@@ -2171,10 +2217,16 @@
                     const wallZ = wb.mesh.matrixWorld.elements[14];
                     
                     if (xOverlap < zOverlap) {
+                        // v45.7.9 Momentum Preservation: Capture Impact Velocity
+                        player.wallImpactVelocity = Math.abs(player.velocity.x); 
+                        
                         const sign = (nextPos.x < wallX) ? -1 : 1;
                         nextPos.x += xOverlap * sign;
                         player.velocity.x = 0;
                     } else {
+                        // v45.7.9 Momentum Preservation: Capture Impact Velocity
+                        player.wallImpactVelocity = Math.abs(player.velocity.z);
+
                         const sign = (nextPos.z < wallZ) ? -1 : 1;
                         nextPos.z += zOverlap * sign;
                         player.velocity.z = 0;
@@ -2182,6 +2234,13 @@
                     playerBox.min.set(nextPos.x - radius, nextPos.y - 1.5, nextPos.z - radius);
                     playerBox.max.set(nextPos.x + radius, nextPos.y + 0.5, nextPos.z + radius);
                 }
+            }
+
+            // v45.7.7 Wall Friction (Vertical Drag)
+            if (touchingWall) {
+                const wallDamping = Math.exp(-CONFIG.frictionWall * dt);
+                player.velocity.x *= wallDamping;
+                player.velocity.z *= wallDamping;
             }
 
             // GROUND DETECTION
@@ -2237,8 +2296,8 @@
                  moveStreaks.longAerial.count = 0;
                  moveStreaks.aerial.count = 0;
             }
-            // Auto-Hop Logic (Wall)
-            else if (!player.onGround && touchingWall && wantsToJump && player.jumpsRemaining > 0) {
+            // Auto-Hop Logic (Wall) - v45.7.7 Infinite Wall Jumps
+            else if (!player.onGround && touchingWall && wantsToJump) {
                  performWallJump();
             }
 
@@ -2273,6 +2332,11 @@
              // This prevents the "Stacking Score" bug where airTimeStart remains old.
              if(player.onGround) {
                  player.airTimeStart = performance.now();
+                 // v45.7.7 Visuals
+                 spawnRipple(camera.position.clone().add(new THREE.Vector3(0,-1.5,0)), new THREE.Vector3(0,1,0), 0x00ffff);
+             } else {
+                 // Air Jump Visuals
+                 spawnRipple(camera.position.clone().add(new THREE.Vector3(0,-1.5,0)), new THREE.Vector3(0,1,0), 0x00ffaa);
              }
              
              player.onGround = false;
@@ -2288,12 +2352,23 @@
                 new THREE.Vector3(0,0,1), new THREE.Vector3(0,0,-1)
             ];
             let hitWall = false;
+            let wallNormal = new THREE.Vector3(0,1,0); // Default
+            
             for(let d of dirs) {
                 d.applyQuaternion(camera.quaternion);
                 globalRaycaster.set(camera.position, d);
-                if(globalRaycaster.intersectObjects(walls).length > 0) {
+                const intersects = globalRaycaster.intersectObjects(walls);
+                if(intersects.length > 0) {
                     hitWall = true;
-                    player.velocity.addScaledVector(d, -CONFIG.wallPushForce);
+                    // Wall Jump kicks off the wall
+                    // v45.7.9 Preserve Momentum (Bounce Physics)
+                    const force = Math.max(CONFIG.wallPushForce, (player.wallImpactVelocity || 0) * 0.9);
+                    
+                    player.velocity.addScaledVector(d, -force);
+                    
+                    if (intersects[0].face) wallNormal = intersects[0].face.normal;
+                    // v45.7.7 Wall Ripple
+                    spawnRipple(intersects[0].point, wallNormal, 0xffff00);
                     break;
                 }
             }
@@ -2301,7 +2376,6 @@
             if (hitWall) {
                 player.velocity.y = CONFIG.wallJumpForce;
                 // v45.7.3: Wall bounces are free (do not consume jumps)
-                // player.jumpsRemaining--; 
                 player.onGround = false;
                 player.lastJumpTime = performance.now();
                 player.lastWallJumpTime = performance.now(); 
@@ -3181,6 +3255,8 @@
                         dest = playerPos;
                         const dist = this.mesh.position.distanceTo(playerPos);
                         
+                        // v45.7.8 Reverted "Keep Distance" logic (removed backpedal) per user request
+                        
                         // Smart Retreat / Healing Logic
                         // v45.7.4 Gated Retreat with Reaction Delay
                         if (hpPct < 0.5 && !this.isRetreating && !this.pendingRetreat) {
@@ -3478,9 +3554,8 @@
                                 this.strafeTimer = 1.5 + Math.random() * 2.0;
                             }
 
-                            // v45.7.0 Combat Range Logic: Reduced Ideal Range
-                            // Force bots to come INSIDE attack range (3.5 scale) vs Attack Trigger (5 scale)
-                            const idealRange = 3.5 * this.type.scale;
+                            // v45.7.8 Combat Range Logic: Closer with slight buffer
+                            const idealRange = 1.5 + (3.0 * this.type.scale);
 
                             if (dist < 15 + (10 * this.type.scale)) {
                                 // Calculate Orbit Vector (Perpendicular to direction to player)
@@ -3857,6 +3932,8 @@
                                     player.velocity.y = CONFIG.jumpForce;
                                     player.jumpsRemaining--;
                                     AudioSys.playJump();
+                                    // Air Jump Visual
+                                    spawnRipple(camera.position.clone().add(new THREE.Vector3(0,-1.5,0)), new THREE.Vector3(0,1,0), 0x00ffaa);
                                 } else if (hitWall) {
                                     // Wall jump handled in performWallJump usually, but here for manual single press:
                                     performWallJump();
@@ -3955,6 +4032,14 @@
                     p.life -= dt;
                     if (p.isStatic) {
                          p.mesh.material.opacity = p.life * 0.4; // Slightly lower opacity for trails
+                    } else if (p.type === 'ripple') {
+                        // V45.7.8 Enhanced Ripple Animation (Non-Linear Expansion)
+                        const progress = 1.0 - (p.life / p.maxLife);
+                        const ease = 1 - Math.pow(1 - progress, 3); // EaseOutCubic
+                        
+                        const scale = 1 + (ease * 1);
+                        p.mesh.scale.setScalar(scale);
+                        p.mesh.material.opacity = (1.0 - ease) * 0.1;
                     } else {
                          p.mesh.position.addScaledVector(p.vel, dt);
                          p.mesh.scale.setScalar(p.life * 2); 
