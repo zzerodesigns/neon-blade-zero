@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v45.7.9</title>
+    <title>Neon Blade: Melee Arena v45.9</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -398,7 +398,7 @@
                 <button class="btn-secondary" id="fps-btn">SHOW FPS: OFF</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v45.7.9</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v45.9</div>
         </div>
     </div>
 
@@ -521,11 +521,68 @@
             { count: 500, title: "REAPER" },
             { count: 1000, title: "DEATH INCARNATE" }
         ];
+        
+        // --- INPUT MANAGER (v45.8) ---
+        const InputManager = {
+            keys: { w: false, a: false, s: false, d: false, space: false, shift: false, c: false, q: false },
+            mouseDown: false,
+            init: function() {
+                document.addEventListener('keydown', (e) => this.onKeyDown(e));
+                document.addEventListener('keyup', (e) => this.onKeyUp(e));
+                document.addEventListener('mousedown', (e) => {
+                    if (e.button === 0) this.mouseDown = true;
+                    if (isLocked && e.button === 0) {
+                        player.onAttackInput();
+                    }
+                });
+                document.addEventListener('mouseup', () => { this.mouseDown = false; });
+                document.addEventListener('mousemove', (e) => this.onMouseMove(e));
+            },
+            onKeyDown: function(e) {
+                switch(e.key.toLowerCase()) {
+                    case 'w': this.keys.w = true; break;
+                    case 'a': this.keys.a = true; break;
+                    case 's': this.keys.s = true; break;
+                    case 'd': this.keys.d = true; break;
+                    case ' ': 
+                        this.keys.space = true;
+                        if (isLocked) player.onJumpInput(e.repeat);
+                        break;
+                    case 'shift': this.keys.shift = true; break;
+                    case 'c': this.keys.c = true; break;
+                    case 'q': 
+                        if(!this.keys.q) {
+                            this.keys.q = true;
+                            if(isLocked && !player.isDead) player.onTeleportInput();
+                        }
+                        break;
+                    case 't': if(!e.repeat) toggleTheme(); break;
+                }
+            },
+            onKeyUp: function(e) {
+                switch(e.key.toLowerCase()) {
+                    case 'w': this.keys.w = false; break;
+                    case 'a': this.keys.a = false; break;
+                    case 's': this.keys.s = false; break;
+                    case 'd': this.keys.d = false; break;
+                    case ' ': this.keys.space = false; player.wantsToJump = false; break;
+                    case 'shift': this.keys.shift = false; break;
+                    case 'c': this.keys.c = false; break;
+                    case 'q': this.keys.q = false; break;
+                }
+            },
+            onMouseMove: function(e) {
+                if (!isLocked || player.isDead) return;
+                camera.rotation.y -= e.movementX * 0.002;
+                camera.rotation.x -= e.movementY * 0.002;
+                camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
+            }
+        };
 
         const GameStats = {
             highestCombo: 0,
-            botKills: 0, // v45.7.1
-            persistentAchievements: [], // v45.6.12 Separation for Paus Screen
+            botKills: 0, 
+            persistentAchievements: [],
             moves: {
                 slideHit: 0,
                 midAirHit: 0,
@@ -540,10 +597,7 @@
                 for(let k in this.moves) this.moves[k] = 0;
             },
             addAchievement: function(name, color="#ff00ff", type="PERSISTENT") {
-                // TYPE: "PERSISTENT" (Gameplay Milestones) | "FEED_ONLY" (Spam/Meme)
-                
                 showKillMessage(name, "achievement", color);
-                
                 if (type === "PERSISTENT") {
                     if(!this.persistentAchievements.includes(name)) {
                         this.persistentAchievements.push(name);
@@ -750,9 +804,6 @@
         let scene, camera, renderer;
         let isLocked = false;
         let lastTime = performance.now();
-        const keys = { w: false, a: false, s: false, d: false, space: false, shift: false, c: false, q: false };
-        let wantsToJump = false; 
-        let mouseDown = false;
         let lastUnlockTime = 0; 
         
         let currentTheme = 0; 
@@ -776,7 +827,6 @@
         let sharedSnowGeo = null;
         let sharedLeafGeo = null;
         const globalRaycaster = new THREE.Raycaster();
-        let staticWallBounds = []; // Pre-computed World AABBs for static walls
         
         // v45.7.5 Optimization: Reuse geometries for bots to save memory
         const sharedEnemyGeo = new THREE.BoxGeometry(1, 2, 1);
@@ -791,34 +841,475 @@
         const materials = {};
         const textures = {};
 
-        const player = {
-            velocity: new THREE.Vector3(),
-            onGround: false,
-            jumpsRemaining: 2, 
-            isSliding: false,
-            isCrouching: false,
-            isSprinting: false,
-            health: CONFIG.playerMaxHP, // v45.6.5
-            stamina: 100,
-            score: 0,
-            extraLives: 0,
-            isDead: false,
-            cameraHeightOffset: 0,
-            lastDamageTime: 0,
-            isRegenerating: false,
-            teleportActive: false,
-            teleportTarget: null,
-            airTimeStart: 0,
-            lastSlideTime: 0,
-            lastJumpTime: 0,
-            lastTeleportTime: 0,
-            lastWallJumpTime: 0,
-            lastTeleportWasAerial: false,
-            hasPhaseStruck: false,
-            totalHits: 0, // v45.6.5 Track total hits for Crit Scaling
-            tpAimStartTime: 0, // v45.7.3
-            wallImpactVelocity: 0 // v45.7.9
-        };
+        // --- SPATIAL PARTITIONING (v45.8) ---
+        class SpatialHashGrid {
+            constructor(bounds, dimensions) {
+                const [x, z] = dimensions;
+                this.cells = new Map();
+                this.cellSize = 50; 
+            }
+
+            _getKey(x, z) {
+                return `${Math.floor(x / this.cellSize)}:${Math.floor(z / this.cellSize)}`;
+            }
+
+            insert(mesh, box) {
+                const minX = Math.floor(box.min.x / this.cellSize);
+                const maxX = Math.floor(box.max.x / this.cellSize);
+                const minZ = Math.floor(box.min.z / this.cellSize);
+                const maxZ = Math.floor(box.max.z / this.cellSize);
+
+                for (let x = minX; x <= maxX; x++) {
+                    for (let z = minZ; z <= maxZ; z++) {
+                        const key = `${x}:${z}`;
+                        if (!this.cells.has(key)) {
+                            this.cells.set(key, []);
+                        }
+                        this.cells.get(key).push({ mesh, box });
+                    }
+                }
+            }
+
+            query(box) {
+                const results = new Set();
+                const minX = Math.floor(box.min.x / this.cellSize);
+                const maxX = Math.floor(box.max.x / this.cellSize);
+                const minZ = Math.floor(box.min.z / this.cellSize);
+                const maxZ = Math.floor(box.max.z / this.cellSize);
+
+                for (let x = minX; x <= maxX; x++) {
+                    for (let z = minZ; z <= maxZ; z++) {
+                        const key = `${x}:${z}`;
+                        const cell = this.cells.get(key);
+                        if (cell) {
+                            for (const item of cell) {
+                                results.add(item);
+                            }
+                        }
+                    }
+                }
+                return results;
+            }
+        }
+        
+        const spatialGrid = new SpatialHashGrid(null, [400, 400]);
+
+        // --- PLAYER CONTROLLER CLASS (v45.8) ---
+        class PlayerController {
+            constructor() {
+                this.velocity = new THREE.Vector3();
+                this.onGround = false;
+                this.jumpsRemaining = 2;
+                this.isSliding = false;
+                this.isCrouching = false;
+                this.isSprinting = false;
+                this.health = CONFIG.playerMaxHP;
+                this.stamina = 100;
+                this.score = 0;
+                this.extraLives = 0;
+                this.isDead = false;
+                this.cameraHeightOffset = 0;
+                this.lastDamageTime = 0;
+                this.isRegenerating = false;
+                this.teleportActive = false;
+                this.teleportTarget = null;
+                this.airTimeStart = 0;
+                this.lastSlideTime = 0;
+                this.lastJumpTime = 0;
+                this.lastTeleportTime = 0;
+                this.lastWallJumpTime = 0;
+                this.lastTeleportWasAerial = false;
+                this.hasPhaseStruck = false;
+                this.totalHits = 0;
+                this.tpAimStartTime = 0;
+                this.wallImpactVelocity = 0;
+                this.wantsToJump = false;
+
+                // Weapon System
+                this.currentWeapon = null;
+            }
+
+            init() {
+                this.currentWeapon = new Katana(this);
+            }
+
+            onJumpInput(isRepeat) {
+                if(this.onGround) {
+                    performJump();
+                    this.wantsToJump = true;
+                    moveStreaks.longAerial.count = 0;
+                    moveStreaks.aerial.count = 0;
+                } else {
+                     if (!isRepeat) { 
+                         if(this.jumpsRemaining > 0) {
+                            performWallJump(); 
+                            // Manual Air Jump check (if not wall jump)
+                            // v45.6 Reuse global raycaster for wall check logic (simplified here)
+                            // ... Actually performWallJump handles logic.
+                            // If performWallJump succeeded, velocity changed. If not, normal jump.
+                            // This is slightly distinct from old code: old code checked walls separately.
+                            // Let's preserve old logic structure:
+                            
+                            let hitWall = false;
+                            globalRaycaster.far = 1.5;
+                            const dirs = [new THREE.Vector3(1,0,0), new THREE.Vector3(-1,0,0), new THREE.Vector3(0,0,1), new THREE.Vector3(0,0,-1)];
+                            for(let d of dirs) {
+                                d.applyQuaternion(camera.quaternion);
+                                globalRaycaster.set(camera.position, d);
+                                if(globalRaycaster.intersectObjects(walls).length > 0) { hitWall = true; break; }
+                            }
+                            
+                            if (!hitWall && this.jumpsRemaining > 0) {
+                                this.velocity.y = CONFIG.jumpForce;
+                                this.jumpsRemaining--;
+                                AudioSys.playJump();
+                                spawnRipple(camera.position.clone().add(new THREE.Vector3(0,-1.5,0)), new THREE.Vector3(0,1,0), 0x00ffaa);
+                            } else if (hitWall) {
+                                performWallJump();
+                            }
+                         }
+                     }
+                     this.wantsToJump = true;
+                }
+            }
+
+            onAttackInput() {
+                if (teleportMode === 'AIM' && this.teleportActive) {
+                    tryAimTeleport();
+                    this.currentWeapon.use(); 
+                } else {
+                    this.currentWeapon.use();
+                }
+            }
+
+            onTeleportInput() {
+                if(teleportMode === 'INSTANT') tryInstantTeleport();
+                else if(teleportMode === 'AIM') {
+                    this.teleportActive = !this.teleportActive;
+                    if(this.teleportActive) this.tpAimStartTime = 0; 
+                }
+            }
+
+            update(dt) {
+                if (this.isDead) return;
+                
+                // Weapon Update
+                if(this.currentWeapon) this.currentWeapon.update(dt);
+
+                // v45.9 Auto Strike
+                if (isLocked && InputManager.mouseDown) {
+                    this.onAttackInput();
+                }
+
+                camera.position.y -= this.cameraHeightOffset;
+                this.handleHealthRegen(dt);
+                this.handleStamina(dt);
+                this.handleTeleport(dt);
+
+                // Movement Logic
+                const keys = InputManager.keys;
+                const isMoving = (keys.w || keys.a || keys.s || keys.d);
+                this.isSprinting = keys.shift && this.stamina > 0 && isMoving && !this.isCrouching;
+
+                // Slide & Crouch
+                if (keys.c) {
+                    if (this.onGround) {
+                        const speed = new THREE.Vector2(this.velocity.x, this.velocity.z).length();
+                        if ((this.isSprinting || this.isSliding || speed > CONFIG.baseSpeed) && !this.isCrouching) {
+                            if (!this.isSliding) {
+                                this.isSliding = true;
+                                this.lastSlideTime = performance.now(); 
+                                const forward = new THREE.Vector3();
+                                camera.getWorldDirection(forward);
+                                forward.y = 0; forward.normalize();
+                                this.velocity.addScaledVector(forward, CONFIG.slideBoost);
+                            }
+                        } else if (!this.isSliding) {
+                            this.isCrouching = true;
+                        }
+                    }
+                } else {
+                    this.isSliding = false;
+                    this.isCrouching = false;
+                }
+                
+                if (this.isSliding && currentTheme === 0) {
+                    if (Math.random() < 0.3) spawnSnowTrail(camera.position);
+                    if (Math.random() < 0.5) spawnSnowKickup(camera.position);
+                }
+
+                AudioSys.toggleSlideSound(this.isSliding && new THREE.Vector2(this.velocity.x, this.velocity.z).length() > 5);
+                const targetHeight = (this.isSliding || this.isCrouching) ? -0.8 : 0;
+                this.cameraHeightOffset = THREE.MathUtils.lerp(this.cameraHeightOffset, targetHeight, dt * 15);
+
+                const forward = new THREE.Vector3();
+                const right = new THREE.Vector3();
+                camera.getWorldDirection(forward);
+                forward.y = 0; forward.normalize();
+                right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+
+                const inputDir = new THREE.Vector3();
+                if (keys.w) inputDir.add(forward);
+                if (keys.s) inputDir.sub(forward);
+                if (keys.a) inputDir.sub(right);
+                if (keys.d) inputDir.add(right);
+                if (inputDir.length() > 0) inputDir.normalize();
+
+                let targetSpeed = CONFIG.baseSpeed;
+                if (this.isCrouching) targetSpeed = CONFIG.crouchSpeed;
+                if (this.isSprinting) targetSpeed = CONFIG.sprintSpeed;
+                
+                let friction = this.onGround ? CONFIG.frictionGround : CONFIG.frictionAir;
+                let drive = friction; 
+                if (!this.onGround) { friction = CONFIG.frictionAir; drive = CONFIG.airControl; }
+                
+                if (this.isSliding) { 
+                    if (this.onGround) {
+                        friction = CONFIG.frictionSlide; 
+                        drive = 1; 
+                        targetSpeed = CONFIG.sprintSpeed; 
+                    } else {
+                        friction = CONFIG.frictionAir; 
+                        drive = CONFIG.airControl * 0.5; 
+                    }
+                }
+
+                if (inputDir.length() > 0) {
+                    this.velocity.addScaledVector(inputDir, targetSpeed * drive * dt);
+                }
+
+                const damping = Math.exp(-friction * dt);
+                this.velocity.x *= damping;
+                this.velocity.z *= damping;
+                this.velocity.y -= CONFIG.gravity * dt;
+
+                const nextPos = camera.position.clone().addScaledVector(this.velocity, dt);
+                const playerBox = new THREE.Box3();
+                const radius = 0.4;
+                playerBox.min.set(nextPos.x - radius, nextPos.y - 1.5, nextPos.z - radius);
+                playerBox.max.set(nextPos.x + radius, nextPos.y + 0.5, nextPos.z + radius);
+
+                // COLLISION (Spatial Grid)
+                let touchingWall = false;
+                const nearbyWalls = spatialGrid.query(playerBox);
+                
+                for (const wb of nearbyWalls) {
+                    if (playerBox.intersectsBox(wb.box)) {
+                        touchingWall = true;
+                        const xOverlap = Math.min(playerBox.max.x - wb.box.min.x, wb.box.max.x - playerBox.min.x);
+                        const zOverlap = Math.min(playerBox.max.z - wb.box.min.z, wb.box.max.z - playerBox.min.z);
+                        
+                        const wallX = wb.mesh.matrixWorld.elements[12];
+                        const wallZ = wb.mesh.matrixWorld.elements[14];
+                        
+                        if (xOverlap < zOverlap) {
+                            this.wallImpactVelocity = Math.abs(this.velocity.x); 
+                            const sign = (nextPos.x < wallX) ? -1 : 1;
+                            nextPos.x += xOverlap * sign;
+                            this.velocity.x = 0;
+                        } else {
+                            this.wallImpactVelocity = Math.abs(this.velocity.z);
+                            const sign = (nextPos.z < wallZ) ? -1 : 1;
+                            nextPos.z += zOverlap * sign;
+                            this.velocity.z = 0;
+                        }
+                        playerBox.min.set(nextPos.x - radius, nextPos.y - 1.5, nextPos.z - radius);
+                        playerBox.max.set(nextPos.x + radius, nextPos.y + 0.5, nextPos.z + radius);
+                    }
+                }
+
+                if (touchingWall) {
+                    const wallDamping = Math.exp(-CONFIG.frictionWall * dt);
+                    this.velocity.x *= wallDamping;
+                    this.velocity.z *= wallDamping;
+                }
+
+                // GROUND DETECTION
+                let groundY = -999;
+                const r = 0.35;
+                const offsets = [[0,0], [r,r], [-r,r], [r,-r], [-r,-r]]; 
+                globalRaycaster.far = 5;
+                const rayOrigin = nextPos.clone();
+                for(let o of offsets) {
+                    rayOrigin.set(nextPos.x + o[0], nextPos.y, nextPos.z + o[1]);
+                    globalRaycaster.set(rayOrigin, new THREE.Vector3(0, -1, 0));
+                    const hits = globalRaycaster.intersectObjects(worldObjects);
+                    if(hits.length > 0) {
+                        if(hits[0].point.y > groundY) groundY = hits[0].point.y;
+                    }
+                }
+
+                const wasOnGround = this.onGround;
+                this.onGround = false;
+                
+                if (groundY > -990) {
+                    const dist = nextPos.y - groundY;
+                    const desiredHeight = 1.6; 
+                    if (dist < desiredHeight + 0.2 && this.velocity.y <= 0) {
+                        nextPos.y = groundY + desiredHeight;
+                        this.velocity.y = 0;
+                        this.onGround = true;
+                        this.jumpsRemaining = 2; 
+                        
+                        if(!wasOnGround) {
+                            moveStreaks.longAerial.count = 0; 
+                            moveStreaks.aerial.count = 0;
+                            this.lastTeleportWasAerial = false; 
+                        }
+                    }
+                }
+                
+                if (wasOnGround && !this.onGround && this.velocity.y <= 0) {
+                    this.jumpsRemaining = 3;
+                }
+
+                if (this.onGround && this.wantsToJump) {
+                     performJump();
+                     moveStreaks.longAerial.count = 0;
+                     moveStreaks.aerial.count = 0;
+                } else if (!this.onGround && touchingWall && this.wantsToJump) {
+                     performWallJump();
+                }
+
+                if (wasOnGround && !this.onGround) {
+                    this.airTimeStart = performance.now();
+                }
+
+                camera.position.copy(nextPos);
+                camera.position.y += this.cameraHeightOffset;
+                
+                if (camera.position.y < -100) {
+                    GameStats.addAchievement("DOWN THE RABBIT HOLE", "#ff00ff", "PERSISTENT");
+                    damagePlayer(20);
+                    camera.position.set(0, 2, 0);
+                    this.velocity.set(0,0,0);
+                }
+            }
+
+            handleHealthRegen(dt) {
+                const now = performance.now();
+                if (this.isRegenerating) {
+                    this.health += CONFIG.regenRate * dt;
+                    if (this.health >= CONFIG.playerMaxHP) { 
+                        this.health = CONFIG.playerMaxHP;
+                        this.isRegenerating = false;
+                    }
+                } else {
+                    if (now - this.lastDamageTime > CONFIG.regenDelay && this.health < CONFIG.playerMaxHP) {
+                        this.isRegenerating = true;
+                    }
+                }
+                
+                // Low Health Effects Update
+                const vignette = document.getElementById('low-health-vignette');
+                const healthFill = document.getElementById('health-fill');
+                const maxHP = CONFIG.playerMaxHP;
+                if (this.health < maxHP * 0.4) {
+                    if (!healthFill.classList.contains('health-critical')) healthFill.classList.add('health-critical');
+                    if (this.health < maxHP * 0.25) vignette.style.boxShadow = "inset 0 0 150px rgba(255, 0, 0, 0.6)";
+                    else vignette.style.boxShadow = "inset 0 0 100px rgba(255, 0, 0, 0.3)";
+                    
+                    let hbInterval = 1.0;
+                    if(this.health < maxHP * 0.2) hbInterval = 0.4;
+                    else if(this.health < maxHP * 0.4) hbInterval = 0.8;
+                    const nowSec = performance.now() / 1000;
+                    if(nowSec - lastHeartbeatTime > hbInterval) {
+                        AudioSys.playHeartbeat();
+                        lastHeartbeatTime = nowSec;
+                    }
+                } else {
+                     if (healthFill.classList.contains('health-critical')) healthFill.classList.remove('health-critical');
+                     vignette.style.boxShadow = "inset 0 0 100px rgba(255, 0, 0, 0)";
+                }
+            }
+
+            handleStamina(dt) {
+                if (this.isSprinting) {
+                    this.stamina -= CONFIG.staminaDrain * dt;
+                    if (this.stamina < 0) this.stamina = 0;
+                } else {
+                    this.stamina += CONFIG.staminaRegen * dt;
+                    if (this.stamina > 100) this.stamina = 100;
+                }
+            }
+
+            handleTeleport(dt) {
+                if (teleportMode === 'AIM' && this.teleportActive) {
+                    const result = getTeleportTarget();
+                    teleportMarker.position.copy(result.point);
+                    this.teleportTarget = result.point;
+                    teleportMarker.visible = true;
+
+                    let closestEnemy = null;
+                    let closestDist = 999;
+                    for (const enemy of enemies) {
+                        if (enemy.isDeadCorpse) continue;
+                        const dist = this.teleportTarget.distanceTo(enemy.mesh.position);
+                        const threshold = 2.5 + (enemy.type.scale || 1);
+                        if (dist < threshold && dist < closestDist) {
+                            closestDist = dist;
+                            closestEnemy = enemy;
+                        }
+                    }
+
+                    if (lastHoveredEnemy && lastHoveredEnemy !== closestEnemy) {
+                        lastHoveredEnemy.setHighlight(false);
+                    }
+                    if (closestEnemy) {
+                        closestEnemy.setHighlight(true);
+                        lastHoveredEnemy = closestEnemy;
+                    } else {
+                        lastHoveredEnemy = null;
+                    }
+                    
+                    const t = performance.now();
+                    teleportMarker.userData.diamond.rotation.y += dt * 2.0;
+                    
+                    if (!this.tpAimStartTime) this.tpAimStartTime = performance.now();
+                    const timeActive = performance.now() - this.tpAimStartTime;
+                    const cycle = (Math.cos(timeActive * 0.0015) + 1) / 2; 
+                    
+                    const baseCol = new THREE.Color(0x00ffff); 
+                    const whiteCol = new THREE.Color(0xffffff);
+                    const targetColor = baseCol.clone().lerp(whiteCol, cycle);
+                    const targetOpacity = 0.3 + (0.7 * cycle);
+                    
+                    materials.marker.opacity = targetOpacity;
+                    materials.marker.color.copy(targetColor);
+                    materials.marker.emissive.copy(targetColor);
+                    materials.marker.emissiveIntensity = 2.0 * cycle;
+                    
+                    teleportMarker.userData.ringMat.opacity = targetOpacity;
+                    teleportMarker.userData.ringMat.color.copy(targetColor);
+                    teleportMarker.userData.ringMat.emissive.copy(targetColor);
+                    teleportMarker.userData.ringMat.emissiveIntensity = 2.0 * cycle;
+
+                    const pulse = Math.sin(t * 0.003); 
+                    const hoverY = 1.5 + pulse * 0.2;
+                    teleportMarker.userData.diamond.position.y = hoverY;
+                    teleportMarker.userData.ring.scale.setScalar(1 + pulse * 0.05);
+
+                    document.getElementById('icon-q').classList.add('active');
+                } else {
+                    teleportMarker.visible = false;
+                    this.tpAimStartTime = 0; 
+                    document.getElementById('icon-q').classList.remove('active');
+                    if (lastHoveredEnemy) {
+                        lastHoveredEnemy.setHighlight(false);
+                        lastHoveredEnemy = null;
+                    }
+                }
+                
+                const ch = document.getElementById('crosshair');
+                if (slashActive || (teleportMode === 'AIM' && this.teleportActive)) {
+                    ch.style.opacity = 0;
+                } else {
+                    ch.style.opacity = 1;
+                }
+            }
+        }
+
+        const player = new PlayerController();
 
         const moveStreaks = {
             slide: { count: 0, lastTime: 0 },
@@ -839,6 +1330,276 @@
         let slashGeometry; 
         let lastAttackTime = 0;
         let currentSlashColor = 0x0088ff;
+
+        // --- WEAPON SYSTEM (v45.8) ---
+        class Katana {
+            constructor(owner) {
+                this.owner = owner;
+            }
+
+            update(dt) { }
+
+            use() {
+                const now = performance.now();
+                if (now - lastAttackTime < CONFIG.attackCooldown) return;
+                lastAttackTime = now;
+
+                const COMBO_WINDOW = 1000; 
+                const STREAK_WINDOW = 1500; 
+
+                let activeStreakCount = 0;
+                const recentSlide = (now - player.lastSlideTime < COMBO_WINDOW) || player.isSliding;
+                const recentTeleport = (now - player.lastTeleportTime < COMBO_WINDOW);
+                const recentWallJump = (now - player.lastWallJumpTime < COMBO_WINDOW);
+                const isAerial = !player.onGround;
+
+                const getStreak = (key) => (now - moveStreaks[key].lastTime < STREAK_WINDOW) ? moveStreaks[key].count : 0;
+
+                if(recentSlide) activeStreakCount += getStreak('slide');
+                if(isAerial) {
+                    const airDuration = (now - player.airTimeStart) / 1000;
+                    if(airDuration > 0.8) activeStreakCount += getStreak('longAerial');
+                    else activeStreakCount += getStreak('aerial');
+                }
+                if(recentTeleport) activeStreakCount += getStreak('phase');
+                if(recentWallJump) activeStreakCount += getStreak('wall');
+
+                AudioSys.playSlash();
+                const slashMesh = spawnSlash(camera);
+                
+                const rng = Math.random();
+                const missChance = 1/50; 
+                const grazeChance = 1/24; 
+                const baseCritChance = 1/36; 
+                const critBonus = activeStreakCount * 0.01; 
+                
+                let hitType = "NORMAL";
+                let dmgMult = 1.0;
+                
+                if (rng < missChance) {
+                    hitType = "MISS";
+                    dmgMult = 0;
+                } else if (rng < missChance + grazeChance) {
+                    hitType = "GRAZE";
+                    dmgMult = 0.5;
+                } else if (rng < missChance + grazeChance + baseCritChance + critBonus) {
+                    hitType = "CRIT";
+                    dmgMult = 3.0;
+                }
+                
+                if (hitType === "MISS") {
+                     AudioSys.playMiss();
+                     showKillMessage("MISS", "graze");
+                     return; 
+                }
+
+                const uniqueHitEnemies = new Set();
+                const camDir = new THREE.Vector3();
+                camera.getWorldDirection(camDir);
+
+                globalRaycaster.setFromCamera(new THREE.Vector2(0, 0), camera); 
+                globalRaycaster.far = CONFIG.attackRange;
+                
+                const hitObjects = [];
+                enemies.forEach(e => { 
+                    if (!e.isDeadCorpse) e.mesh.traverse(c => hitObjects.push(c)); 
+                });
+                
+                const hitIntersects = globalRaycaster.intersectObjects(hitObjects);
+                hitIntersects.forEach(hit => {
+                    let hitObj = hit.object;
+                    while(hitObj.parent && !enemies.some(e => e.mesh === hitObj)) {
+                        hitObj = hitObj.parent;
+                    }
+                    const enemy = enemies.find(e => e.mesh === hitObj);
+                    if(enemy) uniqueHitEnemies.add(enemy);
+                });
+
+                enemies.forEach(e => {
+                    if(e.isDeadCorpse) return;
+                    const toEnemy = e.mesh.position.clone().sub(camera.position);
+                    const dist = toEnemy.length();
+                    if (dist < CONFIG.attackRange) {
+                        toEnemy.normalize();
+                        const angle = camDir.angleTo(toEnemy);
+                        if (angle < 0.5) { 
+                            uniqueHitEnemies.add(e);
+                        }
+                    }
+                });
+
+                if (uniqueHitEnemies.size > 0) {
+                    player.totalHits += uniqueHitEnemies.size; 
+
+                    const hitCount = uniqueHitEnemies.size;
+                    if (hitCount >= 10) GameStats.addAchievement("SLAUGHTERHOUSE", "#ff0000", "PERSISTENT");
+                    else if (hitCount >= 5) GameStats.addAchievement("CROWD CONTROL", "#ff8800", "PERSISTENT");
+                    else if (hitCount >= 3) GameStats.addAchievement("TRIPLE THREAT", "#ffff00", "FEED_ONLY"); 
+
+                    let hitScore = 10;
+                    let addedScore = 0;
+                    let comboNames = [];
+
+                    function updateStreak(type, baseBonus) {
+                        if (now - moveStreaks[type].lastTime < STREAK_WINDOW) {
+                            moveStreaks[type].count++;
+                        } else {
+                            moveStreaks[type].count = 0;
+                        }
+                        moveStreaks[type].lastTime = now;
+                        return baseBonus + moveStreaks[type].count;
+                    }
+
+                    if (recentSlide) {
+                        const bonus = updateStreak('slide', 25);
+                        addedScore += bonus;
+                        comboNames.push("SLIDE");
+                        GameStats.moves.slideHit++;
+                        GameStats.checkMoveMilestone('slideHit', "SLIDE", "#00ffff");
+                    }
+                    
+                    const isGroundTeleport = recentTeleport && !player.lastTeleportWasAerial;
+                    
+                    if (!player.onGround && !isGroundTeleport) {
+                         const airDuration = (now - player.airTimeStart) / 1000;
+                         if (airDuration > 0.8) {
+                            const extraTicks = Math.floor((airDuration - 0.8) / 0.2); 
+                            const longAirBonus = 50 + (extraTicks * 10);
+                            addedScore += longAirBonus;
+                            comboNames.push("LONG AERIAL");
+                            GameStats.moves.longAirHit++;
+                            GameStats.checkMoveMilestone('longAirHit', "SKY ASSASSIN", "#ff00aa");
+                         } else {
+                            const bonus = updateStreak('aerial', 25);
+                            addedScore += bonus;
+                            comboNames.push("AERIAL");
+                            GameStats.moves.midAirHit++;
+                            GameStats.checkMoveMilestone('midAirHit', "AERIAL", "#ff00aa");
+                         }
+                    }
+                    
+                    if (recentTeleport) {
+                         let base = 0;
+                         if (!player.hasPhaseStruck) {
+                             base = 50;
+                             player.hasPhaseStruck = true; 
+                         }
+                         const bonus = updateStreak('phase', base);
+                         addedScore += bonus;
+                         comboNames.push("TELEPORT");
+                         GameStats.moves.teleportHit++;
+                         GameStats.checkMoveMilestone('teleportHit', "VOID WALKER", "#aa00ff");
+                    }
+
+                    if (recentWallJump) {
+                        const bonus = updateStreak('wall', 30);
+                        addedScore += bonus;
+                        comboNames.push("WALL");
+                        GameStats.moves.wallJumpHit++;
+                        GameStats.checkMoveMilestone('wallJumpHit', "WALL RUNNER", "#00ffaa");
+                    }
+                    
+                    hitScore += addedScore;
+                    
+                    if (comboNames.length > 0) {
+                        let totalStreak = 0;
+                        for(let k in moveStreaks) {
+                            if(now - moveStreaks[k].lastTime < STREAK_WINDOW) totalStreak += moveStreaks[k].count;
+                        }
+                        
+                        let streakColor = "#" + new THREE.Color(currentSlashColor).getHexString();
+                        if (currentTheme === 0) streakColor = "#001133"; 
+                        if (currentTheme === 1) streakColor = "#00ffff"; 
+                        
+                        let msg = comboNames.join(" ") + " +" + addedScore;
+                        if(totalStreak > 0) {
+                             msg += ` <span class="slick-streak" style="color:${streakColor}">+${totalStreak}</span>`;
+                        }
+                        
+                        showKillMessage(msg, "combo");
+                    }
+                    
+                    if(hitType === "CRIT") {
+                         showKillMessage("CRITICAL HIT!", "critical");
+                         spawnParticles(camera.position.clone().add(new THREE.Vector3(0,0,-2)), 0xff0000, 15);
+                         AudioSys.playHit(); 
+                    } else if(hitType === "GRAZE") {
+                         showKillMessage("GRAZE", "graze");
+                    }
+
+                    comboCount += uniqueHitEnemies.size;
+                    
+                    let isAoEKnockback = false;
+                    const s = comboCount.toString();
+                    if (comboCount >= 100) {
+                        if (comboCount % 100 === 0) isAoEKnockback = true;
+                        else if (/^(\d)\1+$/.test(s) || "123456789".includes(s) || "987654321".includes(s)) isAoEKnockback = true;
+                    }
+                    
+                    if (isAoEKnockback) {
+                        showKillMessage("SHOCKWAVE!", "critical", "#00ffff");
+                    }
+
+                    const hitList = Array.from(uniqueHitEnemies).map(e => ({
+                        enemy: e,
+                        dist: e.mesh.position.distanceTo(camera.position)
+                    }));
+                    hitList.sort((a, b) => a.dist - b.dist);
+
+                    hitList.forEach((h, index) => {
+                        if (h.enemy.state === 'CONFUSED') {
+                            GameStats.addAchievement("NO REST FOR THE WICKED", "#aa00ff", "PERSISTENT"); 
+                        }
+                        const distancePenalty = Math.max(0.1, 1.0 - (index * 0.1));
+                        addScore(hitScore); 
+                        
+                        const finalDamage = CONFIG.playerDamage * distancePenalty * dmgMult;
+                        
+                        if (hitType === "CRIT" || isAoEKnockback) {
+                            const knockDir = h.enemy.mesh.position.clone().sub(camera.position).normalize();
+                            knockDir.y = 0.5; 
+                            
+                            let force = 15;
+                            if(isAoEKnockback) force = 30 * (1.0 - (h.dist / CONFIG.attackRange)); 
+                            
+                            h.enemy.velocity.addScaledVector(knockDir, force);
+                            
+                            if (h.enemy.state !== 'CONFUSED' && (Math.random() < 0.2 || isAoEKnockback)) {
+                                h.enemy.state = 'CONFUSED';
+                                h.enemy.confusedTimer = 2.0;
+                                h.enemy.mesh.rotation.x = -Math.PI/2; 
+                            }
+                        }
+
+                        h.enemy.takeHit(finalDamage);
+                        
+                        const pColor = hitType === "CRIT" ? 0xff0000 : 0x00ffff;
+                        
+                        // v45.9 Enhanced Hit FX
+                        spawnParticles(h.enemy.mesh.position, pColor, 15, 1.5);
+                        spawnImpact(h.enemy.mesh.position, pColor, hitType === "CRIT" ? 3.0 : 1.5);
+                        
+                        if (hitType === "CRIT") {
+                            const toCam = camera.position.clone().sub(h.enemy.mesh.position).normalize();
+                            spawnRipple(h.enemy.mesh.position, toCam, pColor);
+                        }
+                    });
+                    
+                    AudioSys.playHit();
+
+                    comboTimer = 3.0; 
+                    updateComboUI();
+
+                    if(slashMesh) {
+                        slashMesh.material.color.setHex(hitType === "CRIT" ? 0xff0000 : 0xffffff); 
+                        slashMesh.material.opacity = 1; 
+                        slashMesh.scale.setScalar(1.2); 
+                        slashMesh.userData.fadeSpeed = 0.06; 
+                        slashMesh.userData.isHit = true; 
+                    }
+                }
+            }
+        }
 
         // --- PROCEDURAL TEXTURES ---
         function createGridTexture(type) {
@@ -952,7 +1713,6 @@
                     }, 800);
                     return;
                 }
-                // v45.7.7 Session Timer Fix: Initialize time only on successful entry
                 sessionStartTime = Date.now();
                 document.body.requestPointerLock().catch(e => {
                     console.warn("Pointer lock failed:", e);
@@ -997,25 +1757,13 @@
 
             setupLighting();
             createLevel();
-            buildStaticWallBounds(); // v45.6 optimization
+            // buildStaticWallBounds(); // v45.8 Removed in favor of SpatialHash
             createSlashEffect(); 
             createTeleportMarker();
+            
+            InputManager.init();
+            player.init();
 
-            document.addEventListener('keydown', onKeyDown);
-            document.addEventListener('keyup', onKeyUp);
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('mousedown', (e) => {
-                if(e.button === 0) mouseDown = true;
-                if(isLocked && e.button === 0) {
-                    if (teleportMode === 'AIM' && player.teleportActive) {
-                        tryAimTeleport();
-                        slash(); 
-                    } else {
-                        slash();
-                    }
-                }
-            });
-            document.addEventListener('mouseup', () => { mouseDown = false; });
             window.addEventListener('resize', onWindowResize);
             
             document.addEventListener('pointerlockchange', () => {
@@ -1029,7 +1777,7 @@
                     screen.style.display = 'flex';
                     AudioSys.stopAll();
                     updatePauseScreenStats();
-                    mouseDown = false; 
+                    InputManager.mouseDown = false; 
                 }
             });
             
@@ -1042,18 +1790,6 @@
 
             applyTheme();
             animate();
-        }
-        
-        // v45.6: Pre-calculate world space bounding boxes for all static walls to avoid matrix calc in update loops
-        function buildStaticWallBounds() {
-            staticWallBounds = [];
-            for(const wall of walls) {
-                // Ensure matrix is up to date
-                wall.updateMatrixWorld(true);
-                const box = wall.geometry.boundingBox.clone();
-                box.applyMatrix4(wall.matrixWorld);
-                staticWallBounds.push({ box: box, mesh: wall });
-            }
         }
 
         function generatePlayerTitle() {
@@ -1424,9 +2160,7 @@
                         if(Math.abs(x) < 25 && Math.abs(z) < 25) continue;
                         
                         scale = minScale + Math.random() * (maxScale - minScale);
-                        const radius = scale * 1.5; // Approximate bounding radius (Scale is half-width? No, Box is size*size. Scale affects object)
-                        // Note: Decoration code uses size=2, then scales mesh by 'scale'.
-                        // Width = 2 * scale. Radius approx scale * 1.4.
+                        const radius = scale * 1.5; 
                         
                         valid = true;
                         for(const b of obstacleBounds) {
@@ -1475,7 +2209,14 @@
             scene.add(mesh);
             mesh.geometry.computeBoundingBox();
             if (isFloor || !isWall) worldObjects.push(mesh);
-            if (!isFloor) walls.push(mesh);
+            if (!isFloor) {
+                walls.push(mesh);
+                // v45.8 Spatial Grid Insertion
+                mesh.updateMatrixWorld(true);
+                const box = mesh.geometry.boundingBox.clone();
+                box.applyMatrix4(mesh.matrixWorld);
+                spatialGrid.insert(mesh, box);
+            }
             return mesh;
         }
 
@@ -1511,6 +2252,12 @@
                 this.colliderMesh.geometry.computeBoundingBox();
                 walls.push(this.colliderMesh);
                 scene.add(this.colliderMesh);
+                
+                // v45.8 Spatial Grid
+                this.colliderMesh.updateMatrixWorld(true);
+                const box = this.colliderMesh.geometry.boundingBox.clone();
+                box.applyMatrix4(this.colliderMesh.matrixWorld);
+                spatialGrid.insert(this.colliderMesh, box);
 
                 const visualGeo = new THREE.BoxGeometry(size, size, size);
                 this.mat = materials.obstacle.clone();
@@ -1784,7 +2531,8 @@
             let mySlashID = -1;
 
             if(parent === camera) {
-                mesh.position.set(0, 0, -2.0); 
+                // v45.9: Recenter slash relative to crosshair
+                mesh.position.set(0.05, 0.05, -2.0); 
                 mesh.rotation.z = -Math.PI / 8; 
                 camera.add(mesh);
                 
@@ -1821,21 +2569,55 @@
             return mesh;
         }
 
-        function spawnImpact(pos) {
-            const mat = new THREE.SpriteMaterial({ map: textures.glow, color: 0xffffff, transparent: true, opacity: 1, blending: THREE.AdditiveBlending });
-            const mesh = new THREE.Sprite(mat);
-            mesh.scale.set(2, 2, 2);
-            mesh.position.copy(pos);
-            scene.add(mesh);
-            let life = 1.0;
-            function animateImpact() {
-                life -= 0.15;
-                mesh.material.opacity = life;
-                mesh.scale.setScalar(2 + (1-life)*2);
-                if(life > 0) requestAnimationFrame(animateImpact);
-                else { scene.remove(mesh); }
+        function spawnImpact(pos, color=0xffffff, scale=1.0) {
+            // v45.9 Enhanced Impact Flash
+            // 1. Core Flash (Bright White Center)
+            const matCore = new THREE.SpriteMaterial({ map: textures.glow, color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending });
+            const core = new THREE.Sprite(matCore);
+            core.position.copy(pos);
+            core.scale.setScalar(scale);
+            scene.add(core);
+            particles.push({ mesh: core, life: 0.1, maxLife: 0.1, type: 'flash', scaleStart: scale, scaleEnd: scale * 0.5 });
+
+            // 2. Glow Halo (Color Tint)
+            const matGlow = new THREE.SpriteMaterial({ map: textures.glow, color: color, transparent: true, blending: THREE.AdditiveBlending, opacity: 0.8 });
+            const glow = new THREE.Sprite(matGlow);
+            glow.position.copy(pos);
+            glow.scale.setScalar(scale * 2);
+            scene.add(glow);
+            particles.push({ mesh: glow, life: 0.25, maxLife: 0.25, type: 'flash', scaleStart: scale * 2, scaleEnd: scale * 4 });
+        }
+
+        function spawnParticles(pos, col, count, speed=1.0) {
+            // v45.9 Enhanced Sparks
+            for(let i=0; i<count; i++) {
+                const mat = new THREE.SpriteMaterial({ 
+                    map: textures.glow, 
+                    color: col, 
+                    transparent: true, 
+                    blending: THREE.AdditiveBlending 
+                });
+                const m = new THREE.Sprite(mat);
+                const s = 0.2 + Math.random() * 0.3;
+                m.scale.set(s, s, s);
+                m.position.copy(pos);
+                scene.add(m);
+                
+                // Directional spray (cone-ish)
+                const vel = new THREE.Vector3(
+                    (Math.random()-0.5), 
+                    (Math.random()-0.5), 
+                    (Math.random()-0.5)
+                ).normalize().multiplyScalar((5 + Math.random() * 10) * speed);
+
+                particles.push({
+                    mesh: m, 
+                    vel: vel,
+                    life: 0.4 + Math.random() * 0.3,
+                    type: 'spark',
+                    gravity: 15
+                });
             }
-            animateImpact();
         }
 
         function spawnRipple(pos, normal, baseColor=0x00ffff) {
@@ -1972,351 +2754,6 @@
             }
         }
 
-        function updatePlayer(dt) {
-            if (player.isDead) return;
-            camera.position.y -= player.cameraHeightOffset;
-
-            // Low Health Effects
-            const vignette = document.getElementById('low-health-vignette');
-            const healthFill = document.getElementById('health-fill');
-            const maxHP = CONFIG.playerMaxHP;
-            
-            // v45.6.5 Adjusted thresholds for 500 HP
-            if (player.health < maxHP * 0.4) {
-                if (!healthFill.classList.contains('health-critical')) healthFill.classList.add('health-critical');
-                
-                if (player.health < maxHP * 0.25) vignette.style.boxShadow = "inset 0 0 150px rgba(255, 0, 0, 0.6)";
-                else vignette.style.boxShadow = "inset 0 0 100px rgba(255, 0, 0, 0.3)";
-                
-                // Heartbeat Audio
-                let hbInterval = 1.0;
-                if(player.health < maxHP * 0.2) hbInterval = 0.4;
-                else if(player.health < maxHP * 0.4) hbInterval = 0.8;
-                
-                const now = performance.now() / 1000;
-                if(now - lastHeartbeatTime > hbInterval) {
-                    AudioSys.playHeartbeat();
-                    lastHeartbeatTime = now;
-                }
-            } else {
-                 if (healthFill.classList.contains('health-critical')) healthFill.classList.remove('health-critical');
-                 vignette.style.boxShadow = "inset 0 0 100px rgba(255, 0, 0, 0)";
-            }
-
-            if (teleportMode === 'AIM' && player.teleportActive) {
-                // v45.5: Unified helper logic
-                const result = getTeleportTarget();
-                teleportMarker.position.copy(result.point);
-                player.teleportTarget = result.point;
-                teleportMarker.visible = true;
-
-                // 2. Proximity Check for Highlighting (Decoupled from Camera Raycast)
-                let closestEnemy = null;
-                let closestDist = 999;
-                
-                for (const enemy of enemies) {
-                    if (enemy.isDeadCorpse) continue;
-                    // Calculate distance from marker to enemy
-                    const dist = player.teleportTarget.distanceTo(enemy.mesh.position);
-                    // Threshold: Base (2.5) + Enemy Scale. If marker is within this radius, glow.
-                    const threshold = 2.5 + (enemy.type.scale || 1);
-                    
-                    if (dist < threshold && dist < closestDist) {
-                        closestDist = dist;
-                        closestEnemy = enemy;
-                    }
-                }
-
-                if (lastHoveredEnemy && lastHoveredEnemy !== closestEnemy) {
-                    lastHoveredEnemy.setHighlight(false);
-                }
-                if (closestEnemy) {
-                    closestEnemy.setHighlight(true);
-                    lastHoveredEnemy = closestEnemy;
-                } else {
-                    lastHoveredEnemy = null;
-                }
-                
-                // Animate Marker
-                const t = performance.now();
-                
-                // 1. Rotation (Normal)
-                teleportMarker.userData.diamond.rotation.y += dt * 2.0;
-                
-                // v45.7.3: Cycle White -> Cyan, Slow Fade, Start White
-                if (!player.tpAimStartTime) player.tpAimStartTime = performance.now();
-                const timeActive = performance.now() - player.tpAimStartTime;
-                
-                // Frequency: Match bounce (0.003) but "take twice as long" -> 0.0015
-                // Start from 1 (Full Opacity/White) -> Cosine
-                const cycle = (Math.cos(timeActive * 0.0015) + 1) / 2; 
-                
-                const baseCol = new THREE.Color(0x00ffff); // Cyan
-                const whiteCol = new THREE.Color(0xffffff);
-                
-                const targetColor = baseCol.clone().lerp(whiteCol, cycle); // 1=White, 0=Cyan
-                const targetOpacity = 0.3 + (0.7 * cycle); // Pulse opacity 0.3 -> 1.0
-                
-                materials.marker.opacity = targetOpacity;
-                materials.marker.color.copy(targetColor);
-                materials.marker.emissive.copy(targetColor);
-                materials.marker.emissiveIntensity = 2.0 * cycle; // Pulse emissive
-                
-                // Ring update
-                teleportMarker.userData.ringMat.opacity = targetOpacity;
-                teleportMarker.userData.ringMat.color.copy(targetColor);
-                teleportMarker.userData.ringMat.emissive.copy(targetColor);
-                teleportMarker.userData.ringMat.emissiveIntensity = 2.0 * cycle;
-
-                // 3. Bounce (v45.6.7 Freq)
-                const pulse = Math.sin(t * 0.003); 
-                const hoverY = 1.5 + pulse * 0.2;
-                teleportMarker.userData.diamond.position.y = hoverY;
-                
-                // Ring Breath
-                teleportMarker.userData.ring.scale.setScalar(1 + pulse * 0.05);
-
-                document.getElementById('icon-q').classList.add('active');
-            } else {
-                teleportMarker.visible = false;
-                player.tpAimStartTime = 0; // Reset
-                document.getElementById('icon-q').classList.remove('active');
-                if (lastHoveredEnemy) {
-                    lastHoveredEnemy.setHighlight(false);
-                    lastHoveredEnemy = null;
-                }
-            }
-
-            // Handle Crosshair Visibility
-            const ch = document.getElementById('crosshair');
-            if (slashActive || (teleportMode === 'AIM' && player.teleportActive)) {
-                ch.style.opacity = 0;
-            } else {
-                ch.style.opacity = 1;
-            }
-
-            const now = performance.now();
-            
-            // REGEN LOGIC
-            if (player.isRegenerating) {
-                player.health += CONFIG.regenRate * dt;
-                if (player.health >= CONFIG.playerMaxHP) { // Cap at Max
-                    player.health = CONFIG.playerMaxHP;
-                    player.isRegenerating = false;
-                }
-            } else {
-                if (now - player.lastDamageTime > CONFIG.regenDelay && player.health < CONFIG.playerMaxHP) {
-                    player.isRegenerating = true;
-                }
-            }
-
-            const isMoving = (keys.w || keys.a || keys.s || keys.d);
-            player.isSprinting = keys.shift && player.stamina > 0 && isMoving && !player.isCrouching;
-            if (player.isSprinting) {
-                player.stamina -= CONFIG.staminaDrain * dt;
-                if (player.stamina < 0) player.stamina = 0;
-            } else {
-                player.stamina += CONFIG.staminaRegen * dt;
-                if (player.stamina > 100) player.stamina = 100;
-            }
-
-            // SLIDE & CROUCH
-            if (keys.c) {
-                if (player.onGround) {
-                    const speed = new THREE.Vector2(player.velocity.x, player.velocity.z).length();
-                    if ((player.isSprinting || player.isSliding || speed > CONFIG.baseSpeed) && !player.isCrouching) {
-                        if (!player.isSliding) {
-                            player.isSliding = true;
-                            player.lastSlideTime = performance.now(); 
-                            const forward = new THREE.Vector3();
-                            camera.getWorldDirection(forward);
-                            forward.y = 0; forward.normalize();
-                            player.velocity.addScaledVector(forward, CONFIG.slideBoost);
-                        }
-                    } else if (!player.isSliding) {
-                        player.isCrouching = true;
-                    }
-                }
-            } else {
-                player.isSliding = false;
-                player.isCrouching = false;
-            }
-            
-            if (player.isSliding && currentTheme === 0) {
-                if (Math.random() < 0.3) spawnSnowTrail(camera.position);
-                if (Math.random() < 0.5) spawnSnowKickup(camera.position);
-            }
-
-            AudioSys.toggleSlideSound(player.isSliding && new THREE.Vector2(player.velocity.x, player.velocity.z).length() > 5);
-            const targetHeight = (player.isSliding || player.isCrouching) ? -0.8 : 0;
-            player.cameraHeightOffset = THREE.MathUtils.lerp(player.cameraHeightOffset, targetHeight, dt * 15);
-
-            const forward = new THREE.Vector3();
-            const right = new THREE.Vector3();
-            camera.getWorldDirection(forward);
-            forward.y = 0; forward.normalize();
-            right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
-
-            const inputDir = new THREE.Vector3();
-            if (keys.w) inputDir.add(forward);
-            if (keys.s) inputDir.sub(forward);
-            if (keys.a) inputDir.sub(right);
-            if (keys.d) inputDir.add(right);
-            if (inputDir.length() > 0) inputDir.normalize();
-
-            let targetSpeed = CONFIG.baseSpeed;
-            if (player.isCrouching) targetSpeed = CONFIG.crouchSpeed;
-            if (player.isSprinting) targetSpeed = CONFIG.sprintSpeed;
-            
-            // v45.7.5 Physics Fix: Separate Slide Logic for Ground vs Air
-            let friction = player.onGround ? CONFIG.frictionGround : CONFIG.frictionAir;
-            let drive = friction; 
-            if (!player.onGround) { friction = CONFIG.frictionAir; drive = CONFIG.airControl; }
-            
-            if (player.isSliding) { 
-                if (player.onGround) {
-                    friction = CONFIG.frictionSlide; 
-                    drive = 1; // v45.7.9: Allow steering while sliding (Low Control)
-                    targetSpeed = CONFIG.sprintSpeed; // Allow input magnitude to matter
-                } else {
-                    // v45.7.5: Allow sliding off ledges to keep momentum (use Air Friction)
-                    friction = CONFIG.frictionAir; 
-                    drive = CONFIG.airControl * 0.5; // Slight reduction in air control while sliding
-                }
-            }
-
-            if (inputDir.length() > 0) {
-                // v45.7.9: Allow input while sliding (removed restriction)
-                player.velocity.addScaledVector(inputDir, targetSpeed * drive * dt);
-            }
-
-            const damping = Math.exp(-friction * dt);
-            player.velocity.x *= damping;
-            player.velocity.z *= damping;
-            player.velocity.y -= CONFIG.gravity * dt;
-
-            const nextPos = camera.position.clone().addScaledVector(player.velocity, dt);
-            const playerBox = new THREE.Box3();
-            const radius = 0.4;
-            playerBox.min.set(nextPos.x - radius, nextPos.y - 1.5, nextPos.z - radius);
-            playerBox.max.set(nextPos.x + radius, nextPos.y + 0.5, nextPos.z + radius);
-
-            // WALL COLLISION
-            let touchingWall = false;
-            // v45.6 Optimization: Use pre-calculated static world bounds
-            for (const wb of staticWallBounds) {
-                // Use the pre-computed box directly, no matrix calculations
-                if (playerBox.intersectsBox(wb.box)) {
-                    touchingWall = true;
-                    const xOverlap = Math.min(playerBox.max.x - wb.box.min.x, wb.box.max.x - playerBox.min.x);
-                    const zOverlap = Math.min(playerBox.max.z - wb.box.min.z, wb.box.max.z - playerBox.min.z);
-                    
-                    // Retrieve world position directly from matrix elements for center comparison
-                    // matrixWorld elements: 12, 13, 14 are x, y, z translation
-                    const wallX = wb.mesh.matrixWorld.elements[12];
-                    const wallZ = wb.mesh.matrixWorld.elements[14];
-                    
-                    if (xOverlap < zOverlap) {
-                        // v45.7.9 Momentum Preservation: Capture Impact Velocity
-                        player.wallImpactVelocity = Math.abs(player.velocity.x); 
-                        
-                        const sign = (nextPos.x < wallX) ? -1 : 1;
-                        nextPos.x += xOverlap * sign;
-                        player.velocity.x = 0;
-                    } else {
-                        // v45.7.9 Momentum Preservation: Capture Impact Velocity
-                        player.wallImpactVelocity = Math.abs(player.velocity.z);
-
-                        const sign = (nextPos.z < wallZ) ? -1 : 1;
-                        nextPos.z += zOverlap * sign;
-                        player.velocity.z = 0;
-                    }
-                    playerBox.min.set(nextPos.x - radius, nextPos.y - 1.5, nextPos.z - radius);
-                    playerBox.max.set(nextPos.x + radius, nextPos.y + 0.5, nextPos.z + radius);
-                }
-            }
-
-            // v45.7.7 Wall Friction (Vertical Drag)
-            if (touchingWall) {
-                const wallDamping = Math.exp(-CONFIG.frictionWall * dt);
-                player.velocity.x *= wallDamping;
-                player.velocity.z *= wallDamping;
-            }
-
-            // GROUND DETECTION
-            // v45.7.3: Multi-point "Feet" Raycast to simulate larger footprint
-            // Checks center + 4 corners of hitbox
-            let groundY = -999;
-            const r = 0.35;
-            const offsets = [[0,0], [r,r], [-r,r], [r,-r], [-r,-r]]; 
-            
-            globalRaycaster.far = 5;
-            const rayOrigin = nextPos.clone();
-            
-            for(let o of offsets) {
-                rayOrigin.set(nextPos.x + o[0], nextPos.y, nextPos.z + o[1]);
-                globalRaycaster.set(rayOrigin, new THREE.Vector3(0, -1, 0));
-                const hits = globalRaycaster.intersectObjects(worldObjects);
-                if(hits.length > 0) {
-                    if(hits[0].point.y > groundY) groundY = hits[0].point.y;
-                }
-            }
-
-            const wasOnGround = player.onGround;
-            player.onGround = false;
-            
-            // Check against highest ground found
-            if (groundY > -990) {
-                const dist = nextPos.y - groundY;
-                const desiredHeight = 1.6; 
-                // Tolerance window
-                if (dist < desiredHeight + 0.2 && player.velocity.y <= 0) {
-                    nextPos.y = groundY + desiredHeight;
-                    player.velocity.y = 0;
-                    player.onGround = true;
-                    player.jumpsRemaining = 2; 
-                    
-                    if(!wasOnGround) {
-                        moveStreaks.longAerial.count = 0; 
-                        moveStreaks.aerial.count = 0;
-                        player.lastTeleportWasAerial = false; // Reset state on land
-                    }
-                }
-            }
-            
-            // v45.7.5: Walking off a ledge grants 1 "recovery" jump + 2 air jumps = 3 total
-            if (wasOnGround && !player.onGround && player.velocity.y <= 0) {
-                player.jumpsRemaining = 3;
-            }
-
-            // Auto-Hop Logic (Ground)
-            if (player.onGround && wantsToJump) {
-                 performJump();
-                 // FIX: Reset streaks immediately to prevent stacking bug on bunnyhops
-                 moveStreaks.longAerial.count = 0;
-                 moveStreaks.aerial.count = 0;
-            }
-            // Auto-Hop Logic (Wall) - v45.7.7 Infinite Wall Jumps
-            else if (!player.onGround && touchingWall && wantsToJump) {
-                 performWallJump();
-            }
-
-            if (wasOnGround && !player.onGround) {
-                player.airTimeStart = performance.now();
-            }
-
-            camera.position.copy(nextPos);
-            camera.position.y += player.cameraHeightOffset;
-            
-            // v45.7.1 Rabbit Hole Logic: Lowered threshold to -100
-            if (camera.position.y < -100) {
-                GameStats.addAchievement("DOWN THE RABBIT HOLE", "#ff00ff", "PERSISTENT");
-                damagePlayer(20);
-                camera.position.set(0, 2, 0);
-                player.velocity.set(0,0,0);
-            }
-        }
-
         function performJump() {
              player.velocity.y = CONFIG.jumpForce;
              if(player.isSliding) {
@@ -2324,18 +2761,12 @@
                   const forward = new THREE.Vector3();
                   camera.getWorldDirection(forward);
                   forward.y=0; forward.normalize();
-                  // v45.6.4 Removed boost per request
-                  // player.velocity.addScaledVector(forward, CONFIG.bunnyHopBoost);
              }
              
-             // FIX: Reset air time start if we are launching from ground.
-             // This prevents the "Stacking Score" bug where airTimeStart remains old.
              if(player.onGround) {
                  player.airTimeStart = performance.now();
-                 // v45.7.7 Visuals
                  spawnRipple(camera.position.clone().add(new THREE.Vector3(0,-1.5,0)), new THREE.Vector3(0,1,0), 0x00ffff);
              } else {
-                 // Air Jump Visuals
                  spawnRipple(camera.position.clone().add(new THREE.Vector3(0,-1.5,0)), new THREE.Vector3(0,1,0), 0x00ffaa);
              }
              
@@ -2345,14 +2776,13 @@
         }
         
         function performWallJump() {
-            // v45.6 Reuse global raycaster
             globalRaycaster.far = 1.5;
             const dirs = [
                 new THREE.Vector3(1,0,0), new THREE.Vector3(-1,0,0),
                 new THREE.Vector3(0,0,1), new THREE.Vector3(0,0,-1)
             ];
             let hitWall = false;
-            let wallNormal = new THREE.Vector3(0,1,0); // Default
+            let wallNormal = new THREE.Vector3(0,1,0); 
             
             for(let d of dirs) {
                 d.applyQuaternion(camera.quaternion);
@@ -2379,22 +2809,18 @@
                 player.onGround = false;
                 player.lastJumpTime = performance.now();
                 player.lastWallJumpTime = performance.now(); 
-                // Note: We do NOT reset airTimeStart on wall jumps to allow Long Aerial combos.
                 AudioSys.playWallJump();
             }
         }
 
         function executeTeleport(target) {
              if (player.stamina < CONFIG.teleportCost) {
-                 // Not enough stamina
                  AudioSys.playMiss();
                  return;
              }
              player.stamina -= CONFIG.teleportCost;
 
              let yOffset = 0;
-             // V44.22h FIX: Use strict physics state for startInAir detection
-             // If player was on ground physically, startInAir is false, regardless of camera height.
              const startInAir = !player.onGround;
 
              const ray = new THREE.Raycaster(target.clone().add(new THREE.Vector3(0,1,0)), new THREE.Vector3(0,-1,0), 0, 2);
@@ -2480,9 +2906,6 @@
             if (isPattern) {
                 el.classList.add('cyan-mode');
             } else if (comboCount !== 666 && comboCount !== 777) { 
-                // Don't remove if it is a specific meme number that might want cyan
-                // Actually the prompt says 666 and 777 should follow pattern hit counts display rule
-                // So adding them to isPattern logic implicitly handles it, or explicit check here:
                 if (MEME_TRIGGERS[comboCount] && (comboCount === 666 || comboCount === 777)) {
                      el.classList.add('cyan-mode');
                 } else {
@@ -2547,295 +2970,17 @@
             if(comboCount > GameStats.highestCombo) GameStats.highestCombo = comboCount;
         }
 
-        function slash() {
-            const now = performance.now();
-            if (now - lastAttackTime < CONFIG.attackCooldown) return;
-            lastAttackTime = now;
-
-            const COMBO_WINDOW = 1000; 
-            const STREAK_WINDOW = 1500; 
-
-            // v45.6.6: Identify potential active move streaks for Crit Bonus logic
-            // Need to check conditions *before* applying the hit
-            let activeStreakCount = 0;
-            const recentSlide = (now - player.lastSlideTime < COMBO_WINDOW) || player.isSliding;
-            const recentTeleport = (now - player.lastTeleportTime < COMBO_WINDOW);
-            const recentWallJump = (now - player.lastWallJumpTime < COMBO_WINDOW);
-            const isAerial = !player.onGround;
-
-            // Helper to see if a streak is active
-            const getStreak = (key) => (now - moveStreaks[key].lastTime < STREAK_WINDOW) ? moveStreaks[key].count : 0;
-
-            if(recentSlide) activeStreakCount += getStreak('slide');
-            if(isAerial) {
-                const airDuration = (now - player.airTimeStart) / 1000;
-                if(airDuration > 0.8) activeStreakCount += getStreak('longAerial');
-                else activeStreakCount += getStreak('aerial');
-            }
-            if(recentTeleport) activeStreakCount += getStreak('phase');
-            if(recentWallJump) activeStreakCount += getStreak('wall');
-
-            AudioSys.playSlash();
-            const slashMesh = spawnSlash(camera);
-            
-            // v45.6.6 Adjusted Player Attack RNG
-            const rng = Math.random();
-            const missChance = 1/50; 
-            const grazeChance = 1/24; 
-            const baseCritChance = 1/36; 
-            
-            // v45.6.7 Crit Scaling: 1% per streak count (sum of all active streak counts)
-            const critBonus = activeStreakCount * 0.01; 
-            
-            let hitType = "NORMAL";
-            let dmgMult = 1.0;
-            
-            if (rng < missChance) {
-                hitType = "MISS";
-                dmgMult = 0;
-            } else if (rng < missChance + grazeChance) {
-                hitType = "GRAZE";
-                dmgMult = 0.5;
-            } else if (rng < missChance + grazeChance + baseCritChance + critBonus) {
-                hitType = "CRIT";
-                dmgMult = 3.0;
-            }
-            
-            if (hitType === "MISS") {
-                 AudioSys.playMiss();
-                 showKillMessage("MISS", "graze");
-                 return; // No damage logic
-            }
-
-            const uniqueHitEnemies = new Set();
-            const camDir = new THREE.Vector3();
-            camera.getWorldDirection(camDir);
-
-            // 1. Raycast Check - v45.6 Reuse global Raycaster
-            globalRaycaster.setFromCamera(new THREE.Vector2(0, 0), camera); 
-            globalRaycaster.far = CONFIG.attackRange;
-            
-            const hitObjects = [];
-            enemies.forEach(e => { 
-                if (!e.isDeadCorpse) e.mesh.traverse(c => hitObjects.push(c)); 
-            });
-            
-            const hitIntersects = globalRaycaster.intersectObjects(hitObjects);
-            hitIntersects.forEach(hit => {
-                let hitObj = hit.object;
-                while(hitObj.parent && !enemies.some(e => e.mesh === hitObj)) {
-                    hitObj = hitObj.parent;
-                }
-                const enemy = enemies.find(e => e.mesh === hitObj);
-                if(enemy) uniqueHitEnemies.add(enemy);
-            });
-
-            // 2. Cone Check
-            enemies.forEach(e => {
-                if(e.isDeadCorpse) return;
-                const toEnemy = e.mesh.position.clone().sub(camera.position);
-                const dist = toEnemy.length();
-                if (dist < CONFIG.attackRange) {
-                    toEnemy.normalize();
-                    const angle = camDir.angleTo(toEnemy);
-                    if (angle < 0.5) { 
-                        uniqueHitEnemies.add(e);
-                    }
-                }
-            });
-
-            if (uniqueHitEnemies.size > 0) {
-                player.totalHits += uniqueHitEnemies.size; // Track hits
-
-                const hitCount = uniqueHitEnemies.size;
-                if (hitCount >= 10) GameStats.addAchievement("SLAUGHTERHOUSE", "#ff0000", "PERSISTENT");
-                else if (hitCount >= 5) GameStats.addAchievement("CROWD CONTROL", "#ff8800", "PERSISTENT");
-                else if (hitCount >= 3) GameStats.addAchievement("TRIPLE THREAT", "#ffff00", "FEED_ONLY"); // Spam Allowed
-
-                let hitScore = 10;
-                let addedScore = 0;
-                let comboNames = [];
-
-                function updateStreak(type, baseBonus) {
-                    if (now - moveStreaks[type].lastTime < STREAK_WINDOW) {
-                        moveStreaks[type].count++;
-                    } else {
-                        moveStreaks[type].count = 0;
-                    }
-                    moveStreaks[type].lastTime = now;
-                    return baseBonus + moveStreaks[type].count;
-                }
-
-                if (recentSlide) {
-                    const bonus = updateStreak('slide', 25);
-                    addedScore += bonus;
-                    comboNames.push("SLIDE");
-                    GameStats.moves.slideHit++;
-                    GameStats.checkMoveMilestone('slideHit', "SLIDE", "#00ffff");
-                }
-                
-                // --- NEW AERIAL LOGIC (v44.22h) ---
-                // Filter out Ground Teleports from aerial scoring
-                const isGroundTeleport = recentTeleport && !player.lastTeleportWasAerial;
-                
-                if (!player.onGround && !isGroundTeleport) {
-                     // Check flight duration
-                     const airDuration = (now - player.airTimeStart) / 1000;
-                     
-                     if (airDuration > 0.8) {
-                        // LONG AERIAL
-                        const extraTicks = Math.floor((airDuration - 0.8) / 0.2); 
-                        const longAirBonus = 50 + (extraTicks * 10);
-                        addedScore += longAirBonus;
-                        comboNames.push("LONG AERIAL");
-                        GameStats.moves.longAirHit++;
-                        GameStats.checkMoveMilestone('longAirHit', "SKY ASSASSIN", "#ff00aa");
-                     } else {
-                        // NORMAL AERIAL
-                        const bonus = updateStreak('aerial', 25);
-                        addedScore += bonus;
-                        comboNames.push("AERIAL");
-                        GameStats.moves.midAirHit++;
-                        GameStats.checkMoveMilestone('midAirHit', "AERIAL", "#ff00aa");
-                     }
-                }
-                
-                if (recentTeleport) {
-                     let base = 0;
-                     if (!player.hasPhaseStruck) {
-                         base = 50;
-                         player.hasPhaseStruck = true; // Only grant base score once per teleport
-                     }
-                     const bonus = updateStreak('phase', base);
-                     addedScore += bonus;
-                     comboNames.push("TELEPORT");
-                     GameStats.moves.teleportHit++;
-                     GameStats.checkMoveMilestone('teleportHit', "VOID WALKER", "#aa00ff");
-                }
-
-                if (recentWallJump) {
-                    const bonus = updateStreak('wall', 30);
-                    addedScore += bonus;
-                    comboNames.push("WALL");
-                    GameStats.moves.wallJumpHit++;
-                    GameStats.checkMoveMilestone('wallJumpHit', "WALL RUNNER", "#00ffaa");
-                }
-                
-                hitScore += addedScore;
-                
-                if (comboNames.length > 0) {
-                    let totalStreak = 0;
-                    for(let k in moveStreaks) {
-                        if(now - moveStreaks[k].lastTime < STREAK_WINDOW) totalStreak += moveStreaks[k].count;
-                    }
-                    
-                    let streakColor = "#" + new THREE.Color(currentSlashColor).getHexString();
-                    if (currentTheme === 0) streakColor = "#001133"; 
-                    if (currentTheme === 1) streakColor = "#00ffff"; 
-                    
-                    let msg = comboNames.join(" ") + " +" + addedScore;
-                    if(totalStreak > 0) {
-                         msg += ` <span class="slick-streak" style="color:${streakColor}">+${totalStreak}</span>`;
-                    }
-                    
-                    showKillMessage(msg, "combo");
-                }
-                
-                // Attack Type Message
-                if(hitType === "CRIT") {
-                     showKillMessage("CRITICAL HIT!", "critical");
-                     spawnParticles(camera.position.clone().add(new THREE.Vector3(0,0,-2)), 0xff0000, 15);
-                     AudioSys.playHit(); // Double sound for impact
-                } else if(hitType === "GRAZE") {
-                     showKillMessage("GRAZE", "graze");
-                }
-
-                comboCount += uniqueHitEnemies.size;
-                
-                // v45.7.2 Check for AoE Knockback Trigger (Century or Pattern)
-                let isAoEKnockback = false;
-                const s = comboCount.toString();
-                if (comboCount >= 100) {
-                    if (comboCount % 100 === 0) isAoEKnockback = true;
-                    else if (/^(\d)\1+$/.test(s) || "123456789".includes(s) || "987654321".includes(s)) isAoEKnockback = true;
-                }
-                
-                if (isAoEKnockback) {
-                    showKillMessage("SHOCKWAVE!", "critical", "#00ffff");
-                }
-
-                const hitList = Array.from(uniqueHitEnemies).map(e => ({
-                    enemy: e,
-                    dist: e.mesh.position.distanceTo(camera.position)
-                }));
-                hitList.sort((a, b) => a.dist - b.dist);
-
-                hitList.forEach((h, index) => {
-                    if (h.enemy.state === 'CONFUSED') {
-                        GameStats.addAchievement("NO REST FOR THE WICKED", "#aa00ff", "PERSISTENT"); 
-                    }
-                    const distancePenalty = Math.max(0.1, 1.0 - (index * 0.1));
-                    addScore(hitScore); 
-                    
-                    const finalDamage = CONFIG.playerDamage * distancePenalty * dmgMult;
-                    
-                    // v45.7.1 Crit Impact & Knockback
-                    // v45.7.2 Added AoE Knockback Logic
-                    if (hitType === "CRIT" || isAoEKnockback) {
-                        // Knockback
-                        const knockDir = h.enemy.mesh.position.clone().sub(camera.position).normalize();
-                        knockDir.y = 0.5; // Slight lift
-                        
-                        let force = 15;
-                        if(isAoEKnockback) force = 30 * (1.0 - (h.dist / CONFIG.attackRange)); // AoE scales with distance
-                        
-                        h.enemy.velocity.addScaledVector(knockDir, force);
-                        
-                        // Concussion Chance (20% for Crit, 100% for AoE)
-                        if (h.enemy.state !== 'CONFUSED' && (Math.random() < 0.2 || isAoEKnockback)) {
-                            h.enemy.state = 'CONFUSED';
-                            h.enemy.confusedTimer = 2.0;
-                            h.enemy.mesh.rotation.x = -Math.PI/2; // Fall over
-                        }
-                    }
-
-                    h.enemy.takeHit(finalDamage);
-                    
-                    const pColor = hitType === "CRIT" ? 0xff0000 : 0x00ffff;
-                    spawnParticles(h.enemy.mesh.position, pColor, 10);
-                    spawnImpact(h.enemy.mesh.position);
-                });
-                
-                AudioSys.playHit();
-
-                comboTimer = 3.0; 
-                updateComboUI();
-
-                if(slashMesh) {
-                    slashMesh.material.color.setHex(hitType === "CRIT" ? 0xff0000 : 0xffffff); 
-                    slashMesh.material.opacity = 1; 
-                    slashMesh.scale.setScalar(1.2); 
-                    slashMesh.userData.fadeSpeed = 0.06; 
-                    slashMesh.userData.isHit = true; 
-                }
-            }
-        }
-
         // --- ENEMY AI ---
-        // v45.6.2 Doubled HP
-        // v45.6.13 Increased Speed Modifiers for Big Bots to make them more threatening
         const BOT_TYPES = {
             NORMAL: { scale: 1, hp: 200, speedMod: 1, dmgRed: 1, skill: 1, name: "NORMAL", color: 0x2F4F4F, eye: 0xffffff },   
-            BRUTE: { scale: 2, hp: 600, speedMod: 0.85, dmgRed: 1, skill: 2, name: "BRUTE", color: 0x191970, eye: 0xffff00 }, // Speed 0.7 -> 0.85
-            TITAN: { scale: 3, hp: 1200, speedMod: 0.75, dmgRed: 1, skill: 2, name: "TITAN", color: 0x4B0082, eye: 0xff8c00 }, // Speed 0.5 -> 0.75
-            COLOSSUS: { scale: 5, hp: 4000, speedMod: 0.6, dmgRed: 0.5, skill: 1, name: "COLOSSUS", color: 0x800000, eye: 0xff0000 } // Speed 0.3 -> 0.6
+            BRUTE: { scale: 2, hp: 600, speedMod: 0.85, dmgRed: 1, skill: 2, name: "BRUTE", color: 0x191970, eye: 0xffff00 }, 
+            TITAN: { scale: 3, hp: 1200, speedMod: 0.75, dmgRed: 1, skill: 2, name: "TITAN", color: 0x4B0082, eye: 0xff8c00 }, 
+            COLOSSUS: { scale: 5, hp: 4000, speedMod: 0.6, dmgRed: 0.5, skill: 1, name: "COLOSSUS", color: 0x800000, eye: 0xff0000 } 
         };
         
-        // v45.7.5 Helper for bot reaction delays
         function getBotReactionTime(bot) {
             const hpPct = bot.health / bot.maxHealth;
-            // Lower HP = Slower Reaction (Damage/Fatigue)
-            const base = 100 + (1 - hpPct) * 300; // 100ms (Healthy) -> 400ms (Near Death)
+            const base = 100 + (1 - hpPct) * 300; 
             const rand = Math.random() * 50;
             return base + rand;
         }
@@ -2865,7 +3010,6 @@
                     let validSpawn = false;
                     if (Math.random() < 0.4 && decorations.length > 0) {
                          const dec = decorations[Math.floor(Math.random() * decorations.length)];
-                         // Constrain spawn to 60% of the surface area to avoid edges
                          const range = (dec.scale - 2) * 0.6; 
                          if(range > 2) {
                              x = dec.visualMesh.position.x + (Math.random() - 0.5) * 2 * range;
@@ -2909,7 +3053,6 @@
                 }
                 
                 // v45.7.5 Optimization: Use Shared Geometry
-                // We clone material to allow color changes without affecting others
                 const bodyMat = new THREE.MeshPhysicalMaterial({ 
                     color: this.type.color,
                     metalness: 0.1,
@@ -2969,34 +3112,29 @@
                 this.corpseTimer = 0;
                 this.confusedTimer = 0; 
                 
-                // v45.6.5 AI Variables
                 this.streak = 0;
                 this.lastHitTime = 0;
                 this.lastDamageTime = 0;
                 this.isRegenerating = false;
                 this.isRetreating = false;
-                this.pendingRetreat = false; // v45.7.4
+                this.pendingRetreat = false; 
                 this.teleportTimer = 0;
-                this.teleportDelay = 0; // v45.6.13 Teleport Reaction Delay
-                this.personalSpeedMod = 0.8 + Math.random() * 0.4; // Variance
+                this.teleportDelay = 0; 
+                this.personalSpeedMod = 0.8 + Math.random() * 0.4; 
 
-                // v45.6.8 Tactical AI
                 this.strafeDir = Math.random() < 0.5 ? 1 : -1;
                 this.strafeTimer = 0;
                 this.dodgeTimer = 0;
-                this.dodgeReactionTimer = 0; // v45.7.4
+                this.dodgeReactionTimer = 0; 
                 this.ledgeTimer = 0; 
                 
-                // v45.6.11 Track Last Pos for Stuck Check
                 this.lastPos = new THREE.Vector2(this.mesh.position.x, this.mesh.position.z);
                 
-                // v45.7.2 Reduced Stamina (Mana) to 10. v45.7.3 Reduced Regen to 3.
                 this.stamina = 10;
                 this.maxStamina = 10;
                 this.staminaRegen = 3; 
 
-                // v45.7.5 Optimization: Vision Throttling
-                this.visionTimer = Math.random() * 0.5; // Offset start to desync checks
+                this.visionTimer = Math.random() * 0.5; 
                 this.canSeePlayerCached = false;
                 
                 this.updateTheme(currentTheme);
@@ -3006,7 +3144,6 @@
 
             setHighlight(active) {
                 if(active) {
-                    // V44.22i: Proper surface glow using emissive channel
                     this.body.material.emissive.setHex(0xff0000); 
                     this.body.material.emissiveIntensity = 1.0;
                     this.outline.material.color.setHex(0xffffff);
@@ -3033,15 +3170,11 @@
             }
 
             pickRoamTarget() {
-                // v45.4: Improved platform logic to prevent bots constantly falling off
                 const myGround = getGroundHeight(this.mesh.position.x, this.mesh.position.z);
-                
-                // If on a platform (height > 2), try to find a target on similar height
                 if (myGround > 2) {
                     for(let i=0; i<10; i++) {
                          const tx = this.mesh.position.x + (Math.random() - 0.5) * 60;
                          const tz = this.mesh.position.z + (Math.random() - 0.5) * 60;
-                         // Keep within bounds roughly
                          if (Math.abs(tx) > 150 || Math.abs(tz) > 150) continue;
                          
                          const tGround = getGroundHeight(tx, tz);
@@ -3061,23 +3194,18 @@
 
             canSeePlayer(playerPos) {
                 if (this.isDeadCorpse || this.state === 'CONFUSED') return false;
-                // v45.7.5 Return cached result from update loop
                 return this.canSeePlayerCached;
             }
 
-            // v45.7.5: Actual raycast logic, called periodically
             checkVision(playerPos) {
                 if (this.isDeadCorpse || this.state === 'CONFUSED') return false;
                 if (this.mesh.position.distanceTo(playerPos) > 60) return false; 
                 
-                // v45.6.11 Use Reserved Vector Pool _vec3_3 to avoid conflict with update loop
                 _vec3_3.copy(this.mesh.position).add(new THREE.Vector3(0, 0.5, 0));
                 
-                // v45.7.5 Optimization: Vector calculation without cloning
                 const distToPlayer = _vec3_3.distanceTo(playerPos);
-                _vec3_1.subVectors(playerPos, _vec3_3).normalize(); // Direction
+                _vec3_1.subVectors(playerPos, _vec3_3).normalize(); 
                 
-                // v45.6 Reuse global Raycaster
                 globalRaycaster.set(_vec3_3, _vec3_1);
                 globalRaycaster.far = 60;
                 const hits = globalRaycaster.intersectObjects(walls);
@@ -3088,11 +3216,10 @@
             }
 
             update(dt, playerPos) {
-                // v45.7.5 Optimization: Update vision cache
                 this.visionTimer -= dt;
                 if (this.visionTimer <= 0) {
                     this.canSeePlayerCached = this.checkVision(playerPos);
-                    this.visionTimer = 0.3 + Math.random() * 0.2; // Check every ~0.4s
+                    this.visionTimer = 0.3 + Math.random() * 0.2; 
                 }
 
                 if (this.isDeadCorpse) {
@@ -3109,28 +3236,25 @@
                     return;
                 }
                 
-                // Bot Regen Logic v45.6.5
                 const now = performance.now();
                 if (now - this.lastDamageTime > CONFIG.regenDelay && this.health < this.maxHealth) {
                     this.health += CONFIG.regenRate * dt;
                     if (this.health >= this.maxHealth) {
                         this.health = this.maxHealth;
-                        this.isRetreating = false; // Stop retreating when full hp
+                        this.isRetreating = false; 
                     }
                 }
 
-                // v45.6.13 Stamina Regen
                 if(this.stamina < this.maxStamina) {
                     this.stamina = Math.min(this.maxStamina, this.stamina + this.staminaRegen * dt);
                 }
                 
-                // Cooldowns
                 if(this.teleportTimer > 0) this.teleportTimer -= dt * 1000;
                 if(this.teleportDelay > 0) this.teleportDelay -= dt; 
 
                 if(this.strafeTimer > 0) this.strafeTimer -= dt;
                 if(this.dodgeTimer > 0) this.dodgeTimer -= dt;
-                if(this.dodgeReactionTimer > 0) this.dodgeReactionTimer -= dt; // v45.7.4
+                if(this.dodgeReactionTimer > 0) this.dodgeReactionTimer -= dt; 
                 if(this.ledgeTimer > 0) this.ledgeTimer -= dt;
 
                 if (this.state === 'CONFUSED') {
@@ -3142,8 +3266,6 @@
                         this.mesh.rotation.x = 0;
                     }
                     
-                    // Fix HP Bar Position when Fallen (v45.6.6 Adjustment)
-                    // It was clipping, so raise it higher
                     this.healthBarGroup.position.copy(this.mesh.position).add(new THREE.Vector3(0, 1.0 * this.type.scale, 0));
                     return;
                 }
@@ -3157,11 +3279,8 @@
                 if (currentY > floorThreshold + 0.1) {
                     this.velocity.y -= CONFIG.gravity * dt;
                     
-                    // v45.6.5 Enhanced Double Jump Logic for Falling Bots
-                    // If falling fast and haven't used all jumps
-                    // v45.6.7 Low HP Panic Jump Logic: If retreating and low health, jump more often
                     let jumpChance = 0.05;
-                    if (this.isRetreating && hpPct < 0.3) jumpChance = 0.3; // v45.6.7 Tweak
+                    if (this.isRetreating && hpPct < 0.3) jumpChance = 0.3; 
 
                     if (this.velocity.y < -8 && this.jumps < 2 && Math.random() < jumpChance) {
                          this.velocity.y = 18; 
@@ -3169,11 +3288,10 @@
                     }
                     
                 } else {
-                    if (this.velocity.y < -22) { // Hard landing
-                        // v45.6.6: If AGGRO/Escape, rarely fall flat
+                    if (this.velocity.y < -22) { 
                         let shouldFall = true;
                         if (this.state === 'AGGRO') {
-                            if (Math.random() < 0.9) shouldFall = false; // 90% chance to stick the landing in combat
+                            if (Math.random() < 0.9) shouldFall = false; 
                         }
 
                         if (shouldFall) {
@@ -3189,14 +3307,11 @@
                     this.jumps = 0;
                 }
                 
-                // v45.7.0 Fix: Apply horizontal velocity (Lunge) and drag
                 this.mesh.position.addScaledVector(this.velocity, dt);
                 
-                // Horizontal Friction (Heavy Drag for Dash feel)
                 const drag = Math.exp(-5.0 * dt);
                 this.velocity.x *= drag;
                 this.velocity.z *= drag;
-                // Note: velocity.y is gravity, we don't apply drag to it here, logic handles gravity reset on ground.
 
                 this.healthBarGroup.position.copy(this.mesh.position).add(new THREE.Vector3(0, 1.3 * this.type.scale, 0));
                 this.healthBarGroup.lookAt(camera.position);
@@ -3218,21 +3333,16 @@
                 let dest = this.targetPos;
                 let speed = (this.isSprinting ? CONFIG.botSprintSpeed : CONFIG.botSpeed) * this.type.speedMod * this.personalSpeedMod;
                 
-                // v45.6.11 Vector Pooling for Direction Calculation
-                // _vec3_1 is 'dir'
-                
                 if (this.state === 'ROAM') {
                     speed = CONFIG.botRoamSpeed * this.type.speedMod * this.personalSpeedMod;
                     
-                    // v45.5: Check for Ledge ahead
                     if (this.onGroundSafe(groundY)) {
                         const forward = new THREE.Vector3(0,0,1).applyAxisAngle(new THREE.Vector3(0,1,0), this.mesh.rotation.y);
                         const lookAheadPos = this.mesh.position.clone().addScaledVector(forward, 2.0); 
                         const aheadHeight = getGroundHeight(lookAheadPos.x, lookAheadPos.z);
                         
-                        // If drop is significant > 3 units
                         if (groundY - aheadHeight > 3.0) {
-                            if (Math.random() > 0.1) { // 90% chance to turn (10% clumsy)
+                            if (Math.random() > 0.1) { 
                                 this.pickRoamTarget();
                             }
                         }
@@ -3242,11 +3352,10 @@
                         this.pickRoamTarget();
                     }
                     
-                    // Roaming Jump Logic - Reduced Frequency
                     if (this.onGroundSafe(groundY) && Math.random() < 0.005) {
-                        this.velocity.y = 16; // Moderate jump
+                        this.velocity.y = 16; 
                         this.jumps = 1;
-                        this.mesh.position.y += 0.2; // Nudge
+                        this.mesh.position.y += 0.2; 
                     }
 
                 } else if (this.state === 'AGGRO') {
@@ -3255,52 +3364,37 @@
                         dest = playerPos;
                         const dist = this.mesh.position.distanceTo(playerPos);
                         
-                        // v45.7.8 Reverted "Keep Distance" logic (removed backpedal) per user request
-                        
-                        // Smart Retreat / Healing Logic
-                        // v45.7.4 Gated Retreat with Reaction Delay
                         if (hpPct < 0.5 && !this.isRetreating && !this.pendingRetreat) {
-                            // Start thinking about retreating
                             this.pendingRetreat = true;
-                            // Hijack teleportDelay for decision/reaction timing
                             if (this.teleportDelay <= 0) {
                                 this.teleportDelay = getBotReactionTime(this) / 1000;
                             }
                         }
                         
-                        // Check if delay passed to actually start retreating
                         if (this.pendingRetreat && this.teleportDelay <= 0) {
                             this.isRetreating = true;
                             this.pendingRetreat = false;
                         }
                         
                         if (this.isRetreating) {
-                            // v45.6.7 Logic: Panic if < 25% HP
                             speed = CONFIG.botSprintSpeed * this.type.speedMod * this.personalSpeedMod * 1.3;
                             this.isSprinting = true;
                             
-                            // v45.6.7 HP-based slide probability
                             if (hpPct < 0.25) {
-                                // High probability to slide in panic
                                 if(!this.isSliding && Math.random() < 0.4) this.isSliding = true; 
                             } else {
-                                // >25% HP, mostly run, low slide chance
                                 if(!this.isSliding && Math.random() < 0.05) this.isSliding = true;
                             }
 
                             const retreatDir = this.mesh.position.clone().sub(playerPos).normalize();
                             
-                            // v45.6.7 Corner Logic: Check if path is blocked
                             globalRaycaster.set(this.mesh.position, retreatDir);
                             globalRaycaster.far = 5;
                             const wallsAhead = globalRaycaster.intersectObjects(walls);
                             
                             if (wallsAhead.length > 0) {
-                                // Cornered! 
-                                // v45.6.13 Improved Fan Check Logic
                                 let escapeFound = false;
                                 
-                                // Try 90 degrees Left/Right
                                 const leftDir = new THREE.Vector3(-retreatDir.z, 0, retreatDir.x);
                                 const rightDir = new THREE.Vector3(retreatDir.z, 0, -retreatDir.x);
                                 
@@ -3316,85 +3410,67 @@
                                      }
                                 }
                                 
-                                // v45.6.13 Panic Super Jump if still stuck and player close
                                 if (!escapeFound && dist < 10) {
-                                    // Try to vault over player
                                     if(this.onGroundSafe(groundY)) {
-                                        this.velocity.y = 25; // Super Jump
+                                        this.velocity.y = 25; 
                                         this.jumps = 1;
-                                        // Move towards player to jump over them
                                         retreatDir.subVectors(playerPos, this.mesh.position).normalize();
                                     }
                                 } else if (!escapeFound) {
-                                     // Just pick random escape vector if player is still far
                                      retreatDir.set((Math.random()-0.5), 0, (Math.random()-0.5)).normalize();
                                 }
                             }
 
                             dest = this.mesh.position.clone().addScaledVector(retreatDir, 40);
-                            this.targetPos.copy(dest); // Force destination for logic
+                            this.targetPos.copy(dest); 
                         }
                         
-                        // Bot Random Teleport Logic v45.6.13 (Stamina Based)
-                        // v45.6.13 Check Stamina (Need 10)
                         if (this.teleportTimer <= 0 && this.stamina >= 10 && this.teleportDelay <= 0) {
                             
-                            // v45.7.4 Reaction Delay for TP
                             let wantsToTp = false;
                             
                             if (dist < 15 && this.isRetreating) wantsToTp = true;
-                            if (dist > 25 && !this.isRetreating) wantsToTp = true; // Chase
-                            if (dist < 15 && !this.isRetreating) wantsToTp = true; // Combat blink
+                            if (dist > 25 && !this.isRetreating) wantsToTp = true; 
+                            if (dist < 15 && !this.isRetreating) wantsToTp = true; 
 
                             if (wantsToTp && !this.teleportReactionPending) {
                                 this.teleportDelay = getBotReactionTime(this) / 1000;
                                 this.teleportReactionPending = true;
                             }
                             
-                            // If Delay is passed
                             if (this.teleportDelay <= 0 && this.teleportReactionPending) {
-                                this.teleportReactionPending = false; // Reset
+                                this.teleportReactionPending = false; 
 
-                                // Calculate chance
                                 let tpChance = 0.005;
-                                if (this.isRetreating) tpChance = 0.05; // Higher in retreat
+                                if (this.isRetreating) tpChance = 0.05; 
                                 if (dist > 25) tpChance = 0.02; 
 
                                 if (Math.random() < tpChance) {
                                     let newPos;
-                                    // v45.6.13 Range Scaling (5 to 20 based on missing health)
                                     const minRange = 5;
                                     const maxRange = 20;
                                     const tpRange = minRange + (1.0 - hpPct) * (maxRange - minRange);
 
-                                    // v45.6.7 Escape TP
                                     if (this.isRetreating) {
                                         const escapeDir = this.mesh.position.clone().sub(playerPos).normalize();
-                                        // Add noise
                                         escapeDir.x += (Math.random()-0.5)*0.5;
                                         escapeDir.z += (Math.random()-0.5)*0.5;
                                         escapeDir.normalize();
-                                        
                                         newPos = this.mesh.position.clone().addScaledVector(escapeDir, tpRange);
                                     } 
-                                    // v45.7.2 Aggressive Chase TP
-                                    else if (dist > 25) { // Reduced from 40
-                                        // Blink closer but maintain some distance (don't land on player)
+                                    else if (dist > 25) { 
                                         const approachDir = playerPos.clone().sub(this.mesh.position).normalize();
-                                        // Try to land 5 units away, but limited by maxRange (20)
                                         const travelDist = dist - 5; 
                                         if(travelDist > 5) {
                                             newPos = this.mesh.position.clone().addScaledVector(approachDir, Math.min(travelDist, maxRange));
                                         }
                                     }
-                                    // Close combat side blink
                                     else if (dist < 15 && !this.isRetreating) {
                                         const offset = new THREE.Vector3((Math.random()-0.5)*10, 0, (Math.random()-0.5)*10);
                                         newPos = this.mesh.position.clone().add(offset);
                                     }
 
                                     if (newPos) {
-                                        // v45.6.7 Safety Check: Raycast to target to prevent wall clipping
                                         const tpRayDir = newPos.clone().sub(this.mesh.position).normalize();
                                         const tpDist = newPos.distanceTo(this.mesh.position);
                                         
@@ -3403,7 +3479,6 @@
                                         const tpHits = globalRaycaster.intersectObjects(walls);
                                         
                                         if (tpHits.length > 0) {
-                                            // Hit wall! Stop just before it
                                             newPos.copy(tpHits[0].point).addScaledVector(tpRayDir, -1.0);
                                         }
 
@@ -3412,17 +3487,14 @@
                                             this.mesh.position.copy(newPos);
                                             spawnParticles(this.mesh.position, 0xff00ff, 15);
                                             AudioSys.playTeleport();
-                                            
-                                            // v45.6.13 Cost
                                             this.stamina -= 10;
-                                            this.teleportTimer = 500; // Short global cooldown
+                                            this.teleportTimer = 500; 
                                         }
                                     }
                                 }
                             }
                         }
 
-                        // Attack Logic
                         if (dist < 5 * this.type.scale) {
                             const now = performance.now();
                             if (now - this.lastAttack > CONFIG.botAttackCooldown) {
@@ -3430,39 +3502,28 @@
                                 spawnSlash(this.mesh); 
                                 AudioSys.playSlash();
                                 
-                                // v45.7.0 Fix: Apply Physical Lunge Force
                                 const lungeDir = playerPos.clone().sub(this.mesh.position).normalize();
-                                
-                                // Flatten direction to X/Z so they don't fly upwards
                                 lungeDir.y = 0; lungeDir.normalize();
-
-                                // v45.7.0 Stronger Lunge Force for Big Bots to overcome drag
                                 const lungeForce = 25 + (this.type.scale * 5); 
                                 this.velocity.addScaledVector(lungeDir, lungeForce);
                                 
-                                // v45.6.5 Scale-based Hit Chance
-                                // Smaller = higher chance. Normal=1 -> 0.95. Colossus=5 -> 0.55
                                 const hitChance = 1.05 - (this.type.scale * 0.1); 
                                 
                                 if (Math.random() < hitChance) {
-                                    // Reset Bot Combo Streak if too long since last hit
                                     if (now - this.lastHitTime > 2000) {
                                         this.streak = 0;
                                     }
-                                    
-                                    // Damage Calculation
-                                    let dmg = CONFIG.botDamage * this.type.scale; // Base
-                                    dmg += this.streak * 2; // Streak bonus
-                                    dmg = Math.min(dmg, 40); // Cap
+                                    let dmg = CONFIG.botDamage * this.type.scale; 
+                                    dmg += this.streak * 2; 
+                                    dmg = Math.min(dmg, 40); 
                                     
                                     this.streak++;
                                     this.lastHitTime = now;
-                                    
                                     damagePlayer(dmg); 
                                 }
                                 else {
                                     AudioSys.playMiss();
-                                    this.streak = 0; // Reset streak on miss
+                                    this.streak = 0; 
                                 }
                             }
                         }
@@ -3483,7 +3544,6 @@
                     if (this.canSeePlayer(playerPos)) {
                         this.state = 'AGGRO';
                         this.body.material.color.setHex(0x8b0000);
-                        // v45.7.4 Apply Aggro Delay
                         this.reactionTimer = CONFIG.botAggroDelay; 
                     } else if (this.searchTimer <= 0) {
                         this.state = 'ROAM';
@@ -3503,16 +3563,11 @@
                      this.velocity.y = 0; 
                 } else {
                     if (this.state !== 'SEARCH') {
-                        // v45.6.8: Tactical Combat Movement (Strafing/Orbiting)
-                        
-                        // v45.6.11 Optimization: Use _vec3_1 as 'dir'
                         _vec3_1.subVectors(dest, this.mesh.position);
                         _vec3_1.y = 0; 
                         _vec3_1.normalize();
 
-                        // v45.6.9: Save vector to player for separate rotation logic
-                        // v45.6.11: Use _vec3_2 as 'vectorToPlayer'
-                        _vec3_2.copy(_vec3_1); // Default to dir
+                        _vec3_2.copy(_vec3_1); 
                         
                         if (this.state === 'AGGRO' && !this.isRetreating) {
                             _vec3_2.subVectors(playerPos, this.mesh.position);
@@ -3521,87 +3576,64 @@
                         }
 
                         if (this.state === 'AGGRO' && !this.isRetreating && this.canSeePlayer(playerPos)) {
-                            // Note: canSeePlayer uses _vec3_3 internally, so _vec3_1 and _vec3_2 are safe.
-                            
                             const dist = this.mesh.position.distanceTo(playerPos);
                             
-                            // v45.6.8 Reactive Dodge: If player is aiming at me and moving fast
                             if (this.dodgeTimer <= 0) {
                                 const playerAim = new THREE.Vector3();
                                 camera.getWorldDirection(playerAim);
                                 playerAim.y = 0; playerAim.normalize();
                                 const toBot = this.mesh.position.clone().sub(playerPos).normalize();
                                 
-                                // Player looking at bot + Player moving fast = Danger
                                 if (playerAim.dot(toBot) > 0.9 && player.velocity.length() > 10) {
-                                    // v45.7.4: Gated Dodge Reaction
                                     if (this.dodgeReactionTimer <= 0) {
                                          this.dodgeReactionTimer = getBotReactionTime(this) / 1000;
                                     }
                                 }
                             }
                             
-                            // Execute Dodge if reaction passed
                             if (this.dodgeReactionTimer > 0 && this.dodgeReactionTimer <= dt && this.dodgeTimer <= 0) {
-                                this.strafeDir *= -1; // Juke
+                                this.strafeDir *= -1; 
                                 this.dodgeTimer = 1.0; 
                                 this.dodgeReactionTimer = 0;
                             }
                             
-                            // v45.6.8 Change Strafe Direction periodically
                             if (this.strafeTimer <= 0) {
                                 this.strafeDir *= -1;
                                 this.strafeTimer = 1.5 + Math.random() * 2.0;
                             }
 
-                            // v45.7.8 Combat Range Logic: Closer with slight buffer
                             const idealRange = 1.5 + (3.0 * this.type.scale);
 
                             if (dist < 15 + (10 * this.type.scale)) {
-                                // Calculate Orbit Vector (Perpendicular to direction to player)
-                                // orbitVec = (-z, 0, x) * strafeDir
                                 const orbitVec = new THREE.Vector3(-_vec3_1.z, 0, _vec3_1.x).multiplyScalar(this.strafeDir);
                                 
-                                // Blend vectors based on distance
                                 if (dist > idealRange) {
-                                    // Too far: Move forward + Orbit (Spiral In)
                                     _vec3_1.addScaledVector(orbitVec, 0.8).normalize();
                                 } else if (dist < idealRange - 2) {
-                                    // Too close: Back up + Orbit (Spiral Out)
                                     _vec3_1.multiplyScalar(-0.5).addScaledVector(orbitVec, 1.0).normalize();
                                 } else {
-                                    // Sweet spot: Mostly Orbit + slight adjustments
-                                    // But if attack cooldown is ready, rush in!
                                     const attackReady = (performance.now() - this.lastAttack > CONFIG.botAttackCooldown);
                                     if (attackReady) {
-                                        _vec3_1.addScaledVector(orbitVec, 0.2).normalize(); // Charge
+                                        _vec3_1.addScaledVector(orbitVec, 0.2).normalize(); 
                                     } else {
-                                        // v45.7.3 Tweak: Strafe less, face more front
-                                        // Old: _vec3_1.multiplyScalar(0.1).addScaledVector(orbitVec, 1.5).normalize();
-                                        // New: More weight on _vec3_1 (To/From Player) vs Orbit
                                         _vec3_1.multiplyScalar(0.4).addScaledVector(orbitVec, 0.8).normalize(); 
                                     }
                                 }
                                 
-                                // Ledge Safety for Orbiting
                                 const predictPos = this.mesh.position.clone().addScaledVector(_vec3_1, 2.0);
                                 if (!this.onGroundSafe(getGroundHeight(predictPos.x, predictPos.z))) {
-                                    // v45.6.9 Ledge Stabilization: Only flip if cooldown is done
                                     if (this.ledgeTimer <= 0) {
                                         this.strafeDir *= -1;
-                                        this.ledgeTimer = 0.5; // Prevent flipping again for 0.5s to avoid vibration
+                                        this.ledgeTimer = 0.5; 
                                     }
                                 }
                             }
                         }
 
-                        // v45.6.11 FIXED ANTI-STUCK LOGIC (Preserved for v45.6.12)
-                        // Calculate actual 2D distance moved since last frame
                         const distMoved = Math.hypot(this.mesh.position.x - this.lastPos.x, this.mesh.position.z - this.lastPos.y);
                         const isMovingHorizontal = _vec3_1.lengthSq() > 0.1;
 
                         if (isMovingHorizontal && distMoved < 0.01 && this.state !== 'SEARCH') {
-                             // Stuck? Force Jump
                              if (this.onGroundSafe(groundY)) {
                                  this.velocity.y = 18;
                                  this.jumps = 1;
@@ -3614,9 +3646,6 @@
                         if (this.isSliding) speed *= 1.5;
                         this.mesh.position.addScaledVector(_vec3_1, speed * dt);
                         
-                        // v45.6.9 DECOUPLED ROTATION LOGIC
-                        // If in combat and not retreating, face the PLAYER (VectorToPlayer)
-                        // Otherwise face movement direction (dir)
                         let lookDir = _vec3_1;
                         if (this.state === 'AGGRO' && !this.isRetreating) {
                             lookDir = _vec3_2;
@@ -3638,13 +3667,12 @@
                     else this.mesh.rotation.x = 0;
                 }
 
-                // Simple collision resolution with less jitter
-                // v45.7.5 Optimization: Reuse _box3_1
                 _box3_1.setFromObject(this.body);
                 const botBox = _box3_1;
                 
-                // v45.6: Use Static Wall Bounds
-                for(const wb of staticWallBounds) {
+                // v45.8 Spatial Grid Collision
+                const nearbyWalls = spatialGrid.query(botBox);
+                for(const wb of nearbyWalls) {
                     if(botBox.intersectsBox(wb.box)) {
                          const xOverlap = Math.min(botBox.max.x - wb.box.min.x, wb.box.max.x - botBox.min.x);
                          const zOverlap = Math.min(botBox.max.z - wb.box.min.z, wb.box.max.z - botBox.min.z);
@@ -3660,15 +3688,12 @@
                              this.mesh.position.z += zOverlap * sign;
                          }
 
-                         // v45.5: Wall Avoidance while Roaming
                          if (this.state === 'ROAM' && Math.random() > 0.1) {
                              this.pickRoamTarget();
                          }
                     }
                 }
             }
-            
-            // ... (Rest of class methods unchanged) ...
 
             onGroundSafe(groundY) {
                  return Math.abs(this.mesh.position.y - (groundY + this.type.scale)) < 0.5;
@@ -3678,13 +3703,11 @@
                 if(this.isDeadCorpse || this.state === 'CONFUSED') {
                     if(this.state === 'CONFUSED') {
                         amt *= 2;
-                        // v45.6.6 Wake Up Logic
                         if (this.health < this.maxHealth * 0.3) {
                             this.state = 'AGGRO';
                             this.confusedTimer = 0;
                             this.mesh.rotation.x = 0;
                             this.isRetreating = true;
-                            // Jump up in surprise
                             this.velocity.y = 15;
                             this.jumps = 1;
                         }
@@ -3693,12 +3716,12 @@
                 
                 amt *= this.type.dmgRed;
                 this.health -= amt;
-                this.lastDamageTime = performance.now(); // Reset regen timer
+                this.lastDamageTime = performance.now(); 
                 this.body.material.color.setHex(0xffffff); 
                 
                 setTimeout(() => { 
                     if(!this.isDeadCorpse && this.state !== 'CONFUSED') {
-                        if (currentTheme === 2) { // Neon
+                        if (currentTheme === 2) { 
                             this.body.material.color.setHex(0x000000);
                         } else {
                             if(this.state === 'SEARCH') this.body.material.color.setHex(0xffaa00);
@@ -3710,15 +3733,13 @@
 
                 if (this.state !== 'AGGRO' && this.state !== 'CONFUSED') {
                     this.state = 'AGGRO'; 
-                    this.reactionTimer = CONFIG.botAggroDelay; // v45.7.4 Renamed
+                    this.reactionTimer = CONFIG.botAggroDelay; 
                     this.hasAggroed = true;
                 }
 
                 if (this.health <= 0) {
-                    // v45.7.1 Increased Bot Kill Rewards (1000 base)
                     addScore(1000 * this.type.scale);
                     
-                    // v45.7.1 Kill Stats
                     GameStats.botKills++;
                     GameStats.checkKillMilestone();
 
@@ -3762,30 +3783,7 @@
                 if(idx > -1) enemies.splice(idx, 1);
             }
         }
-
-        // ... (Rest of file unchanged) ...
         
-        function spawnParticles(pos, col, count) {
-            for(let i=0; i<count; i++) {
-                const mat = new THREE.SpriteMaterial({ 
-                    map: textures.glow, 
-                    color: col, 
-                    transparent: true, 
-                    blending: THREE.AdditiveBlending 
-                });
-                const m = new THREE.Sprite(mat);
-                m.scale.set(0.5, 0.5, 0.5);
-                m.position.copy(pos);
-                scene.add(m);
-                particles.push({
-                    mesh: m, 
-                    vel: new THREE.Vector3((Math.random()-0.5)*10, (Math.random()-0.5)*10, (Math.random()-0.5)*10),
-                    life: 0.5,
-                    isStatic: false
-                });
-            }
-        }
-
         function damagePlayer(amt) {
             player.health -= amt;
             player.lastDamageTime = performance.now();
@@ -3798,12 +3796,10 @@
             
             if(player.health <= 0) {
                 if (player.extraLives > 0) {
-                    // Use Extra Life
                     player.extraLives--;
                     player.health = CONFIG.playerMaxHP; 
                     showKillMessage("EXTRA LIFE USED!", "achievement", "#00ff00");
-                    AudioSys.playTeleport(); // Sound effect for revive
-                    // Update Lives UI
+                    AudioSys.playTeleport(); 
                     updateLivesDisplay();
                 } else {
                     player.health = 0;
@@ -3835,7 +3831,6 @@
             player.score += amt;
             document.getElementById('score-display').innerText = "SCORE: " + player.score;
             
-            // Extra Life Check (Every 10,000)
             if (Math.floor(player.score / 10000) > Math.floor(oldScore / 10000)) {
                 if (player.extraLives < 3) {
                     player.extraLives++;
@@ -3854,7 +3849,7 @@
             player.isSliding = false;
             player.isCrouching = false;
             player.velocity.set(0,0,0);
-            player.totalHits = 0; // Reset hit counter
+            player.totalHits = 0; 
             camera.position.set(0, 2, 0);
             sessionStartTime = Date.now();
             
@@ -3875,7 +3870,6 @@
             updateComboUI();
             document.getElementById('score-display').innerText = "SCORE: 0";
             
-            // Clear critical effects
             document.getElementById('health-fill').classList.remove('health-critical');
             document.getElementById('low-health-vignette').style.boxShadow = "inset 0 0 100px rgba(255, 0, 0, 0)";
         }
@@ -3893,98 +3887,6 @@
             if(feed.children.length > 6) feed.removeChild(feed.lastChild);
         }
 
-        function onKeyDown(e) {
-            switch(e.key.toLowerCase()) {
-                case 'w': keys.w = true; break;
-                case 'a': keys.a = true; break;
-                case 's': keys.s = true; break;
-                case 'd': keys.d = true; break;
-                case ' ': 
-                    keys.space = true;
-                    if (!isLocked) return;
-                    
-                    if(player.onGround) {
-                        // Immediate Ground Jump
-                        performJump();
-                        // Also set flag to auto-hop if held on landing later
-                        wantsToJump = true;
-                        // Reset streaks
-                        moveStreaks.longAerial.count = 0;
-                        moveStreaks.aerial.count = 0;
-                    } else {
-                         // Mid-Air Logic
-                         if (!e.repeat) { // Only first press triggers double jump
-                             if(player.jumpsRemaining > 0) {
-                                // Manual Wall Jump Check first if pressing jump mid-air
-                                performWallJump(); // Will fail if no wall
-                                
-                                // v45.6 Reuse global raycaster
-                                globalRaycaster.far = 1.5;
-                                const dirs = [new THREE.Vector3(1,0,0), new THREE.Vector3(-1,0,0), new THREE.Vector3(0,0,1), new THREE.Vector3(0,0,-1)];
-                                let hitWall = false;
-                                for(let d of dirs) {
-                                    d.applyQuaternion(camera.quaternion);
-                                    globalRaycaster.set(camera.position, d);
-                                    if(globalRaycaster.intersectObjects(walls).length > 0) { hitWall = true; break; }
-                                }
-                                
-                                if (!hitWall && player.jumpsRemaining > 0) {
-                                    player.velocity.y = CONFIG.jumpForce;
-                                    player.jumpsRemaining--;
-                                    AudioSys.playJump();
-                                    // Air Jump Visual
-                                    spawnRipple(camera.position.clone().add(new THREE.Vector3(0,-1.5,0)), new THREE.Vector3(0,1,0), 0x00ffaa);
-                                } else if (hitWall) {
-                                    // Wall jump handled in performWallJump usually, but here for manual single press:
-                                    performWallJump();
-                                }
-                             }
-                         }
-                         // Holding triggers auto-hop on next landing OR wall touch
-                         wantsToJump = true;
-                    }
-                    break;
-                case 'shift': keys.shift = true; break;
-                case 'c': keys.c = true; break;
-                case 'q': 
-                    if(!keys.q) {
-                        keys.q = true;
-                        if(isLocked && !player.isDead) {
-                            if(teleportMode === 'INSTANT') tryInstantTeleport();
-                            else if(teleportMode === 'AIM') {
-                                player.teleportActive = !player.teleportActive;
-                                if(player.teleportActive) player.tpAimStartTime = 0; // Force reset
-                            }
-                        }
-                    }
-                    break;
-                case 't': if(!e.repeat) toggleTheme(); break;
-            }
-        }
-
-        function onKeyUp(e) {
-            switch(e.key.toLowerCase()) {
-                case 'w': keys.w = false; break;
-                case 'a': keys.a = false; break;
-                case 's': keys.s = false; break;
-                case 'd': keys.d = false; break;
-                case ' ': 
-                    keys.space = false; 
-                    wantsToJump = false; 
-                    break;
-                case 'shift': keys.shift = false; break;
-                case 'c': keys.c = false; break;
-                case 'q': keys.q = false; break;
-            }
-        }
-
-        function onMouseMove(e) {
-            if (!isLocked || player.isDead) return;
-            camera.rotation.y -= e.movementX * 0.002;
-            camera.rotation.x -= e.movementY * 0.002;
-            camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
-        }
-
         function onWindowResize() {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
@@ -3998,7 +3900,6 @@
             const dt = Math.min((now - lastTime) / 1000, 0.1);
             lastTime = now;
             
-            // v45.6 FPS Calculation
             if(showFPS) {
                 fpsFrames++;
                 if(now > lastFpsTime + 1000) {
@@ -4013,14 +3914,7 @@
                     new Enemy();
                 }
                 
-                if (mouseDown) {
-                     if (teleportMode === 'AIM' && player.teleportActive) {
-                     } else {
-                        slash();
-                     }
-                }
-                
-                updatePlayer(dt);
+                player.update(dt);
                 updateWeather(dt);
                 
                 for (let i = enemies.length - 1; i >= 0; i--) {
@@ -4030,17 +3924,32 @@
                 for (let i = particles.length - 1; i >= 0; i--) {
                     const p = particles[i];
                     p.life -= dt;
-                    if (p.isStatic) {
-                         p.mesh.material.opacity = p.life * 0.4; // Slightly lower opacity for trails
-                    } else if (p.type === 'ripple') {
-                        // V45.7.8 Enhanced Ripple Animation (Non-Linear Expansion)
+                    
+                    if (p.type === 'flash') {
+                        // Impact flash logic
+                        const progress = 1.0 - (p.life / p.maxLife); 
+                        p.mesh.material.opacity = 1.0 - progress;
+                        const s = THREE.MathUtils.lerp(p.scaleStart, p.scaleEnd, progress);
+                        p.mesh.scale.setScalar(s);
+                    } 
+                    else if (p.type === 'spark') {
+                        // Spark logic
+                        p.vel.y -= p.gravity * dt; 
+                        p.mesh.position.addScaledVector(p.vel, dt);
+                        p.mesh.scale.setScalar(p.life * 1.5); 
+                    }
+                    else if (p.isStatic) {
+                         p.mesh.material.opacity = p.life * 0.4; 
+                    } 
+                    else if (p.type === 'ripple') {
                         const progress = 1.0 - (p.life / p.maxLife);
-                        const ease = 1 - Math.pow(1 - progress, 3); // EaseOutCubic
+                        const ease = 1 - Math.pow(1 - progress, 3); 
                         
                         const scale = 1 + (ease * 1);
                         p.mesh.scale.setScalar(scale);
                         p.mesh.material.opacity = (1.0 - ease) * 0.1;
-                    } else {
+                    } 
+                    else {
                          p.mesh.position.addScaledVector(p.vel, dt);
                          p.mesh.scale.setScalar(p.life * 2); 
                     }
@@ -4061,11 +3970,9 @@
                     }
                 }
                 
-                // v45.6.5 Normalize for Bar width (500 HP / 5 = 100%)
                 const hpPct = Math.max(0, player.health / (CONFIG.playerMaxHP/100)); 
                 const stPct = Math.max(0, player.stamina);
                 
-                // v45.7.6 REVERT DOM Optimization to fix stuck bar bug
                 document.getElementById('health-fill').style.width = hpPct + '%';
                 document.getElementById('stamina-fill').style.width = stPct + '%';
                 
