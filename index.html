@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v45.9</title>
+    <title>Neon Blade: Melee Arena v46.0</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -100,7 +100,7 @@
             box-shadow: inset 0 0 5px rgba(0,0,0,0.5);
         }
         #health-fill { background: linear-gradient(90deg, #cc0000, #ff3333); box-shadow: 0 0 10px #ff3333; transition: all 0.1s; }
-        #stamina-fill { background: linear-gradient(90deg, #0066cc, #33ccff); box-shadow: 0 0 10px #33ccff; }
+        #energy-fill { background: linear-gradient(90deg, #0066cc, #33ccff); box-shadow: 0 0 10px #33ccff; }
         
         .health-critical {
             animation: pulse-red 0.5s infinite alternate;
@@ -347,8 +347,8 @@
                 <div class="bar-frame"><div id="health-fill" class="bar-fill"></div></div>
             </div>
             <div class="stat-group">
-                <span class="stat-label">STAMINA</span>
-                <div class="bar-frame"><div id="stamina-fill" class="bar-fill"></div></div>
+                <span class="stat-label">ENERGY</span>
+                <div class="bar-frame"><div id="energy-fill" class="bar-fill"></div></div>
             </div>
             <div class="ability-group">
                 <div class="ability-icon" id="icon-q">
@@ -367,7 +367,7 @@
             <div id="player-title-display"></div>
             <p>
                 <strong>WASD</strong> Move | <strong>SPACE</strong> Jump | <strong>SHIFT</strong> Sprint<br>
-                <strong>C</strong> Slide/Crouch | <strong>Q</strong> Teleport | <strong>HOLD M1</strong> Auto Strike
+                <strong>C</strong> Slide | <strong>Q</strong> Teleport | <strong>G</strong> Frag | <strong>V</strong> Sticky | <strong>E</strong> Impulse
             </p>
             
             <div class="btn-row">
@@ -398,7 +398,7 @@
                 <button class="btn-secondary" id="fps-btn">SHOW FPS: OFF</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v45.9</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.0</div>
         </div>
     </div>
 
@@ -419,16 +419,19 @@
             frictionGround: 6.0, 
             frictionAir: 0.02, 
             airControl: 2.0,  
-            frictionSlide: 0.8, // v45.7.8 Buffed Slide (Less friction = More distance)
-            frictionWall: 0.5, // v45.7.7 Wall Slide Friction
+            frictionSlide: 0.8, 
+            frictionWall: 0.5, 
             slideBoost: 15, 
             bunnyHopBoost: 0, 
             
-            staminaMax: 100,
-            staminaDrain: 25, 
-            staminaRegen: 15,
+            energyMax: 100,
+            energyDrain: 25, 
+            energyRegen: 15, // Was staminaRegen
             teleportCost: 10,
             
+            gadgetCost: { frag: 30, sticky: 30, impulse: 25 },
+            gadgetCooldown: 500,
+
             attackRange: 8,
             attackCooldown: 250,
             playerDamage: 40, 
@@ -448,7 +451,7 @@
             botRoamSpeed: 4.5, 
             
             botAggroDuration: 10000, 
-            botAggroDelay: 1000, // v45.7.4 Renamed from reactionDelay
+            botAggroDelay: 1000, 
             
             regenDelay: 3000, 
             regenRate: 25
@@ -524,7 +527,7 @@
         
         // --- INPUT MANAGER (v45.8) ---
         const InputManager = {
-            keys: { w: false, a: false, s: false, d: false, space: false, shift: false, c: false, q: false },
+            keys: { w: false, a: false, s: false, d: false, space: false, shift: false, c: false, q: false, g: false, v: false, e: false },
             mouseDown: false,
             init: function() {
                 document.addEventListener('keydown', (e) => this.onKeyDown(e));
@@ -556,6 +559,15 @@
                             if(isLocked && !player.isDead) player.onTeleportInput();
                         }
                         break;
+                    case 'g': 
+                        if (!this.keys.g) { this.keys.g = true; if(isLocked && !player.isDead) player.throwGadget('FRAG'); }
+                        break;
+                    case 'v':
+                        if (!this.keys.v) { this.keys.v = true; if(isLocked && !player.isDead) player.throwGadget('STICKY'); }
+                        break;
+                    case 'e':
+                        if (!this.keys.e) { this.keys.e = true; if(isLocked && !player.isDead) player.throwGadget('IMPULSE'); }
+                        break;
                     case 't': if(!e.repeat) toggleTheme(); break;
                 }
             },
@@ -569,6 +581,9 @@
                     case 'shift': this.keys.shift = false; break;
                     case 'c': this.keys.c = false; break;
                     case 'q': this.keys.q = false; break;
+                    case 'g': this.keys.g = false; break;
+                    case 'v': this.keys.v = false; break;
+                    case 'e': this.keys.e = false; break;
                 }
             },
             onMouseMove: function(e) {
@@ -779,6 +794,42 @@
                 osc.stop(t + 0.2);
             },
             
+            playExplosion: function() {
+                if (!this.ctx) return;
+                const t = this.ctx.currentTime;
+                // Noise burst
+                const bSize = this.ctx.sampleRate * 0.5;
+                const b = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
+                const d = b.getChannelData(0);
+                for(let i=0;i<bSize;i++) d[i] = Math.random()*2-1;
+                const n = this.ctx.createBufferSource();
+                n.buffer = b;
+                const ng = this.ctx.createGain();
+                ng.gain.setValueAtTime(0.5, t);
+                ng.gain.exponentialRampToValueAtTime(0.01, t+0.5);
+                const nf = this.ctx.createBiquadFilter();
+                nf.type = 'lowpass';
+                nf.frequency.setValueAtTime(1000, t);
+                nf.frequency.exponentialRampToValueAtTime(100, t+0.4);
+                n.connect(nf); nf.connect(ng); ng.connect(this.ctx.destination);
+                n.start();
+                // Low thump
+                const osc = this.ctx.createOscillator();
+                const og = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(100, t);
+                osc.frequency.exponentialRampToValueAtTime(40, t+0.4);
+                og.gain.setValueAtTime(0.5, t);
+                og.gain.exponentialRampToValueAtTime(0.01, t+0.4);
+                osc.connect(og); og.connect(this.ctx.destination);
+                osc.start(); osc.stop(t+0.5);
+            },
+
+            playThrow: function() {
+                if(!this.ctx) return;
+                this.playTone(600, 'triangle', 0.1, 0.1);
+            },
+
             playHeartbeat: function(speed) {
                 if(!this.ctx) return;
                 const t = this.ctx.currentTime;
@@ -904,7 +955,7 @@
                 this.isCrouching = false;
                 this.isSprinting = false;
                 this.health = CONFIG.playerMaxHP;
-                this.stamina = 100;
+                this.energy = CONFIG.energyMax; // Renamed from stamina
                 this.score = 0;
                 this.extraLives = 0;
                 this.isDead = false;
@@ -924,6 +975,8 @@
                 this.tpAimStartTime = 0;
                 this.wallImpactVelocity = 0;
                 this.wantsToJump = false;
+                this.lastGadgetTime = 0;
+                this.portalCooldown = 0;
 
                 // Weapon System
                 this.currentWeapon = null;
@@ -943,12 +996,6 @@
                      if (!isRepeat) { 
                          if(this.jumpsRemaining > 0) {
                             performWallJump(); 
-                            // Manual Air Jump check (if not wall jump)
-                            // v45.6 Reuse global raycaster for wall check logic (simplified here)
-                            // ... Actually performWallJump handles logic.
-                            // If performWallJump succeeded, velocity changed. If not, normal jump.
-                            // This is slightly distinct from old code: old code checked walls separately.
-                            // Let's preserve old logic structure:
                             
                             let hitWall = false;
                             globalRaycaster.far = 1.5;
@@ -990,11 +1037,40 @@
                 }
             }
 
+            throwGadget(type) {
+                const now = performance.now();
+                if (now - this.lastGadgetTime < CONFIG.gadgetCooldown) return;
+                
+                let cost = 0;
+                if (type === 'FRAG') cost = CONFIG.gadgetCost.frag;
+                if (type === 'STICKY') cost = CONFIG.gadgetCost.sticky;
+                if (type === 'IMPULSE') cost = CONFIG.gadgetCost.impulse;
+
+                if (this.energy < cost) {
+                    AudioSys.playMiss();
+                    return;
+                }
+
+                this.energy -= cost;
+                this.lastGadgetTime = now;
+
+                const dir = new THREE.Vector3();
+                camera.getWorldDirection(dir);
+                const spawnPos = camera.position.clone().addScaledVector(dir, 1.0);
+                const vel = dir.multiplyScalar(25);
+                vel.y += 2; // slight arc
+
+                projectiles.push(new Projectile(type, spawnPos, vel));
+                AudioSys.playThrow();
+            }
+
             update(dt) {
                 if (this.isDead) return;
                 
                 // Weapon Update
                 if(this.currentWeapon) this.currentWeapon.update(dt);
+
+                if (this.portalCooldown > 0) this.portalCooldown -= dt;
 
                 // v45.9 Auto Strike
                 if (isLocked && InputManager.mouseDown) {
@@ -1003,13 +1079,13 @@
 
                 camera.position.y -= this.cameraHeightOffset;
                 this.handleHealthRegen(dt);
-                this.handleStamina(dt);
+                this.handleEnergy(dt);
                 this.handleTeleport(dt);
 
                 // Movement Logic
                 const keys = InputManager.keys;
                 const isMoving = (keys.w || keys.a || keys.s || keys.d);
-                this.isSprinting = keys.shift && this.stamina > 0 && isMoving && !this.isCrouching;
+                this.isSprinting = keys.shift && this.energy > 0 && isMoving && !this.isCrouching;
 
                 // Slide & Crouch
                 if (keys.c) {
@@ -1178,6 +1254,16 @@
                 camera.position.copy(nextPos);
                 camera.position.y += this.cameraHeightOffset;
                 
+                // Portal Check
+                if (this.portalCooldown <= 0) {
+                    for(let p of portals) {
+                        if (camera.position.distanceTo(p.mesh.position) < 2.0) {
+                             p.teleportPlayer(this);
+                             break;
+                        }
+                    }
+                }
+                
                 if (camera.position.y < -100) {
                     GameStats.addAchievement("DOWN THE RABBIT HOLE", "#ff00ff", "PERSISTENT");
                     damagePlayer(20);
@@ -1200,7 +1286,6 @@
                     }
                 }
                 
-                // Low Health Effects Update
                 const vignette = document.getElementById('low-health-vignette');
                 const healthFill = document.getElementById('health-fill');
                 const maxHP = CONFIG.playerMaxHP;
@@ -1223,13 +1308,13 @@
                 }
             }
 
-            handleStamina(dt) {
+            handleEnergy(dt) {
                 if (this.isSprinting) {
-                    this.stamina -= CONFIG.staminaDrain * dt;
-                    if (this.stamina < 0) this.stamina = 0;
+                    this.energy -= CONFIG.energyDrain * dt;
+                    if (this.energy < 0) this.energy = 0;
                 } else {
-                    this.stamina += CONFIG.staminaRegen * dt;
-                    if (this.stamina > 100) this.stamina = 100;
+                    this.energy += CONFIG.energyRegen * dt;
+                    if (this.energy > CONFIG.energyMax) this.energy = CONFIG.energyMax;
                 }
             }
 
@@ -1325,11 +1410,235 @@
         const particles = [];
         const decorations = [];
         const weatherParticles = [];
+        const projectiles = [];
+        const portals = [];
 
         let teleportMarker;
         let slashGeometry; 
         let lastAttackTime = 0;
         let currentSlashColor = 0x0088ff;
+        
+        // --- PORTAL CLASS (v46.0) ---
+        class Portal {
+            constructor(x, y, z, targetPortal = null) {
+                this.mesh = new THREE.Group();
+                this.mesh.position.set(x, y + 1.5, z);
+                
+                const geo = new THREE.TorusGeometry(1.2, 0.1, 8, 24);
+                const mat = materials.marker.clone();
+                mat.color.setHex(0x00ffff);
+                mat.emissive.setHex(0x0088ff);
+                mat.transparent = true;
+                mat.opacity = 0.8;
+                
+                this.ring = new THREE.Mesh(geo, mat);
+                this.mesh.add(this.ring);
+                
+                // Particle inner core
+                const coreGeo = new THREE.SphereGeometry(0.8, 8, 8);
+                const coreMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.1 });
+                this.core = new THREE.Mesh(coreGeo, coreMat);
+                this.mesh.add(this.core);
+
+                scene.add(this.mesh);
+                this.target = targetPortal;
+            }
+            
+            update(dt) {
+                this.ring.rotation.y += dt;
+                this.ring.rotation.x += dt * 0.5;
+                const scale = 1 + Math.sin(performance.now() * 0.005) * 0.1;
+                this.core.scale.setScalar(scale);
+            }
+            
+            teleportPlayer(p) {
+                if (this.target) {
+                    AudioSys.playTeleport();
+                    spawnParticles(p.cameraHeightOffset ? camera.position : new THREE.Vector3(camera.position.x, camera.position.y-1, camera.position.z), 0x00ffff, 20);
+                    
+                    camera.position.copy(this.target.mesh.position);
+                    p.velocity.set(0,0,0); // Stop momentum
+                    
+                    // Push out slightly
+                    const forward = new THREE.Vector3(0,0,1).applyQuaternion(camera.quaternion);
+                    camera.position.addScaledVector(forward, 1.5);
+                    
+                    p.portalCooldown = 2.0; 
+                    spawnParticles(camera.position, 0x00ffff, 20);
+                }
+            }
+        }
+
+        // --- GADGETS / PROJECTILES (v46.0) ---
+        class Projectile {
+            constructor(type, pos, vel) {
+                this.type = type;
+                this.velocity = vel.clone();
+                this.radius = 0.2;
+                this.stuckTo = null;
+                this.life = type === 'STICKY' ? 2.0 : (type === 'IMPULSE' ? 10.0 : 2.5); // Impulse detonates on impact
+                
+                let color = 0x00ff00; // FRAG
+                if(type === 'STICKY') color = 0xff0000;
+                if(type === 'IMPULSE') color = 0x00ffff;
+
+                const geo = new THREE.DodecahedronGeometry(0.2);
+                const mat = new THREE.MeshStandardMaterial({ 
+                    color: color, 
+                    emissive: color, 
+                    emissiveIntensity: 0.5,
+                    roughness: 0.4 
+                });
+                
+                this.mesh = new THREE.Mesh(geo, mat);
+                this.mesh.position.copy(pos);
+                scene.add(this.mesh);
+                this.active = true;
+            }
+
+            update(dt) {
+                if (!this.active) return;
+                
+                this.life -= dt;
+                if (this.life <= 0) {
+                    this.explode();
+                    return;
+                }
+
+                if (this.stuckTo) {
+                    if (this.stuckTo.isDeadCorpse || this.stuckTo.health <= 0) {
+                         this.stuckTo = null; // Detach if dead
+                    } else {
+                         this.mesh.position.copy(this.stuckTo.mesh.position).add(this.stuckOffset);
+                    }
+                    return; 
+                }
+
+                this.velocity.y -= CONFIG.gravity * dt;
+                const nextPos = this.mesh.position.clone().addScaledVector(this.velocity, dt);
+                
+                // Raycast for collision
+                const dir = nextPos.clone().sub(this.mesh.position);
+                const dist = dir.length();
+                if (dist > 0.001) {
+                    globalRaycaster.set(this.mesh.position, dir.normalize());
+                    globalRaycaster.far = dist;
+                    
+                    const hits = globalRaycaster.intersectObjects(worldObjects);
+                    
+                    // Check Enemies for sticky
+                    let enemyHit = null;
+                    for(let e of enemies) {
+                         if (!e.isDeadCorpse && e.mesh.position.distanceTo(nextPos) < e.type.scale + 0.5) {
+                             enemyHit = e;
+                             break;
+                         }
+                    }
+
+                    if (enemyHit) {
+                         if (this.type === 'IMPULSE') {
+                             this.active = false; this.explode(); return;
+                         }
+                         if (this.type === 'STICKY') {
+                             this.stuckTo = enemyHit;
+                             this.stuckOffset = new THREE.Vector3(0, 1, 0); // Stick to head-ish
+                             return;
+                         }
+                         if (this.type === 'FRAG') {
+                             // Bounce off enemy
+                             this.velocity.negate().multiplyScalar(0.5);
+                         }
+                    }
+
+                    if (hits.length > 0) {
+                         if (this.type === 'IMPULSE') {
+                             this.active = false; this.explode(); return;
+                         }
+                         if (this.type === 'STICKY') {
+                             // Stick to wall/floor
+                             this.active = false; // logic pause
+                             this.life = 2.0; // reset fuse
+                             // Just sit there
+                             this.mesh.position.copy(hits[0].point);
+                             // To simulate sticking, we create a specialized state or just stop velocity
+                             this.velocity.set(0,0,0);
+                             // Hack: treat as "stuckTo" nothing but zero velocity active
+                             this.active = true; 
+                             this.stuckTo = { mesh: { position: hits[0].point }, isDeadCorpse: false, health: 1 };
+                             this.stuckOffset = new THREE.Vector3(0,0,0);
+                             return;
+                         }
+                         if (this.type === 'FRAG') {
+                             // Bounce
+                             const n = hits[0].face.normal;
+                             this.velocity.reflect(n).multiplyScalar(0.6);
+                             this.mesh.position.copy(hits[0].point).addScaledVector(n, 0.2);
+                         }
+                    } else {
+                         this.mesh.position.copy(nextPos);
+                    }
+                } else {
+                     this.mesh.position.copy(nextPos);
+                }
+
+                this.mesh.rotation.x += dt * 5;
+                this.mesh.rotation.z += dt * 5;
+            }
+            
+            explode() {
+                this.active = false;
+                scene.remove(this.mesh);
+                this.mesh.geometry.dispose();
+                this.mesh.material.dispose();
+                
+                // Explosion Logic
+                const pos = this.mesh.position;
+                let range = 10;
+                let damage = 100;
+                let force = 20;
+                let color = 0x00ff00;
+
+                if (this.type === 'FRAG') { range=12; damage=80; force=15; color=0x00ff00; }
+                if (this.type === 'STICKY') { range=8; damage=150; force=10; color=0xff0000; }
+                if (this.type === 'IMPULSE') { range=20; damage=0; force=60; color=0x00ffff; }
+
+                AudioSys.playExplosion();
+                spawnImpact(pos, color, range/3);
+                spawnRipple(pos, new THREE.Vector3(0,1,0), color);
+
+                // Hits Enemies
+                for (let e of enemies) {
+                    if (e.isDeadCorpse) continue;
+                    const dist = e.mesh.position.distanceTo(pos);
+                    if (dist < range) {
+                        const falloff = 1 - (dist / range);
+                        if (damage > 0) e.takeHit(damage * falloff);
+                        
+                        const dir = e.mesh.position.clone().sub(pos).normalize();
+                        dir.y = 0.5; dir.normalize();
+                        e.velocity.addScaledVector(dir, force * falloff);
+                        if(this.type === 'IMPULSE' || damage > 50) {
+                            e.state = 'CONFUSED';
+                            e.confusedTimer = 2.0;
+                        }
+                    }
+                }
+                
+                // Hits Player (Knockback only, maybe self damage?)
+                const pDist = camera.position.distanceTo(pos);
+                if (pDist < range) {
+                     const falloff = 1 - (pDist / range);
+                     const dir = camera.position.clone().sub(pos).normalize();
+                     dir.y = 0.5; dir.normalize();
+                     
+                     // Player takes reduced damage
+                     if(damage > 0) damagePlayer(damage * 0.2 * falloff);
+                     
+                     player.velocity.addScaledVector(dir, force * falloff);
+                     player.onGround = false; 
+                }
+            }
+        }
 
         // --- WEAPON SYSTEM (v45.8) ---
         class Katana {
@@ -2191,6 +2500,35 @@
             
             // Massive
             spawnDecorations(1, 60, 80, 300, 300);
+            
+            // v46.0 Create Portals
+            createPortals();
+        }
+        
+        function createPortals() {
+            // Create 2 pairs (4 portals)
+            const portalLocs = [];
+            for(let i=0; i<4; i++) {
+                let x, z;
+                // Find random spot near ground
+                do {
+                    x = (Math.random()-0.5)*300;
+                    z = (Math.random()-0.5)*300;
+                } while(Math.abs(x) < 30 && Math.abs(z) < 30);
+                
+                const y = getGroundHeight(x, z);
+                portalLocs.push({x, y, z});
+            }
+            
+            const p1 = new Portal(portalLocs[0].x, portalLocs[0].y, portalLocs[0].z);
+            const p2 = new Portal(portalLocs[1].x, portalLocs[1].y, portalLocs[1].z);
+            p1.target = p2; p2.target = p1;
+            portals.push(p1, p2);
+            
+            const p3 = new Portal(portalLocs[2].x, portalLocs[2].y, portalLocs[2].z);
+            const p4 = new Portal(portalLocs[3].x, portalLocs[3].y, portalLocs[3].z);
+            p3.target = p4; p4.target = p3;
+            portals.push(p3, p4);
         }
 
         function createBox(x, y, z, w, h, d, mat, isFloor=false, isWall=false) {
@@ -2814,11 +3152,11 @@
         }
 
         function executeTeleport(target) {
-             if (player.stamina < CONFIG.teleportCost) {
+             if (player.energy < CONFIG.teleportCost) {
                  AudioSys.playMiss();
                  return;
              }
-             player.stamina -= CONFIG.teleportCost;
+             player.energy -= CONFIG.teleportCost;
 
              let yOffset = 0;
              const startInAir = !player.onGround;
@@ -3842,7 +4180,7 @@
 
         function resetGame() {
             player.health = CONFIG.playerMaxHP;
-            player.stamina = 100;
+            player.energy = CONFIG.energyMax; // Renamed
             player.score = 0;
             player.extraLives = 0;
             player.isDead = false;
@@ -3864,6 +4202,13 @@
                 p.mesh.material.dispose();
             });
             particles.length = 0;
+            
+            projectiles.forEach(p => {
+                scene.remove(p.mesh);
+                p.mesh.geometry.dispose();
+                p.mesh.material.dispose();
+            });
+            projectiles.length = 0;
             
             GameStats.reset();
             comboCount = 0;
@@ -3916,6 +4261,15 @@
                 
                 player.update(dt);
                 updateWeather(dt);
+                
+                for(let p of portals) p.update(dt);
+                
+                for (let i = projectiles.length - 1; i >= 0; i--) {
+                    projectiles[i].update(dt);
+                    if (!projectiles[i].active) {
+                        projectiles.splice(i, 1);
+                    }
+                }
                 
                 for (let i = enemies.length - 1; i >= 0; i--) {
                     enemies[i].update(dt, camera.position);
@@ -3971,10 +4325,10 @@
                 }
                 
                 const hpPct = Math.max(0, player.health / (CONFIG.playerMaxHP/100)); 
-                const stPct = Math.max(0, player.stamina);
+                const enPct = Math.max(0, player.energy); // Renamed
                 
                 document.getElementById('health-fill').style.width = hpPct + '%';
-                document.getElementById('stamina-fill').style.width = stPct + '%';
+                document.getElementById('energy-fill').style.width = enPct + '%';
                 
                 const btn = document.getElementById('start-btn');
                 if (btn.innerText === "b r e a t h e" && isLocked) {
