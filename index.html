@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v46.3</title>
+    <title>Neon Blade: Melee Arena v46.4</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -300,6 +300,7 @@
             border-color: rgba(255,255,255,0.4);
         }
     </style>
+    <link rel="stylesheet" href="/index.css">
 </head>
 <body>
 
@@ -415,7 +416,7 @@
                 <button class="btn-secondary" id="fps-btn">SHOW FPS: OFF</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.3</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.4</div>
         </div>
     </div>
 
@@ -1110,16 +1111,16 @@
                     moveStreaks.longAerial.count = 0;
                     moveStreaks.aerial.count = 0;
                 } else {
-                     if (!isRepeat) { 
-                         // v46.3 Fix: Check wall jump first, free of cost
-                         const wallJumped = performWallJump();
-                         
-                         if (!wallJumped && this.jumpsRemaining > 0) {
-                             this.velocity.y = CONFIG.jumpForce;
-                             this.jumpsRemaining--;
-                             AudioSys.playJump();
-                             spawnRipple(camera.position.clone().add(new THREE.Vector3(0,-1.5,0)), new THREE.Vector3(0,1,0), 0x00ffaa);
-                         }
+                     // v46.4: Revised Wall Jump Logic
+                     // 1. Try Wall Jump (Always allowed, even if holding key)
+                     const wallJumped = performWallJump();
+
+                     // 2. Try Air Jump (Only on fresh press)
+                     if (!wallJumped && !isRepeat && this.jumpsRemaining > 0) {
+                         this.velocity.y = CONFIG.jumpForce;
+                         this.jumpsRemaining--;
+                         AudioSys.playJump();
+                         spawnRipple(camera.position.clone().add(new THREE.Vector3(0,-1.5,0)), new THREE.Vector3(0,1,0), 0x00ffaa);
                      }
                      this.wantsToJump = true;
                 }
@@ -1296,6 +1297,10 @@
             physicsStep(dt) {
                 const keys = InputManager.keys;
                 
+                // v46.4 Sprint Fix
+                const isMoving = (keys.w || keys.a || keys.s || keys.d);
+                this.isSprinting = keys.shift && this.energy > 0 && isMoving && !this.isCrouching;
+
                 // 1. INPUT & FRICTION
                 const forward = new THREE.Vector3();
                 const right = new THREE.Vector3();
@@ -1577,6 +1582,7 @@
         };
 
         const worldObjects = []; 
+        const groundObjects = []; // v46.4 Bot Spawn Fix
         const walls = [];        
         const enemies = [];
         const particles = [];
@@ -1619,7 +1625,7 @@
                 for(let i=0; i<5; i++) {
                      const p = new THREE.Mesh(new THREE.SphereGeometry(0.2), new THREE.MeshBasicMaterial({color: 0xffffff}));
                      this.mesh.add(p);
-                     this.particles.push({ mesh: p, offset: Math.random()*10, speed: 0.5 + Math.random() });
+                     this.particles.push({ mesh: p, offset: Math.random() * 10, speed: 0.5 + Math.random() });
                 }
 
                 scene.add(this.mesh);
@@ -2768,6 +2774,9 @@
             mesh.castShadow = true;
             mesh.receiveShadow = true;
             
+            // v46.4 Tag Floor
+            mesh.userData.isFloor = isFloor;
+            
             if (isWall || !isFloor) {
                  const edges = new THREE.EdgesGeometry(geo);
                  const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.05 }));
@@ -2781,9 +2790,13 @@
             mesh.updateMatrixWorld(true);
             const box = mesh.geometry.boundingBox.clone();
             box.applyMatrix4(mesh.matrixWorld);
+            
             spatialGrid.insert(mesh, box);
             
             worldObjects.push(mesh); // Add everything to worldObjects for gadgets/projectiles
+            
+            // v46.4 Fix spawning
+            if (isFloor || !isWall) groundObjects.push(mesh);
 
             if (!isFloor) {
                 walls.push(mesh); // Walls array used for AI Vision and Wall Jump Detection
@@ -2840,6 +2853,7 @@
                 
                 this.visualMesh.updateMatrixWorld();
                 worldObjects.push(this.visualMesh);
+                groundObjects.push(this.visualMesh); // v46.4
                 
                 // Tech Wireframe Overlay
                 const edges = new THREE.EdgesGeometry(visualGeo);
@@ -3300,7 +3314,8 @@
             // v45.6 Reuse global raycaster to avoid GC
             globalRaycaster.set(rayOrigin, new THREE.Vector3(0, -1, 0));
             globalRaycaster.far = 250;
-            const intersects = globalRaycaster.intersectObjects(worldObjects);
+            // v46.4: Use groundObjects (Floor+Obstacles only) to avoid spawning on top of invisible boundary walls
+            const intersects = globalRaycaster.intersectObjects(groundObjects);
             if (intersects.length > 0) {
                 return intersects[0].point.y;
             }
@@ -4279,6 +4294,9 @@
                 // v45.8 Spatial Grid Collision
                 const nearbyWalls = spatialGrid.query(botBox);
                 for(const wb of nearbyWalls) {
+                    // v46.4: Ignore Floor collision for Bots (prevents instant ejection)
+                    if (wb.mesh.userData.isFloor) continue;
+
                     if(botBox.intersectsBox(wb.box)) {
                          const xOverlap = Math.min(botBox.max.x - wb.box.min.x, wb.box.max.x - botBox.min.x);
                          const zOverlap = Math.min(botBox.max.z - wb.box.min.z, wb.box.max.z - botBox.min.z);
