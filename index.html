@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v46.1</title>
+    <title>Neon Blade: Melee Arena v46.2</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -416,7 +415,7 @@
                 <button class="btn-secondary" id="fps-btn">SHOW FPS: OFF</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.1</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.2</div>
         </div>
     </div>
 
@@ -429,10 +428,10 @@
             crouchSpeed: 3, 
             sprintSpeed: 14, 
             
-            jumpForce: 24,
-            wallJumpForce: 22,
+            jumpForce: 14, // v46.2 adjusted for volumetric physics
+            wallJumpForce: 15,
             wallPushForce: 10, 
-            gravity: 40,
+            gravity: 30, // v46.2 tuned for better air control
             
             frictionGround: 6.0, 
             frictionAir: 0.02, 
@@ -1034,7 +1033,7 @@
         
         const spatialGrid = new SpatialHashGrid(null, [400, 400]);
 
-        // --- PLAYER CONTROLLER CLASS (v45.8) ---
+        // --- PLAYER CONTROLLER CLASS (v46.2) ---
         class PlayerController {
             constructor() {
                 this.velocity = new THREE.Vector3();
@@ -1066,6 +1065,10 @@
                 this.wantsToJump = false;
                 this.portalCooldown = 0;
                 
+                // Physics Box (v46.2)
+                this.playerBox = new THREE.Box3();
+                this.boxSize = { w: 0.6, h: 1.8 }; // 0.6 Width, 1.8 Height (Eye level 1.6)
+
                 // Gadget Aiming
                 this.aimingGadget = null; 
                 this.aimLine = null;
@@ -1087,6 +1090,17 @@
                 this.aimLine.frustumCulled = false;
                 this.aimLine.visible = false;
                 scene.add(this.aimLine);
+            }
+            
+            updatePlayerBox() {
+                // Camera Y is roughly eye level (1.6m). Feet are at Y - 1.6
+                // Top is Y + 0.2
+                const x = camera.position.x;
+                const y = camera.position.y;
+                const z = camera.position.z;
+                const halfW = this.boxSize.w / 2;
+                this.playerBox.min.set(x - halfW, y - 1.6, z - halfW);
+                this.playerBox.max.set(x + halfW, y + 0.2, z + halfW);
             }
 
             onJumpInput(isRepeat) {
@@ -1199,7 +1213,9 @@
                     this.onAttackInput();
                 }
 
+                // Restore camera visual height from crouch (apply physics at normal height)
                 camera.position.y -= this.cameraHeightOffset;
+                
                 this.handleHealthRegen(dt);
                 this.handleEnergy(dt);
                 this.handleTeleport(dt);
@@ -1221,176 +1237,49 @@
                     this.aimLine.geometry.setFromPoints(pts);
                 }
 
-                // Movement Logic
-                const keys = InputManager.keys;
-                const isMoving = (keys.w || keys.a || keys.s || keys.d);
-                this.isSprinting = keys.shift && this.energy > 0 && isMoving && !this.isCrouching;
+                // --- NEW VOLUMETRIC PHYSICS ENGINE (v46.2) ---
+                // Sub-stepping for stability at high speeds
+                const timeSteps = Math.min(5, Math.ceil(dt / 0.01)); 
+                const subDt = dt / timeSteps;
+                
+                for(let i=0; i<timeSteps; i++) {
+                    this.physicsStep(subDt);
+                }
 
-                // Slide & Crouch
-                if (keys.c) {
-                    if (this.onGround) {
-                        const speed = new THREE.Vector2(this.velocity.x, this.velocity.z).length();
-                        if ((this.isSprinting || this.isSliding || speed > CONFIG.baseSpeed) && !this.isCrouching) {
-                            if (!this.isSliding) {
-                                this.isSliding = true;
-                                this.lastSlideTime = performance.now(); 
-                                const forward = new THREE.Vector3();
-                                camera.getWorldDirection(forward);
-                                forward.y = 0; forward.normalize();
-                                this.velocity.addScaledVector(forward, CONFIG.slideBoost);
-                            }
-                        } else if (!this.isSliding) {
-                            this.isCrouching = true;
-                        }
-                    }
+                // Apply Visual Crouch Offset
+                // Smooth transition logic
+                const keys = InputManager.keys;
+                const speed = new THREE.Vector2(this.velocity.x, this.velocity.z).length();
+                
+                if (keys.c && this.onGround) {
+                     if ((this.isSprinting || this.isSliding || speed > CONFIG.baseSpeed) && !this.isCrouching) {
+                         if (!this.isSliding) {
+                            this.isSliding = true;
+                            this.lastSlideTime = performance.now();
+                            const forward = new THREE.Vector3();
+                            camera.getWorldDirection(forward);
+                            forward.y = 0; forward.normalize();
+                            this.velocity.addScaledVector(forward, CONFIG.slideBoost);
+                         }
+                     } else if (!this.isSliding) {
+                         this.isCrouching = true;
+                     }
                 } else {
-                    this.isSliding = false;
-                    this.isCrouching = false;
+                     this.isSliding = false;
+                     this.isCrouching = false;
                 }
                 
+                // Audio & Particles for slide
                 if (this.isSliding && currentTheme === 0) {
                     if (Math.random() < 0.3) spawnSnowTrail(camera.position);
                     if (Math.random() < 0.5) spawnSnowKickup(camera.position);
                 }
+                AudioSys.toggleSlideSound(this.isSliding && speed > 5);
 
-                AudioSys.toggleSlideSound(this.isSliding && new THREE.Vector2(this.velocity.x, this.velocity.z).length() > 5);
                 const targetHeight = (this.isSliding || this.isCrouching) ? -0.8 : 0;
                 this.cameraHeightOffset = THREE.MathUtils.lerp(this.cameraHeightOffset, targetHeight, dt * 15);
-
-                const forward = new THREE.Vector3();
-                const right = new THREE.Vector3();
-                camera.getWorldDirection(forward);
-                forward.y = 0; forward.normalize();
-                right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
-
-                const inputDir = new THREE.Vector3();
-                if (keys.w) inputDir.add(forward);
-                if (keys.s) inputDir.sub(forward);
-                if (keys.a) inputDir.sub(right);
-                if (keys.d) inputDir.add(right);
-                if (inputDir.length() > 0) inputDir.normalize();
-
-                let targetSpeed = CONFIG.baseSpeed;
-                if (this.isCrouching) targetSpeed = CONFIG.crouchSpeed;
-                if (this.isSprinting) targetSpeed = CONFIG.sprintSpeed;
                 
-                let friction = this.onGround ? CONFIG.frictionGround : CONFIG.frictionAir;
-                let drive = friction; 
-                if (!this.onGround) { friction = CONFIG.frictionAir; drive = CONFIG.airControl; }
-                
-                if (this.isSliding) { 
-                    if (this.onGround) {
-                        friction = CONFIG.frictionSlide; 
-                        drive = 1; 
-                        targetSpeed = CONFIG.sprintSpeed; 
-                    } else {
-                        friction = CONFIG.frictionAir; 
-                        drive = CONFIG.airControl * 0.5; 
-                    }
-                }
-
-                if (inputDir.length() > 0) {
-                    this.velocity.addScaledVector(inputDir, targetSpeed * drive * dt);
-                }
-
-                const damping = Math.exp(-friction * dt);
-                this.velocity.x *= damping;
-                this.velocity.z *= damping;
-                this.velocity.y -= CONFIG.gravity * dt;
-
-                const nextPos = camera.position.clone().addScaledVector(this.velocity, dt);
-                const playerBox = new THREE.Box3();
-                const radius = 0.4;
-                playerBox.min.set(nextPos.x - radius, nextPos.y - 1.5, nextPos.z - radius);
-                playerBox.max.set(nextPos.x + radius, nextPos.y + 0.5, nextPos.z + radius);
-
-                // COLLISION (Spatial Grid)
-                let touchingWall = false;
-                const nearbyWalls = spatialGrid.query(playerBox);
-                
-                for (const wb of nearbyWalls) {
-                    if (playerBox.intersectsBox(wb.box)) {
-                        touchingWall = true;
-                        const xOverlap = Math.min(playerBox.max.x - wb.box.min.x, wb.box.max.x - playerBox.min.x);
-                        const zOverlap = Math.min(playerBox.max.z - wb.box.min.z, wb.box.max.z - playerBox.min.z);
-                        
-                        const wallX = wb.mesh.matrixWorld.elements[12];
-                        const wallZ = wb.mesh.matrixWorld.elements[14];
-                        
-                        if (xOverlap < zOverlap) {
-                            this.wallImpactVelocity = Math.abs(this.velocity.x); 
-                            const sign = (nextPos.x < wallX) ? -1 : 1;
-                            nextPos.x += xOverlap * sign;
-                            this.velocity.x = 0;
-                        } else {
-                            this.wallImpactVelocity = Math.abs(this.velocity.z);
-                            const sign = (nextPos.z < wallZ) ? -1 : 1;
-                            nextPos.z += zOverlap * sign;
-                            this.velocity.z = 0;
-                        }
-                        playerBox.min.set(nextPos.x - radius, nextPos.y - 1.5, nextPos.z - radius);
-                        playerBox.max.set(nextPos.x + radius, nextPos.y + 0.5, nextPos.z + radius);
-                    }
-                }
-
-                if (touchingWall) {
-                    const wallDamping = Math.exp(-CONFIG.frictionWall * dt);
-                    this.velocity.x *= wallDamping;
-                    this.velocity.z *= wallDamping;
-                }
-
-                // GROUND DETECTION
-                let groundY = -999;
-                const r = 0.35;
-                const offsets = [[0,0], [r,r], [-r,r], [r,-r], [-r,-r]]; 
-                globalRaycaster.far = 5;
-                const rayOrigin = nextPos.clone();
-                for(let o of offsets) {
-                    rayOrigin.set(nextPos.x + o[0], nextPos.y, nextPos.z + o[1]);
-                    globalRaycaster.set(rayOrigin, new THREE.Vector3(0, -1, 0));
-                    const hits = globalRaycaster.intersectObjects(worldObjects);
-                    if(hits.length > 0) {
-                        if(hits[0].point.y > groundY) groundY = hits[0].point.y;
-                    }
-                }
-
-                const wasOnGround = this.onGround;
-                this.onGround = false;
-                
-                if (groundY > -990) {
-                    const dist = nextPos.y - groundY;
-                    const desiredHeight = 1.6; 
-                    if (dist < desiredHeight + 0.2 && this.velocity.y <= 0) {
-                        nextPos.y = groundY + desiredHeight;
-                        this.velocity.y = 0;
-                        this.onGround = true;
-                        this.jumpsRemaining = 2; 
-                        
-                        if(!wasOnGround) {
-                            moveStreaks.longAerial.count = 0; 
-                            moveStreaks.aerial.count = 0;
-                            this.lastTeleportWasAerial = false; 
-                        }
-                    }
-                }
-                
-                if (wasOnGround && !this.onGround && this.velocity.y <= 0) {
-                    this.jumpsRemaining = 3;
-                }
-
-                if (this.onGround && this.wantsToJump) {
-                     performJump();
-                     moveStreaks.longAerial.count = 0;
-                     moveStreaks.aerial.count = 0;
-                } else if (!this.onGround && touchingWall && this.wantsToJump) {
-                     performWallJump();
-                }
-
-                if (wasOnGround && !this.onGround) {
-                    this.airTimeStart = performance.now();
-                }
-
-                camera.position.copy(nextPos);
+                // Apply final visual position
                 camera.position.y += this.cameraHeightOffset;
                 
                 // Portal Check
@@ -1413,6 +1302,151 @@
                     damagePlayer(20);
                     camera.position.set(0, 2, 0);
                     this.velocity.set(0,0,0);
+                }
+            }
+            
+            physicsStep(dt) {
+                const keys = InputManager.keys;
+                
+                // 1. INPUT & FRICTION
+                const forward = new THREE.Vector3();
+                const right = new THREE.Vector3();
+                camera.getWorldDirection(forward);
+                forward.y = 0; forward.normalize();
+                right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
+
+                const inputDir = new THREE.Vector3();
+                if (keys.w) inputDir.add(forward);
+                if (keys.s) inputDir.sub(forward);
+                if (keys.a) inputDir.sub(right);
+                if (keys.d) inputDir.add(right);
+                if (inputDir.length() > 0) inputDir.normalize();
+                
+                let targetSpeed = CONFIG.baseSpeed;
+                if (this.isCrouching) targetSpeed = CONFIG.crouchSpeed;
+                if (this.isSprinting) targetSpeed = CONFIG.sprintSpeed;
+
+                let friction = this.onGround ? CONFIG.frictionGround : CONFIG.frictionAir;
+                let drive = friction;
+                if (!this.onGround) { friction = CONFIG.frictionAir; drive = CONFIG.airControl; }
+
+                if (this.isSliding) { 
+                    if (this.onGround) {
+                        friction = CONFIG.frictionSlide; 
+                        drive = 1; 
+                        targetSpeed = CONFIG.sprintSpeed; 
+                    } else {
+                        friction = CONFIG.frictionAir; 
+                        drive = CONFIG.airControl * 0.5; 
+                    }
+                }
+
+                if (inputDir.length() > 0) {
+                    this.velocity.addScaledVector(inputDir, targetSpeed * drive * dt);
+                }
+
+                const damping = Math.exp(-friction * dt);
+                this.velocity.x *= damping;
+                this.velocity.z *= damping;
+
+                // 2. Y-AXIS (GRAVITY & VERTICAL COLLISION)
+                this.velocity.y -= CONFIG.gravity * dt;
+                
+                camera.position.y += this.velocity.y * dt;
+                
+                this.updatePlayerBox();
+                const wasOnGround = this.onGround;
+                this.onGround = false;
+                
+                let collisions = spatialGrid.query(this.playerBox);
+                for(const wall of collisions) {
+                    if (this.playerBox.intersectsBox(wall.box)) {
+                        const overlapY = Math.min(this.playerBox.max.y - wall.box.min.y, wall.box.max.y - this.playerBox.min.y);
+                        
+                        // We must check XZ overlap to ensure we are actually ON the block, not just next to it
+                        const overlapX = Math.min(this.playerBox.max.x - wall.box.min.x, wall.box.max.x - this.playerBox.min.x);
+                        const overlapZ = Math.min(this.playerBox.max.z - wall.box.min.z, wall.box.max.z - this.playerBox.min.z);
+                        
+                        if (overlapX > 0 && overlapZ > 0) {
+                             if (this.velocity.y < 0) {
+                                 // Falling down onto something
+                                 // Heuristic: If we are close to the top
+                                 if (this.playerBox.min.y < wall.box.max.y && this.playerBox.min.y > wall.box.min.y) {
+                                     camera.position.y += overlapY;
+                                     this.velocity.y = 0;
+                                     this.onGround = true;
+                                     
+                                     // Landing Logic
+                                     if(!wasOnGround) {
+                                        this.jumpsRemaining = 2;
+                                        moveStreaks.longAerial.count = 0; 
+                                        moveStreaks.aerial.count = 0;
+                                        this.lastTeleportWasAerial = false; 
+                                     }
+                                 }
+                             } else if (this.velocity.y > 0) {
+                                 // Jumping into ceiling
+                                 if (this.playerBox.max.y > wall.box.min.y && this.playerBox.max.y < wall.box.max.y) {
+                                     camera.position.y -= overlapY;
+                                     this.velocity.y = 0;
+                                 }
+                             }
+                        }
+                    }
+                }
+                
+                if (wasOnGround && !this.onGround) {
+                     this.airTimeStart = performance.now();
+                     // Coyote time logic or simple fall
+                     if (this.velocity.y <= 0) this.jumpsRemaining = 3; // Give wall jump
+                }
+
+                if (this.onGround && this.wantsToJump) {
+                     performJump();
+                     moveStreaks.longAerial.count = 0;
+                     moveStreaks.aerial.count = 0;
+                }
+
+                // 3. X-AXIS COLLISION
+                camera.position.x += this.velocity.x * dt;
+                this.updatePlayerBox();
+                collisions = spatialGrid.query(this.playerBox);
+                
+                for(const wall of collisions) {
+                    if (this.playerBox.intersectsBox(wall.box)) {
+                        const overlapX = Math.min(this.playerBox.max.x - wall.box.min.x, wall.box.max.x - this.playerBox.min.x);
+                        const overlapY = Math.min(this.playerBox.max.y - wall.box.min.y, wall.box.max.y - this.playerBox.min.y);
+                        const overlapZ = Math.min(this.playerBox.max.z - wall.box.min.z, wall.box.max.z - this.playerBox.min.z);
+                        
+                        // Ignore if this is actually a floor/ceiling hit we just resolved
+                        if (overlapY > 0.1 && overlapZ > 0) {
+                            if (this.velocity.x > 0) camera.position.x -= overlapX;
+                            else camera.position.x += overlapX;
+                            this.wallImpactVelocity = Math.abs(this.velocity.x);
+                            this.velocity.x = 0;
+                        }
+                    }
+                }
+
+                // 4. Z-AXIS COLLISION
+                camera.position.z += this.velocity.z * dt;
+                this.updatePlayerBox();
+                collisions = spatialGrid.query(this.playerBox);
+                
+                for(const wall of collisions) {
+                    if (this.playerBox.intersectsBox(wall.box)) {
+                        const overlapX = Math.min(this.playerBox.max.x - wall.box.min.x, wall.box.max.x - this.playerBox.min.x);
+                        const overlapY = Math.min(this.playerBox.max.y - wall.box.min.y, wall.box.max.y - this.playerBox.min.y);
+                        const overlapZ = Math.min(this.playerBox.max.z - wall.box.min.z, wall.box.max.z - this.playerBox.min.z);
+
+                         // Ignore if floor hit
+                        if (overlapY > 0.1 && overlapX > 0) {
+                            if (this.velocity.z > 0) camera.position.z -= overlapZ;
+                            else camera.position.z += overlapZ;
+                            this.wallImpactVelocity = Math.abs(this.velocity.z);
+                            this.velocity.z = 0;
+                        }
+                    }
                 }
             }
 
@@ -2748,14 +2782,17 @@
 
             scene.add(mesh);
             mesh.geometry.computeBoundingBox();
-            if (isFloor || !isWall) worldObjects.push(mesh);
+            
+            // v46.2: Universal Collision Registration
+            mesh.updateMatrixWorld(true);
+            const box = mesh.geometry.boundingBox.clone();
+            box.applyMatrix4(mesh.matrixWorld);
+            spatialGrid.insert(mesh, box);
+            
+            worldObjects.push(mesh); // Add everything to worldObjects for gadgets/projectiles
+
             if (!isFloor) {
-                walls.push(mesh);
-                // v45.8 Spatial Grid Insertion
-                mesh.updateMatrixWorld(true);
-                const box = mesh.geometry.boundingBox.clone();
-                box.applyMatrix4(mesh.matrixWorld);
-                spatialGrid.insert(mesh, box);
+                walls.push(mesh); // Walls array used for AI Vision and Wall Jump Detection
             }
             return mesh;
         }
