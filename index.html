@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v46.2</title>
+    <title>Neon Blade: Melee Arena v46.3</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -415,7 +415,7 @@
                 <button class="btn-secondary" id="fps-btn">SHOW FPS: OFF</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.2</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.3</div>
         </div>
     </div>
 
@@ -1111,26 +1111,14 @@
                     moveStreaks.aerial.count = 0;
                 } else {
                      if (!isRepeat) { 
-                         if(this.jumpsRemaining > 0) {
-                            performWallJump(); 
-                            
-                            let hitWall = false;
-                            globalRaycaster.far = 1.5;
-                            const dirs = [new THREE.Vector3(1,0,0), new THREE.Vector3(-1,0,0), new THREE.Vector3(0,0,1), new THREE.Vector3(0,0,-1)];
-                            for(let d of dirs) {
-                                d.applyQuaternion(camera.quaternion);
-                                globalRaycaster.set(camera.position, d);
-                                if(globalRaycaster.intersectObjects(walls).length > 0) { hitWall = true; break; }
-                            }
-                            
-                            if (!hitWall && this.jumpsRemaining > 0) {
-                                this.velocity.y = CONFIG.jumpForce;
-                                this.jumpsRemaining--;
-                                AudioSys.playJump();
-                                spawnRipple(camera.position.clone().add(new THREE.Vector3(0,-1.5,0)), new THREE.Vector3(0,1,0), 0x00ffaa);
-                            } else if (hitWall) {
-                                performWallJump();
-                            }
+                         // v46.3 Fix: Check wall jump first, free of cost
+                         const wallJumped = performWallJump();
+                         
+                         if (!wallJumped && this.jumpsRemaining > 0) {
+                             this.velocity.y = CONFIG.jumpForce;
+                             this.jumpsRemaining--;
+                             AudioSys.playJump();
+                             spawnRipple(camera.position.clone().add(new THREE.Vector3(0,-1.5,0)), new THREE.Vector3(0,1,0), 0x00ffaa);
                          }
                      }
                      this.wantsToJump = true;
@@ -1501,6 +1489,12 @@
                     const result = getTeleportTarget();
                     teleportMarker.position.copy(result.point);
                     this.teleportTarget = result.point;
+                    
+                    // v46.3 Offset marker slightly if it's on a wall surface
+                    if (result.hit && result.normal) {
+                        teleportMarker.position.addScaledVector(result.normal, 0.5);
+                    }
+                    
                     teleportMarker.visible = true;
 
                     let closestEnemy = null;
@@ -3323,11 +3317,11 @@
             const intersects = globalRaycaster.intersectObjects(worldObjects);
             
             if (intersects.length > 0) {
-                return { point: intersects[0].point, hit: true };
+                return { point: intersects[0].point, hit: true, normal: intersects[0].face.normal };
             } else {
                 const dir = new THREE.Vector3();
                 camera.getWorldDirection(dir);
-                return { point: camera.position.clone().addScaledVector(dir, CONFIG.teleportRange), hit: false };
+                return { point: camera.position.clone().addScaledVector(dir, CONFIG.teleportRange), hit: false, normal: null };
             }
         }
 
@@ -3387,10 +3381,12 @@
                 player.lastJumpTime = performance.now();
                 player.lastWallJumpTime = performance.now(); 
                 AudioSys.playWallJump();
+                return true;
             }
+            return false;
         }
 
-        function executeTeleport(target) {
+        function executeTeleport(target, normal) {
              if (player.energy < CONFIG.teleportCost) {
                  AudioSys.playMiss();
                  return;
@@ -3400,19 +3396,25 @@
              let yOffset = 0;
              const startInAir = !player.onGround;
 
-             const ray = new THREE.Raycaster(target.clone().add(new THREE.Vector3(0,1,0)), new THREE.Vector3(0,-1,0), 0, 2);
+             // v46.3 Fix: Tunneling prevention
+             const dest = target.clone();
+             if (normal) {
+                 dest.addScaledVector(normal, 0.5); // Offset by player half-width approx
+             }
+
+             const ray = new THREE.Raycaster(dest.clone().add(new THREE.Vector3(0,1,0)), new THREE.Vector3(0,-1,0), 0, 2);
              const hits = ray.intersectObjects(worldObjects);
              if(hits.length > 0) yOffset = 1.6;
 
-             const groundAtTarget = getGroundHeight(target.x, target.z);
-             const endInAir = (target.y - groundAtTarget) > 0.5;
+             const groundAtTarget = getGroundHeight(dest.x, dest.z);
+             const endInAir = (dest.y - groundAtTarget) > 0.5;
 
              player.lastTeleportWasAerial = startInAir || endInAir;
              player.hasPhaseStruck = false; 
 
              spawnParticles(camera.position, 0x00ffaa, 20); 
              
-             camera.position.set(target.x, target.y + yOffset, target.z);
+             camera.position.set(dest.x, dest.y + yOffset, dest.z);
              player.velocity.y = 2; 
              player.jumpsRemaining = 1; 
              player.onGround = false; 
@@ -3424,12 +3426,13 @@
              player.lastTeleportTime = performance.now(); 
              
              AudioSys.playTeleport();
-             spawnParticles(target, 0x00ffaa, 30);
+             spawnParticles(dest, 0x00ffaa, 30);
         }
 
         function tryAimTeleport() {
             if (player.teleportTarget) {
-                executeTeleport(player.teleportTarget);
+                const res = getTeleportTarget(); // Re-fetch to get normal
+                executeTeleport(player.teleportTarget, res.normal);
                 player.teleportActive = false; 
             }
         }
@@ -3437,7 +3440,7 @@
         function tryInstantTeleport() {
             // v45.5: Unified logic via helper
             const result = getTeleportTarget();
-            executeTeleport(result.point);
+            executeTeleport(result.point, result.normal);
             
             document.getElementById('icon-q').classList.add('active');
             setTimeout(() => document.getElementById('icon-q').classList.remove('active'), 200);
@@ -4234,6 +4237,19 @@
                         
                         _vec3_1.normalize();
                         if (this.isSliding) speed *= 1.5;
+
+                        // v46.3 Ledge Check: Stop bots from walking off cliffs
+                        if (this.onGroundSafe(groundY)) {
+                             const lookAhead = this.mesh.position.clone().addScaledVector(_vec3_1, 2.0);
+                             const nextGround = getGroundHeight(lookAhead.x, lookAhead.z);
+                             if (nextGround < groundY - 3) {
+                                 // Ledge detected!
+                                 speed = 0;
+                                 if (this.state === 'ROAM') this.pickRoamTarget();
+                                 else this.velocity.set(0,0,0);
+                             }
+                        }
+
                         this.mesh.position.addScaledVector(_vec3_1, speed * dt);
                         
                         let lookDir = _vec3_1;
