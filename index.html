@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v46.4</title>
+    <title>Neon Blade: Melee Arena v46.5</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -416,7 +417,7 @@
                 <button class="btn-secondary" id="fps-btn">SHOW FPS: OFF</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.4</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.5</div>
         </div>
     </div>
 
@@ -1495,9 +1496,9 @@
                     teleportMarker.position.copy(result.point);
                     this.teleportTarget = result.point;
                     
-                    // v46.3 Offset marker slightly if it's on a wall surface
+                    // v46.5 Offset marker slightly further if it's on a wall surface for safety
                     if (result.hit && result.normal) {
-                        teleportMarker.position.addScaledVector(result.normal, 0.5);
+                        teleportMarker.position.addScaledVector(result.normal, 0.8);
                     }
                     
                     teleportMarker.visible = true;
@@ -3362,6 +3363,9 @@
         }
         
         function performWallJump() {
+            // v46.5 Added Cooldown to prevent machine-gunning multi-triggering
+            if (performance.now() - player.lastWallJumpTime < 600) return false;
+
             globalRaycaster.far = 1.5;
             const dirs = [
                 new THREE.Vector3(1,0,0), new THREE.Vector3(-1,0,0),
@@ -3411,10 +3415,10 @@
              let yOffset = 0;
              const startInAir = !player.onGround;
 
-             // v46.3 Fix: Tunneling prevention
+             // v46.5 Fix: Improved safety offset to prevent clipping into complex geometry/corners
              const dest = target.clone();
              if (normal) {
-                 dest.addScaledVector(normal, 0.5); // Offset by player half-width approx
+                 dest.addScaledVector(normal, 0.8); // Offset by player half-width approx + safety margin
              }
 
              const ray = new THREE.Raycaster(dest.clone().add(new THREE.Vector3(0,1,0)), new THREE.Vector3(0,-1,0), 0, 2);
