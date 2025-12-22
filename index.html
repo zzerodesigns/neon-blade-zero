@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v46.5</title>
+    <title>Neon Blade: Melee Arena v46.6 Redux</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -417,7 +417,7 @@
                 <button class="btn-secondary" id="fps-btn">SHOW FPS: OFF</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.5</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.6 Redux</div>
         </div>
     </div>
 
@@ -1067,6 +1067,10 @@
                 this.wantsToJump = false;
                 this.portalCooldown = 0;
                 
+                // v46.6 Redux: Phasing State
+                this.isPhasing = false;
+                this.phasingTimer = 0;
+                
                 // Physics Box (v46.2)
                 this.playerBox = new THREE.Box3();
                 this.boxSize = { w: 0.6, h: 1.8 }; // 0.6 Width, 1.8 Height (Eye level 1.6)
@@ -1197,6 +1201,12 @@
                 if(this.currentWeapon) this.currentWeapon.update(dt);
 
                 if (this.portalCooldown > 0) this.portalCooldown -= dt;
+                
+                // v46.6 Redux: Phasing Timer
+                if (this.phasingTimer > 0) {
+                    this.phasingTimer -= dt;
+                    if (this.phasingTimer <= 0) this.isPhasing = false;
+                }
 
                 // v45.9 Auto Strike
                 if (isLocked && InputManager.mouseDown) {
@@ -1343,7 +1353,7 @@
                 this.velocity.x *= damping;
                 this.velocity.z *= damping;
 
-                // 2. Y-AXIS (GRAVITY & VERTICAL COLLISION)
+                // 2. Y-AXIS (GRAVITY & VERTICAL COLLISION) - ALWAYS ACTIVE
                 this.velocity.y -= CONFIG.gravity * dt;
                 
                 camera.position.y += this.velocity.y * dt;
@@ -1401,44 +1411,50 @@
                      moveStreaks.aerial.count = 0;
                 }
 
-                // 3. X-AXIS COLLISION
+                // 3. X-AXIS COLLISION - DISABLED DURING PHASING
                 camera.position.x += this.velocity.x * dt;
-                this.updatePlayerBox();
-                collisions = spatialGrid.query(this.playerBox);
                 
-                for(const wall of collisions) {
-                    if (this.playerBox.intersectsBox(wall.box)) {
-                        const overlapX = Math.min(this.playerBox.max.x - wall.box.min.x, wall.box.max.x - this.playerBox.min.x);
-                        const overlapY = Math.min(this.playerBox.max.y - wall.box.min.y, wall.box.max.y - this.playerBox.min.y);
-                        const overlapZ = Math.min(this.playerBox.max.z - wall.box.min.z, wall.box.max.z - this.playerBox.min.z);
-                        
-                        // Ignore if this is actually a floor/ceiling hit we just resolved
-                        if (overlapY > 0.1 && overlapZ > 0) {
-                            if (this.velocity.x > 0) camera.position.x -= overlapX;
-                            else camera.position.x += overlapX;
-                            this.wallImpactVelocity = Math.abs(this.velocity.x);
-                            this.velocity.x = 0;
+                if (!this.isPhasing) {
+                    this.updatePlayerBox();
+                    collisions = spatialGrid.query(this.playerBox);
+                    
+                    for(const wall of collisions) {
+                        if (this.playerBox.intersectsBox(wall.box)) {
+                            const overlapX = Math.min(this.playerBox.max.x - wall.box.min.x, wall.box.max.x - this.playerBox.min.x);
+                            const overlapY = Math.min(this.playerBox.max.y - wall.box.min.y, wall.box.max.y - this.playerBox.min.y);
+                            const overlapZ = Math.min(this.playerBox.max.z - wall.box.min.z, wall.box.max.z - this.playerBox.min.z);
+                            
+                            // Ignore if this is actually a floor/ceiling hit we just resolved
+                            if (overlapY > 0.1 && overlapZ > 0) {
+                                if (this.velocity.x > 0) camera.position.x -= overlapX;
+                                else camera.position.x += overlapX;
+                                this.wallImpactVelocity = Math.abs(this.velocity.x);
+                                this.velocity.x = 0;
+                            }
                         }
                     }
                 }
 
-                // 4. Z-AXIS COLLISION
+                // 4. Z-AXIS COLLISION - DISABLED DURING PHASING
                 camera.position.z += this.velocity.z * dt;
-                this.updatePlayerBox();
-                collisions = spatialGrid.query(this.playerBox);
                 
-                for(const wall of collisions) {
-                    if (this.playerBox.intersectsBox(wall.box)) {
-                        const overlapX = Math.min(this.playerBox.max.x - wall.box.min.x, wall.box.max.x - this.playerBox.min.x);
-                        const overlapY = Math.min(this.playerBox.max.y - wall.box.min.y, wall.box.max.y - this.playerBox.min.y);
-                        const overlapZ = Math.min(this.playerBox.max.z - wall.box.min.z, wall.box.max.z - this.playerBox.min.z);
+                if (!this.isPhasing) {
+                    this.updatePlayerBox();
+                    collisions = spatialGrid.query(this.playerBox);
+                    
+                    for(const wall of collisions) {
+                        if (this.playerBox.intersectsBox(wall.box)) {
+                            const overlapX = Math.min(this.playerBox.max.x - wall.box.min.x, wall.box.max.x - this.playerBox.min.x);
+                            const overlapY = Math.min(this.playerBox.max.y - wall.box.min.y, wall.box.max.y - this.playerBox.min.y);
+                            const overlapZ = Math.min(this.playerBox.max.z - wall.box.min.z, wall.box.max.z - this.playerBox.min.z);
 
-                         // Ignore if floor hit
-                        if (overlapY > 0.1 && overlapX > 0) {
-                            if (this.velocity.z > 0) camera.position.z -= overlapZ;
-                            else camera.position.z += overlapZ;
-                            this.wallImpactVelocity = Math.abs(this.velocity.z);
-                            this.velocity.z = 0;
+                             // Ignore if floor hit
+                            if (overlapY > 0.1 && overlapX > 0) {
+                                if (this.velocity.z > 0) camera.position.z -= overlapZ;
+                                else camera.position.z += overlapZ;
+                                this.wallImpactVelocity = Math.abs(this.velocity.z);
+                                this.velocity.z = 0;
+                            }
                         }
                     }
                 }
@@ -3322,6 +3338,23 @@
             }
             return 0;
         }
+        
+        function snapToFloor(pos) {
+            // v46.6 Redux: Floor Anchor
+            // Prevents teleporting into the void by forcing a Y-coordinate snap if valid ground is nearby.
+            const origin = pos.clone();
+            origin.y += 1.0; 
+            
+            globalRaycaster.set(origin, new THREE.Vector3(0, -1, 0));
+            globalRaycaster.far = 6.0; 
+            
+            const hits = globalRaycaster.intersectObjects(groundObjects);
+            if(hits.length > 0) {
+                // If we found a floor, align feet to it
+                // Player Y (Camera) = Floor + 1.6
+                pos.y = hits[0].point.y + 1.6;
+            }
+        }
 
         // --- GAME LOGIC ---
         function getTeleportTarget() {
@@ -3364,7 +3397,7 @@
         
         function performWallJump() {
             // v46.5 Added Cooldown to prevent machine-gunning multi-triggering
-            if (performance.now() - player.lastWallJumpTime < 600) return false;
+            if (performance.now() - player.lastWallJumpTime < 300) return false;
 
             globalRaycaster.far = 1.5;
             const dirs = [
@@ -3412,31 +3445,34 @@
              }
              player.energy -= CONFIG.teleportCost;
 
-             let yOffset = 0;
-             const startInAir = !player.onGround;
-
-             // v46.5 Fix: Improved safety offset to prevent clipping into complex geometry/corners
+             // 1. Basic Target Calculation
+             // We still want a small offset from walls so we don't look INSIDE the wall texture
              const dest = target.clone();
              if (normal) {
-                 dest.addScaledVector(normal, 0.8); // Offset by player half-width approx + safety margin
+                 dest.addScaledVector(normal, 0.5); 
              }
 
-             const ray = new THREE.Raycaster(dest.clone().add(new THREE.Vector3(0,1,0)), new THREE.Vector3(0,-1,0), 0, 2);
-             const hits = ray.intersectObjects(worldObjects);
-             if(hits.length > 0) yOffset = 1.6;
+             // 2. Floor Anchor (The Void Fix)
+             snapToFloor(dest); 
 
+             const startInAir = !player.onGround;
              const groundAtTarget = getGroundHeight(dest.x, dest.z);
-             const endInAir = (dest.y - groundAtTarget) > 0.5;
+             const endInAir = (dest.y - (groundAtTarget + 1.6)) > 0.5;
 
              player.lastTeleportWasAerial = startInAir || endInAir;
              player.hasPhaseStruck = false; 
 
              spawnParticles(camera.position, 0x00ffaa, 20); 
              
-             camera.position.set(dest.x, dest.y + yOffset, dest.z);
-             player.velocity.y = 2; 
+             camera.position.copy(dest);
+             player.velocity.set(0,0,0); 
+             player.velocity.y = 2; // Slight hop
              player.jumpsRemaining = 1; 
              player.onGround = false; 
+             
+             // 3. Enable Phasing (Soft-Clip)
+             player.isPhasing = true;
+             player.phasingTimer = 0.2; // 200ms grace period
              
              if(!startInAir) {
                  player.airTimeStart = performance.now();
@@ -3450,7 +3486,7 @@
 
         function tryAimTeleport() {
             if (player.teleportTarget) {
-                const res = getTeleportTarget(); // Re-fetch to get normal
+                const res = getTeleportTarget(); 
                 executeTeleport(player.teleportTarget, res.normal);
                 player.teleportActive = false; 
             }
