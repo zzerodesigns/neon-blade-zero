@@ -3465,7 +3465,7 @@
              spawnParticles(camera.position, 0x00ffaa, 20); 
              
              camera.position.copy(dest);
-             player.velocity.set(0,0,0); 
+             // player.velocity.set(0,0,0); // This resets player velocity after teleport
              player.velocity.y = 2; // Slight hop
              player.jumpsRemaining = 1; 
              player.onGround = false; 
