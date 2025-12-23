@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v46.6.1</title>
+    <title>Neon Blade: Melee Arena v46.6.2</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -417,7 +417,7 @@
                 <button class="btn-secondary" id="fps-btn">SHOW FPS: OFF</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.6.1</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.6.2</div>
         </div>
     </div>
 
@@ -994,11 +994,14 @@
                 return `${Math.floor(x / this.cellSize)}:${Math.floor(z / this.cellSize)}`;
             }
 
-            insert(mesh, box) {
+insert(mesh, box) {
                 const minX = Math.floor(box.min.x / this.cellSize);
                 const maxX = Math.floor(box.max.x / this.cellSize);
                 const minZ = Math.floor(box.min.z / this.cellSize);
                 const maxZ = Math.floor(box.max.z / this.cellSize);
+
+                // 46.6.2 FIX: Define the object wrapper OUTSIDE the loop
+                const entry = { mesh, box };
 
                 for (let x = minX; x <= maxX; x++) {
                     for (let z = minZ; z <= maxZ; z++) {
@@ -1006,7 +1009,8 @@
                         if (!this.cells.has(key)) {
                             this.cells.set(key, []);
                         }
-                        this.cells.get(key).push({ mesh, box });
+                        // FIX: Push the same reference
+                        this.cells.get(key).push(entry);
                     }
                 }
             }
@@ -1405,10 +1409,15 @@
                      if (this.velocity.y <= 0) this.jumpsRemaining = 3; // Give wall jump
                 }
 
-                if (this.onGround && this.wantsToJump) {
-                     performJump();
-                     moveStreaks.longAerial.count = 0;
-                     moveStreaks.aerial.count = 0;
+if (this.wantsToJump) {
+                    if (this.onGround) {
+                        performJump();
+                        moveStreaks.longAerial.count = 0;
+                        moveStreaks.aerial.count = 0;
+                    } else {
+                        // 46.6.2 FIX: Check for wall jump every frame while holding space
+                        performWallJump();
+                    }
                 }
 
                 // 3. X-AXIS COLLISION - DISABLED DURING PHASING
