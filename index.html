@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v46.6.2</title>
+    <title>Neon Blade: Melee Arena v46.6.3</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -417,7 +417,7 @@
                 <button class="btn-secondary" id="fps-btn">SHOW FPS: OFF</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.6.2</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.6.3</div>
         </div>
     </div>
 
@@ -3454,50 +3454,80 @@ function executeTeleport(target, normal) {
              }
              player.energy -= CONFIG.teleportCost;
 
-             // 1. Target Calculation & Wall Safety
              const dest = target.clone();
-             let isWall = false;
 
+             // 1. Apply Wall Offset (Push slightly away from surface face)
              if (normal) {
-                 // v46.6.1 FIX 1: Increased offset to 0.8. 
-                 // This ensures the player's 0.6-width hitbox does not clip inside the wall.
-                 dest.addScaledVector(normal, 0.8); 
-                 
-                 // v46.6.1 FIX 2: Detect vertical surfaces (Walls) vs Horizontal (Floors/Slopes)
-                 // If the Y component of the normal is small, it's a wall.
-                 if (Math.abs(normal.y) < 0.5) isWall = true;
+                 dest.addScaledVector(normal, 0.8);
              }
 
-             // 2. Floor Anchor
-             // v46.6.1 FIX 3: Only snap to floor if we are NOT targeting a wall.
-             // This prevents the game from dragging you down to the ground when you try to teleport high up a wall.
-             if (!isWall) {
-                 snapToFloor(dest); 
+             // 2. FLOOR CLAMP FIX - v46.6.3 (Fixes falling through map at wall bases)
+             // Always calculate where the ground is at the destination.
+             const groundHeight = getGroundHeight(dest.x, dest.z);
+             
+             // If the destination Y (camera level) is lower than standing height, snap it up.
+             // This ensures that even if you aim at the bottom inch of a wall, you spawn standing up.
+             if (dest.y < groundHeight + 1.6) {
+                 dest.y = groundHeight + 1.6;
              }
 
+             // 3. CORNER DE-PENETRATION - v46.6.3 (Fixes getting stuck/ejected in corners)
+             // We simulate a collision check at the destination BEFORE committing the move.
+             const tempBox = new THREE.Box3();
+             const halfW = 0.3; // Half of player width
+             
+             // Set box at proposed destination
+             tempBox.min.set(dest.x - halfW, dest.y - 1.6, dest.z - halfW);
+             tempBox.max.set(dest.x + halfW, dest.y + 0.2, dest.z + halfW);
+
+             // Check spatial grid for walls at this specific spot
+             const collisions = spatialGrid.query(tempBox);
+             
+             for(const wall of collisions) {
+                 // Ignore floors (already handled by clamp)
+                 if (wall.mesh.userData.isFloor) continue;
+
+                 if (tempBox.intersectsBox(wall.box)) {
+                     // Calculate overlap depth
+                     const overlapX = Math.min(tempBox.max.x - wall.box.min.x, wall.box.max.x - tempBox.min.x);
+                     const overlapZ = Math.min(tempBox.max.z - wall.box.min.z, wall.box.max.z - tempBox.min.z);
+
+                     // Determine push direction based on wall center vs player center
+                     const wallCenterX = (wall.box.min.x + wall.box.max.x) / 2;
+                     const wallCenterZ = (wall.box.min.z + wall.box.max.z) / 2;
+
+                     // Push out of the shallowest penetration axis
+                     if (overlapX < overlapZ) {
+                         const sign = (dest.x < wallCenterX) ? -1 : 1;
+                         dest.x += (overlapX + 0.05) * sign; // Add small buffer
+                     } else {
+                         const sign = (dest.z < wallCenterZ) ? -1 : 1;
+                         dest.z += (overlapZ + 0.05) * sign;
+                     }
+                     
+                     // Update tempBox for next iteration (in case we pushed into another wall)
+                     tempBox.min.set(dest.x - halfW, dest.y - 1.6, dest.z - halfW);
+                     tempBox.max.set(dest.x + halfW, dest.y + 0.2, dest.z + halfW);
+                 }
+             }
+
+             // --- Standard Teleport Finalization ---
              const startInAir = !player.onGround;
-             const groundAtTarget = getGroundHeight(dest.x, dest.z);
-             const endInAir = (dest.y - (groundAtTarget + 1.6)) > 0.5;
+             
+             // Check aerial state based on corrected position
+             const finalGround = getGroundHeight(dest.x, dest.z);
+             const endInAir = (dest.y - (finalGround + 1.6)) > 0.5;
 
              player.lastTeleportWasAerial = startInAir || endInAir;
              player.hasPhaseStruck = false; 
 
              spawnParticles(camera.position, 0x00ffaa, 20); 
              
-             // 3. Move Player
+             // Commit Position
              camera.position.copy(dest);
-
-             // 4. Momentum Handling
-             // FIX 4: Removed `player.velocity.y = 2`. 
-             // We now preserve your momentum. If you are falling, you keep falling (unless you hit the ground).
-             // If you want to stop falling, you must Dash or Jump after teleporting.
              
              player.jumpsRemaining = 1; 
              player.onGround = false; 
-             
-             // 5. REMOVED PHASING (The Ghost Fix)
-             // We deleted `player.isPhasing = true`.
-             // This ensures collision physics are active INSTANTLY, preventing you from drifting inside walls.
              
              if(!startInAir) {
                  player.airTimeStart = performance.now();
