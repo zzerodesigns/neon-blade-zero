@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v46.6.4</title>
+    <title>Neon Blade: Melee Arena v46.6.5</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -417,7 +417,7 @@
                 <button class="btn-secondary" id="fps-btn">SHOW FPS: OFF</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.6.4</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.6.5</div>
         </div>
     </div>
 
@@ -3470,7 +3470,8 @@ function executeTeleport(target, normal) {
              // If the destination Y (camera level) is lower than standing height, snap it up.
              // This ensures that even if you aim at the bottom inch of a wall, you spawn standing up.
              if (dest.y < groundHeight + 1.6) {
-                 dest.y = groundHeight + 1.6;
+                // v46.6.5 - Fix Top Surface Teleport Snap by adding 0.001 to the landing height
+                 dest.y = groundHeight + 1.601;
              }
 
              // 3. CORNER DE-PENETRATION - v46.6.3 (Fixes getting stuck/ejected in corners)
