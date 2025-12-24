@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v46.6.3</title>
+    <title>Neon Blade: Melee Arena v46.6.4</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -417,7 +417,7 @@
                 <button class="btn-secondary" id="fps-btn">SHOW FPS: OFF</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.6.3</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.6.4</div>
         </div>
     </div>
 
@@ -2945,7 +2945,9 @@ if (this.wantsToJump) {
                     this.mat.emissive = new THREE.Color(r*0.1, g*0.1, 0);
                     this.faceGroup.visible = true;
                     this.edges.visible = false;
-                    this.visualMesh.rotation.y = (Math.PI / 2) * Math.floor(Math.random() * 4);
+                    // Fix - v46.6.4: Rotate the Face Group instead of the Visual Mesh. 
+                    // Rotating the mesh causes slight AABB misalignment triggering the roof snap bug.
+                    this.faceGroup.rotation.y = (Math.PI / 2) * Math.floor(Math.random() * 4);
                 } else if (t === 0) { // Light (Gifts)
                     this.mat.color.setHex(this.palette.box);
                     this.ribbonMat.color.setHex(this.palette.ribbon);
