@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v46.6.5</title>
+    <title>Neon Blade: Melee Arena v46.6.6</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -417,7 +417,7 @@
                 <button class="btn-secondary" id="fps-btn">SHOW FPS: OFF</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.6.5</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.6.6</div>
         </div>
     </div>
 
@@ -1091,15 +1091,43 @@ insert(mesh, box) {
             init() {
                 this.currentWeapon = new Katana(this);
                 
-                // Trajectory Visual
-                const points = [];
-                for(let i=0; i<30; i++) points.push(new THREE.Vector3());
-                const geo = new THREE.BufferGeometry().setFromPoints(points);
-                const mat = new THREE.LineBasicMaterial({ color: 0x00ffaa, opacity: 0.5, transparent: true });
-                this.aimLine = new THREE.Line(geo, mat);
+                // Trajectory Visual (Ribbon + Arrow)
+                const segmentCount = 30;
+                // 2 vertices per segment for the ribbon, plus 3 for the arrow head triangle
+                const vertexCount = segmentCount * 2 + 3; 
+                
+                const geo = new THREE.BufferGeometry();
+                const positions = new Float32Array(vertexCount * 3);
+                geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                
+                const indices = [];
+                // 1. Generate Ribbon Indices (strip of triangles)
+                for(let i=0; i<segmentCount-1; i++) {
+                    const k = i * 2;
+                    // Two triangles per segment to form a quad
+                    indices.push(k, k+1, k+2);
+                    indices.push(k+1, k+3, k+2);
+                }
+                
+                // 2. Generate Arrowhead Indices (Last 3 vertices form a single triangle)
+                const arrowBase = segmentCount * 2;
+                indices.push(arrowBase, arrowBase+1, arrowBase+2);
+                
+                geo.setIndex(indices);
+
+                // ev.io style: White, semi-transparent, flat shading
+                const mat = new THREE.MeshBasicMaterial({ 
+                    color: 0xffffff, 
+                    opacity: 0.4, 
+                    transparent: true, 
+                    side: THREE.DoubleSide, 
+                    depthWrite: false 
+                });
+                
+                this.aimLine = new THREE.Mesh(geo, mat); 
                 this.aimLine.frustumCulled = false;
                 this.aimLine.visible = false;
-                scene.add(this.aimLine);
+                camera.add(this.aimLine);
             }
             
             updatePlayerBox() {
@@ -1227,18 +1255,54 @@ insert(mesh, box) {
                 // Gadget Aim Visual
                 if (this.aimingGadget) {
                     this.aimLine.visible = true;
-                    const pts = [];
-                    const dir = new THREE.Vector3();
-                    camera.getWorldDirection(dir);
-                    let p = camera.position.clone().addScaledVector(dir, 1.0);
-                    let v = dir.clone().multiplyScalar(50).add(this.velocity);
+                    const posAttr = this.aimLine.geometry.attributes.position;
+                    const positions = posAttr.array;
                     
+                    // 1. Start Point (Local Space)
+                    // x: positive number places it to the right (Right Hand throw)
+                    // y: positive number places it above eye level
+                    // z: positive number places it further behind camera
+                    // v46.6.6 - for a nice curved ribbon effect, use (1.25, -1, -8)
+                    let p = new THREE.Vector3(1.25, -1, -8); 
+                    
+                    // 2. Initial Velocity (Local Space)
+                    // Fixed snappy forward velocity for visual consistency
+                    let v = new THREE.Vector3(0, 0, -50);
+
+                    // 3. Gravity (Local Space)
+                    // Rotate world gravity into camera local space so the arc bends "down" relative to the world
+                    const invRot = camera.quaternion.clone().invert();
+                    const localGravity = new THREE.Vector3(0, -CONFIG.gravity, 0).applyQuaternion(invRot);
+
+                    let idx = 0;
+                    let lastP = p.clone();
+
+                    // Generate Ribbon Loop
                     for(let i=0; i<30; i++) {
-                        pts.push(p.clone());
-                        p.addScaledVector(v, 0.05); // Simulate dt=0.05
-                        v.y -= CONFIG.gravity * 0.05;
+                        // Create two vertices for the ribbon width (Left and Right)
+                        // Width is 2 total (+/- 1 from center)
+                        positions[idx++] = p.x - 1; positions[idx++] = p.y; positions[idx++] = p.z;
+                        positions[idx++] = p.x + 1; positions[idx++] = p.y; positions[idx++] = p.z;
+                        
+                        lastP.copy(p);
+                        
+                        // Physics Step
+                        p.addScaledVector(v, 0.05);
+                        v.addScaledVector(localGravity, 0.05);
                     }
-                    this.aimLine.geometry.setFromPoints(pts);
+
+                    // Generate Arrowhead at the tip
+                    const tipDir = v.clone().normalize();
+
+                    // Arrow Base Left (Wider than ribbon)
+                    positions[idx++] = lastP.x - 2; positions[idx++] = lastP.y; positions[idx++] = lastP.z;
+                    // Arrow Base Right
+                    positions[idx++] = lastP.x + 2; positions[idx++] = lastP.y; positions[idx++] = lastP.z;
+                    // Arrow Tip (Projected forward along trajectory)
+                    const tip = lastP.clone().addScaledVector(tipDir, 5);
+                    positions[idx++] = tip.x; positions[idx++] = tip.y; positions[idx++] = tip.z;
+
+                    posAttr.needsUpdate = true;
                 }
 
                 // --- NEW VOLUMETRIC PHYSICS ENGINE (v46.2) ---
