@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v46.6.6</title>
+    <title>Neon Blade: Melee Arena v46.7</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -417,7 +417,7 @@
                 <button class="btn-secondary" id="fps-btn">SHOW FPS: OFF</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.6.6</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.7</div>
         </div>
     </div>
 
@@ -432,7 +432,7 @@
             
             jumpForce: 14, // v46.2 adjusted for volumetric physics
             wallJumpForce: 15,
-            wallPushForce: 10, 
+            wallPushForce: 13, // v46.7 tuned for wall climbing
             gravity: 30, // v46.2 tuned for better air control
             
             frictionGround: 6.0, 
@@ -443,13 +443,13 @@
             slideBoost: 15, 
             bunnyHopBoost: 0, 
             
-            energyMax: 100,
+            energyMax: 1000, // default is 100, v46.7 using 1000 for testing
             energyDrain: 25, 
-            energyRegen: 15, // Was staminaRegen
+            energyRegen: 50, // default is 15, v46.7 using 50 for testing
             teleportCost: 10,
             
             gadgetCost: { frag: 30, sticky: 30, impulse: 25 },
-            gadgetCooldown: 500,
+            gadgetCooldown: 200, // default is 500, v46.7 using 200 for testing
 
             attackRange: 8,
             attackCooldown: 250,
@@ -1044,7 +1044,7 @@ insert(mesh, box) {
             constructor() {
                 this.velocity = new THREE.Vector3();
                 this.onGround = false;
-                this.jumpsRemaining = 2;
+                this.jumpsRemaining = 3; // v46.7 fix default jumps
                 this.isSliding = false;
                 this.isCrouching = false;
                 this.isSprinting = false;
@@ -1144,6 +1144,7 @@ insert(mesh, box) {
             onJumpInput(isRepeat) {
                 if(this.onGround) {
                     performJump();
+                    this.jumpsRemaining--; // v46.7 fix to decrement the counter when performing a standard ground jump
                     this.wantsToJump = true;
                     moveStreaks.longAerial.count = 0;
                     moveStreaks.aerial.count = 0;
@@ -1154,7 +1155,7 @@ insert(mesh, box) {
 
                      // 2. Try Air Jump (Only on fresh press)
                      if (!wallJumped && !isRepeat && this.jumpsRemaining > 0) {
-                         this.velocity.y = CONFIG.jumpForce;
+                         this.velocity.y = Math.max(0, this.velocity.y) + CONFIG.jumpForce; // v46.7 fix to preserve upward momentum
                          this.jumpsRemaining--;
                          AudioSys.playJump();
                          spawnRipple(camera.position.clone().add(new THREE.Vector3(0,-1.5,0)), new THREE.Vector3(0,1,0), 0x00ffaa);
@@ -1450,7 +1451,7 @@ insert(mesh, box) {
                                      
                                      // Landing Logic
                                      if(!wasOnGround) {
-                                        this.jumpsRemaining = 2;
+                                        this.jumpsRemaining = 3; // v46.7 fix detaulf jumps
                                         moveStreaks.longAerial.count = 0; 
                                         moveStreaks.aerial.count = 0;
                                         this.lastTeleportWasAerial = false; 
@@ -1469,8 +1470,6 @@ insert(mesh, box) {
                 
                 if (wasOnGround && !this.onGround) {
                      this.airTimeStart = performance.now();
-                     // Coyote time logic or simple fall
-                     if (this.velocity.y <= 0) this.jumpsRemaining = 3; // Give wall jump
                 }
 
 if (this.wantsToJump) {
@@ -1773,7 +1772,7 @@ if (this.wantsToJump) {
                 this.velocity = vel.clone();
                 this.radius = 0.2;
                 this.stuckTo = null;
-                this.life = type === 'STICKY' ? 2.0 : (type === 'IMPULSE' ? 10.0 : 2.5); 
+                this.life = type === 'STICKY' ? 1.5 : (type === 'IMPULSE' ? 10.0 : 3.5); // v46.7 tune for fuse timer
                 
                 let color = 0x00ff00; // FRAG
                 if(type === 'STICKY') color = 0xff0000;
@@ -1876,7 +1875,7 @@ if (this.wantsToJump) {
                          if (this.type === 'STICKY') {
                              // Stick to wall/floor
                              this.active = false; 
-                             this.life = 2.0; 
+                             // this.life = 2.0; // resets fuse timer on landing to 2 second, v46.7 disabled
                              this.mesh.position.copy(hits[0].point);
                              this.velocity.set(0,0,0);
                              this.active = true; 
@@ -1887,7 +1886,7 @@ if (this.wantsToJump) {
                          if (this.type === 'FRAG') {
                              // Bouncy physics
                              const n = hits[0].face.normal;
-                             this.velocity.reflect(n).multiplyScalar(0.7); // High restitution
+                             this.velocity.reflect(n).multiplyScalar(0.75); // v46.7 tune for higher bounciness
                              this.mesh.position.copy(hits[0].point).addScaledVector(n, 0.2);
                          }
                     } else {
@@ -1913,8 +1912,8 @@ if (this.wantsToJump) {
                 let force = 20;
                 let color = 0x00ff00;
 
-                if (this.type === 'FRAG') { range=15; damage=120; force=25; color=0x00ff00; }
-                if (this.type === 'STICKY') { range=20; damage=150; force=-40; color=0xff0000; } // Implosion
+                if (this.type === 'FRAG') { range=15; damage=150; force=30; color=0x00ff00; }
+                if (this.type === 'STICKY') { range=20; damage=120; force=-60; color=0xff0000; } // Implosion // v46.7 tune for higher pull force
                 if (this.type === 'IMPULSE') { range=20; damage=10; force=60; color=0x00ffff; }
 
                 AudioSys.playExplosion(this.type);
@@ -1930,18 +1929,18 @@ if (this.wantsToJump) {
                         if (damage > 0) e.takeHit(damage * falloff);
                         
                         const dir = e.mesh.position.clone().sub(pos).normalize();
-                        dir.y = 0.2; dir.normalize();
+                        dir.y = 0.8; dir.normalize(); // v46.7 tune for more upward force to blast bots up
                         
                         // Force
                         if(this.type === 'STICKY') {
                             e.velocity.addScaledVector(dir, force * falloff); // Sucks in (force is negative)
-                            e.state = 'CONFUSED';
-                            e.confusedTimer = 3.0;
+                            // e.state = 'CONFUSED'; // v46.7 disabled
+                            // e.confusedTimer = 3.0; // v46.7 disabled
                         } else {
                              e.velocity.addScaledVector(dir, force * falloff);
                              if(this.type === 'IMPULSE' || damage > 80) {
-                                e.state = 'CONFUSED';
-                                e.confusedTimer = 2.0;
+                                // e.state = 'CONFUSED'; // v46.7 disabled
+                                // e.confusedTimer = 2.0; // v46.7 disabled
                             }
                         }
                     }
@@ -3593,7 +3592,7 @@ function executeTeleport(target, normal) {
              // Commit Position
              camera.position.copy(dest);
              
-             player.jumpsRemaining = 1; 
+             player.jumpsRemaining = 1; // Grant 1 jump after teleport
              player.onGround = false; 
              
              if(!startInAir) {
@@ -4079,7 +4078,7 @@ function executeTeleport(target, normal) {
                 
                 this.mesh.position.addScaledVector(this.velocity, dt);
                 
-                const drag = Math.exp(-5.0 * dt);
+                const drag = Math.exp(-2.0 * dt);
                 this.velocity.x *= drag;
                 this.velocity.z *= drag;
 
@@ -4773,7 +4772,7 @@ function executeTeleport(target, normal) {
                 }
                 
                 const hpPct = Math.max(0, player.health / (CONFIG.playerMaxHP/100)); 
-                const enPct = Math.max(0, player.energy); // Renamed
+                const enPct = Math.max(0, (player.energy / CONFIG.energyMax) * 100);
                 
                 document.getElementById('health-fill').style.width = hpPct + '%';
                 document.getElementById('energy-fill').style.width = enPct + '%';
