@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v46.8</title>
+    <title>Neon Blade: Melee Arena v46.9 (Nice)</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -451,15 +451,15 @@
                         <div class="ability-name" id="tp-label">AIM</div>
                     </div>
                 </div>
-                 <div class="ability-icon" id="icon-g">
+                 <div class="ability-icon" id="icon-f">
                     <div class="ability-icon-inner">
-                        <div class="ability-key">G</div>
+                        <div class="ability-key">F</div>
                         <div class="ability-name">FRAG</div>
                     </div>
                 </div>
-                <div class="ability-icon" id="icon-v">
+                <div class="ability-icon" id="icon-r">
                     <div class="ability-icon-inner">
-                        <div class="ability-key">V</div>
+                        <div class="ability-key">R</div>
                         <div class="ability-name">STICKY</div>
                     </div>
                 </div>
@@ -510,7 +510,7 @@
                 <button class="btn-secondary" id="fps-btn">SHOW FPS: OFF</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.8</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.9 (Nice)</div>
         </div>
     </div>
 
@@ -638,7 +638,7 @@
         
         // --- INPUT MANAGER (v45.8) ---
         const InputManager = {
-            keys: { w: false, a: false, s: false, d: false, space: false, shift: false, c: false, q: false, g: false, v: false, e: false },
+            keys: { w: false, a: false, s: false, d: false, space: false, shift: false, c: false, q: false, f: false, r: false, e: false },
             mouseDown: false,
             init: function() {
                 document.addEventListener('keydown', (e) => this.onKeyDown(e));
@@ -670,15 +670,15 @@
                             if(isLocked && !player.isDead) player.onTeleportInput();
                         }
                         break;
-                    case 'g': 
-                        if (!this.keys.g) { 
-                            this.keys.g = true; 
+                    case 'f': 
+                        if (!this.keys.f) { 
+                            this.keys.f = true; 
                             if(isLocked && !player.isDead) player.beginAim('FRAG'); 
                         }
                         break;
-                    case 'v':
-                        if (!this.keys.v) { 
-                            this.keys.v = true; 
+                    case 'r':
+                        if (!this.keys.r) { 
+                            this.keys.r = true; 
                             if(isLocked && !player.isDead) player.beginAim('STICKY'); 
                         }
                         break;
@@ -701,12 +701,12 @@
                     case 'shift': this.keys.shift = false; break;
                     case 'c': this.keys.c = false; break;
                     case 'q': this.keys.q = false; break;
-                    case 'g': 
-                        this.keys.g = false; 
+                    case 'f': 
+                        this.keys.f = false; 
                         if(isLocked && !player.isDead) player.endAim();
                         break;
-                    case 'v': 
-                        this.keys.v = false; 
+                    case 'r': 
+                        this.keys.r = false; 
                         if(isLocked && !player.isDead) player.endAim();
                         break;
                     case 'e': 
@@ -1368,8 +1368,8 @@ insert(mesh, box) {
             
             beginAim(type) {
                 this.aimingGadget = type;
-                document.getElementById('icon-g').classList.toggle('active', type==='FRAG');
-                document.getElementById('icon-v').classList.toggle('active', type==='STICKY');
+                document.getElementById('icon-f').classList.toggle('active', type==='FRAG');
+                document.getElementById('icon-r').classList.toggle('active', type==='STICKY');
                 document.getElementById('icon-e').classList.toggle('active', type==='IMPULSE');
             }
             
@@ -1378,8 +1378,8 @@ insert(mesh, box) {
                     this.throwGadget(this.aimingGadget);
                     this.aimingGadget = null;
                     this.aimLine.visible = false;
-                    document.getElementById('icon-g').classList.remove('active');
-                    document.getElementById('icon-v').classList.remove('active');
+                    document.getElementById('icon-f').classList.remove('active');
+                    document.getElementById('icon-r').classList.remove('active');
                     document.getElementById('icon-e').classList.remove('active');
                 }
             }
