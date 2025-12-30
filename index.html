@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v46.7</title>
+    <title>Neon Blade: Melee Arena v46.8</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -149,12 +149,12 @@
             display: flex; flex-direction: column; align-items: center;
             padding: 50px 60px;
             background: linear-gradient(135deg, rgba(10,20,30,0.95), rgba(5,10,15,0.95));
-            clip-path: polygon(
-                30px 0, 100% 0, 
-                100% calc(100% - 30px), calc(100% - 30px) 100%, 0 100%, 0 30px
-            );
+            clip-path: polygon(30px 0, 100% 0, 100% calc(100% - 30px), calc(100% - 30px) 100%, 0 100%, 0 30px);
             position: relative;
-            max-width: 900px; width: 80%;
+            /* FIX: Allow horizontal growth, remove fixed 80% width */
+            width: fit-content; 
+            min-width: 700px;
+            max-width: 85vw;
             box-shadow: 0 0 50px rgba(0,0,0,0.8);
         }
         #start-content::after {
@@ -207,14 +207,88 @@
         }
         .btn-secondary:hover { border-color: #fff; color: #fff; background: rgba(255,255,255,0.1); }
 
+        /* v46.8 Smarter Horizontal Stats */
+        /* 1. Main Stats Container */
         #stats-container {
-            margin-top: 30px; width: 100%; display: grid; 
-            grid-template-columns: 2fr 1fr; gap: 40px; /* v45.7.5 Layout tweak */
-            border-top: 1px solid rgba(255,255,255,0.1); padding-top: 30px;
+            margin-top: 30px; 
+            width: 100%;           /* Changed to 100% to fill the parent cleanly */
+            display: flex; 
+            gap: 30px; 
+            border-top: 1px solid rgba(255,255,255,0.1);             
+            padding-top: 30px;
+            align-items: flex-start;
+            font-family: inherit; 
         }
-        .stat-box { text-align: left; }
-        .stat-title { color: #33ccff; font-size: 1rem; font-weight: bold; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; }
-        .stat-value { color: #fff; font-size: 0.9rem; font-family: monospace; line-height: 1.6; opacity: 0.8; }
+
+        /* 2. Left Column (Session & Achievements) - GIVES IT MORE SPACE */
+        .stat-box:first-child { 
+            flex: 1; /* Grows to fill all unused space */
+            text-align: left;
+            min-width: 0; /* Prevents layout break on small screens */
+        }
+
+        /* 3. Right Column (Style Matrix) - SNUG FIT */
+        .stat-box:last-child { 
+            flex: 0 0 auto; /* Only takes as much width as it needs */
+            width: auto;    /* strict width control */
+            text-align: left;
+            border-left: 1px solid rgba(255,255,255,0.1);
+            padding-left: 20px;
+            white-space: nowrap; /* Ensures text stays neat on one line */
+        }
+
+        /* 4. FORCE SCORE/COMBO TO SEPARATE LINES */
+        /* This overrides the inline JS style "display: flex" */
+        #statSession > div {
+            display: flex;
+            flex-direction: column !important; /* Forces vertical stack */
+            gap: 5px !important; /* Small gap between Score and Combo */
+            margin-bottom: 15px !important;
+        }
+
+        /* 5. Typography & Colors (Restored) */
+        .stat-title { 
+            color: #33ccff; 
+            font-size: 1rem; 
+            font-weight: bold; 
+            margin-bottom: 10px; 
+            text-transform: uppercase; 
+            letter-spacing: 1px; 
+        }
+
+        .stat-value { 
+            color: #fff; 
+            font-size: 0.9rem; 
+            font-family: monospace; 
+            line-height: 1.6; 
+            opacity: 0.8; 
+        }
+
+        /* Achievement Tags */
+        .achievement-tag {
+            display: inline-block;
+            background: rgba(51, 204, 255, 0.1);
+            border-left: 2px solid #33ccff;
+            padding: 2px 10px;
+            font-size: 0.8rem;
+            color: #fff;
+            white-space: nowrap;
+        }
+
+        /* Scrollable List Container */
+        .achievement-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 5px;
+            max-height: 25vh; /* Safety limit: scrolls if too tall */
+            overflow-y: auto;
+        }
+
+        /* Scrollbar styling */
+        .achievement-list::-webkit-scrollbar { width: 4px; }
+        .achievement-list::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+        .achievement-list::-webkit-scrollbar-thumb { background: #33ccff; border-radius: 2px; }
 
         #kill-feed { position: absolute; top: 100px; left: 20px; text-align: left; display: flex; flex-direction: column; gap: 4px; }
         .kill-msg { 
@@ -299,6 +373,25 @@
             background: rgba(0,0,0,0.2);
             color: #fff;
             border-color: rgba(255,255,255,0.4);
+        }
+        /* Session Info Hover Box */
+        .session-info { position: relative; cursor: help; pointer-events: auto; }
+        .session-info:hover::after {
+            content: attr(data-details);
+            position: absolute;
+            bottom: 120%; right: 0;
+            background: rgba(0, 0, 0, 0.95);
+            border: 1px solid #00ffff;
+            color: #fff;
+            padding: 12px;
+            font-size: 13px;
+            white-space: pre;
+            z-index: 1000;
+            text-align: right;
+            font-family: monospace;
+            box-shadow: 0 0 20px rgba(0,255,255,0.2);
+            line-height: 1.5;
+            min-width: 150px;
         }
     </style>
     <link rel="stylesheet" href="/index.css">
@@ -417,7 +510,7 @@
                 <button class="btn-secondary" id="fps-btn">SHOW FPS: OFF</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.7</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.8</div>
         </div>
     </div>
 
@@ -441,14 +534,13 @@
             frictionSlide: 0.8, 
             frictionWall: 0.5, 
             slideBoost: 15, 
-            bunnyHopBoost: 0, 
             
             energyMax: 1000, // default is 100, v46.7 using 1000 for testing
             energyDrain: 25, 
             energyRegen: 50, // default is 15, v46.7 using 50 for testing
             teleportCost: 10,
             
-            gadgetCost: { frag: 30, sticky: 30, impulse: 25 },
+            gadgetCost: { frag: 35, sticky: 30, impulse: 25 },
             gadgetCooldown: 200, // default is 500, v46.7 using 200 for testing
 
             attackRange: 8,
@@ -671,7 +763,7 @@
             }
         };
 
-        // --- AUDIO SYSTEM ---
+        // --- AUDIO SYSTEM --- // v46.8 Audio overhaul for grenade sounds
         const AudioSys = {
             ctx: null,
             slideOsc: null,
@@ -698,36 +790,42 @@
             },
 
             toggleSlideSound: function(active) {
-                if(!this.ctx) return;
-                const t = this.ctx.currentTime;
-                if(active && !this.slideOsc) {
-                    const bufferSize = this.ctx.sampleRate; 
-                    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-                    const data = buffer.getChannelData(0);
-                    for(let i=0; i<bufferSize; i++) data[i] = Math.random()*2-1;
+                    if(!this.ctx) return;
+                    const t = this.ctx.currentTime;
+                    if(active && !this.slideOsc) {
+                        // We use a noise buffer for the "friction"
+                        const bufferSize = this.ctx.sampleRate; 
+                        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                        const data = buffer.getChannelData(0);
+                        for(let i=0; i<bufferSize; i++) data[i] = Math.random()*2-1;
 
-                    this.slideOsc = this.ctx.createBufferSource();
-                    this.slideOsc.buffer = buffer;
-                    this.slideOsc.loop = true;
-                    const filter = this.ctx.createBiquadFilter();
-                    filter.type = 'lowpass';
-                    filter.frequency.value = 400; 
-                    this.slideGain = this.ctx.createGain();
-                    this.slideGain.gain.setValueAtTime(0, t);
-                    this.slideGain.gain.linearRampToValueAtTime(0.2, t + 0.2);
-                    this.slideOsc.connect(filter);
-                    filter.connect(this.slideGain);
-                    this.slideGain.connect(this.ctx.destination);
-                    this.slideOsc.start();
-                } else if (!active && this.slideOsc) {
-                    try {
-                        this.slideGain.gain.linearRampToValueAtTime(0, t + 0.1);
-                        this.slideOsc.stop(t + 0.1);
-                    } catch(e) {}
-                    this.slideOsc = null;
-                    this.slideGain = null;
-                }
-            },
+                        this.slideOsc = this.ctx.createBufferSource();
+                        this.slideOsc.buffer = buffer;
+                        this.slideOsc.loop = true;
+
+                        const filter = this.ctx.createBiquadFilter();
+                        filter.type = 'lowpass';
+                        // Lowering the frequency to 300Hz makes it "heavier" and less "hissy"
+                        filter.frequency.setValueAtTime(300, t); 
+                        
+                        this.slideGain = this.ctx.createGain();
+                        this.slideGain.gain.setValueAtTime(0, t);
+                        this.slideGain.gain.linearRampToValueAtTime(0.15, t + 0.3); // Slower fade-in for weight
+
+                        this.slideOsc.connect(filter);
+                        filter.connect(this.slideGain);
+                        this.slideGain.connect(this.ctx.destination);
+                        this.slideOsc.start();
+                    } else if (!active && this.slideOsc) {
+                        try {
+                            // Slower release to simulate momentum stopping
+                            this.slideGain.gain.linearRampToValueAtTime(0, t + 0.2);
+                            this.slideOsc.stop(t + 0.2);
+                        } catch(e) {}
+                        this.slideOsc = null;
+                        this.slideGain = null;
+                    }
+                },
 
             playJump: function() { 
                 if(!this.ctx) return;
@@ -849,53 +947,110 @@
                 const og = this.ctx.createGain();
                 
                 if (type === 'STICKY') {
-                    // Implosion sound (Reverse sweep then pop)
-                    osc.type = 'sine';
-                    osc.frequency.setValueAtTime(800, t);
-                    osc.frequency.exponentialRampToValueAtTime(50, t+0.3);
-                    og.gain.setValueAtTime(0.4, t);
-                    og.gain.exponentialRampToValueAtTime(0.01, t+0.4);
+                    // STICKY (Refined: Subtler Vacuum & Snap)
                     
-                    // Suction noise
+                    // 1. The Suction Tension (Lowered Peak)
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(40, t); 
+                    osc.frequency.exponentialRampToValueAtTime(600, t + 0.3); // Lowered peak freq (800 -> 600)
+                    
+                    og.gain.setValueAtTime(0, t);
+                    og.gain.linearRampToValueAtTime(0.25, t + 0.25); // Lowered gain (0.4 -> 0.25)
+                    og.gain.setValueAtTime(0, t + 0.3); 
+
+                    // 2. The Final Snap (Softer Impact)
+                    const snapOsc = this.ctx.createOscillator();
+                    const snapGain = this.ctx.createGain();
+                    snapOsc.type = 'triangle';
+                    snapOsc.frequency.setValueAtTime(100, t + 0.31); 
+                    snapOsc.frequency.exponentialRampToValueAtTime(40, t + 0.45);
+                    
+                    snapGain.gain.setValueAtTime(0, t);
+                    snapGain.gain.setValueAtTime(0.5, t + 0.31); // Lowered gain (0.8 -> 0.5)
+                    snapGain.gain.exponentialRampToValueAtTime(0.01, t + 0.6);
+                    
+                    snapOsc.connect(snapGain);
+                    snapGain.connect(this.ctx.destination);
+                    snapOsc.start(t + 0.31); snapOsc.stop(t + 0.7);
+
+                    // 3. The Atmospheric Vacuum (Mellowed Noise)
                     const nf = this.ctx.createBiquadFilter();
                     nf.type = 'bandpass';
-                    nf.frequency.setValueAtTime(200, t);
-                    nf.frequency.linearRampToValueAtTime(1000, t+0.3);
-                    ng.gain.setValueAtTime(0.5, t);
-                    ng.gain.linearRampToValueAtTime(0, t+0.4);
-                    n.connect(nf); nf.connect(ng); 
+                    nf.frequency.setValueAtTime(100, t);
+                    nf.frequency.exponentialRampToValueAtTime(1500, t + 0.3); // Lowered peak (2500 -> 1500)
+                    nf.Q.value = 2.0; // Lowered resonance for a smoother 'whoosh' (4.0 -> 2.0)
+                    
+                    ng.gain.setValueAtTime(0, t);
+                    ng.gain.linearRampToValueAtTime(0.3, t + 0.25); // Lowered gain (0.6 -> 0.3)
+                    ng.gain.setValueAtTime(0, t + 0.3); 
+                    
+                    n.connect(nf); nf.connect(ng);
                     
                 } else if (type === 'IMPULSE') {
-                    // Sci-fi shockwave
-                    osc.type = 'sawtooth';
-                    osc.frequency.setValueAtTime(50, t);
-                    osc.frequency.exponentialRampToValueAtTime(1200, t+0.2);
-                    og.gain.setValueAtTime(0.3, t);
-                    og.gain.exponentialRampToValueAtTime(0.01, t+0.3);
-                    
-                    // High pass noise
-                    const nf = this.ctx.createBiquadFilter();
-                    nf.type = 'highpass';
-                    nf.frequency.value = 1000;
-                    ng.gain.setValueAtTime(0.3, t);
-                    ng.gain.exponentialRampToValueAtTime(0.01, t+0.3);
-                    n.connect(nf); nf.connect(ng);
+                    // IMPULSE (Final: Maximized Bounce & Soft Power)
 
-                } else { 
-                    // FRAG (Heavy Boom)
-                    osc.type = 'square';
-                    osc.frequency.setValueAtTime(100, t);
-                    osc.frequency.exponentialRampToValueAtTime(20, t+0.5);
-                    og.gain.setValueAtTime(0.5, t);
-                    og.gain.exponentialRampToValueAtTime(0.01, t+0.5);
+                    // 1. The Tone: Deep Elastic Sweep
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(40, t); // Lower start for more "travel"
                     
-                    // Low pass noise
+                    // The peak is slightly higher (550Hz) to make the bounce audible,
+                    // but we hit it fast (0.08s) to keep it punchy.
+                    osc.frequency.exponentialRampToValueAtTime(550, t + 0.08); 
+                    osc.frequency.exponentialRampToValueAtTime(30, t + 0.6); 
+                    
+                    // Attack remains at 15ms for that soft, non-gunshot entry
+                    og.gain.setValueAtTime(0, t);
+                    og.gain.linearRampToValueAtTime(0.5, t + 0.015); 
+                    og.gain.exponentialRampToValueAtTime(0.01, t + 0.5); 
+
+                    // 2. The Air: Resonant "Pop" & Bloom
                     const nf = this.ctx.createBiquadFilter();
                     nf.type = 'lowpass';
-                    nf.frequency.setValueAtTime(800, t);
-                    nf.frequency.exponentialRampToValueAtTime(50, t+0.6);
-                    ng.gain.setValueAtTime(0.8, t);
-                    ng.gain.exponentialRampToValueAtTime(0.01, t+0.8);
+                    nf.frequency.setValueAtTime(600, t); 
+                    nf.frequency.exponentialRampToValueAtTime(40, t + 0.6);
+                    
+                    // THE BOUNCE FIX: High resonance (Q) at the start
+                    // This creates a "tonal thud" in the air itself.
+                    nf.Q.setValueAtTime(8, t); 
+                    nf.Q.exponentialRampToValueAtTime(1, t + 0.15); // Rapidly softens
+
+                    ng.gain.setValueAtTime(0.35, t); 
+                    ng.gain.exponentialRampToValueAtTime(0.01, t + 0.6); 
+                    
+                    n.connect(nf); nf.connect(ng);
+                                
+                } else { 
+                    // FRAG (Non-linear Deep Explosion - Presence V3)
+                    
+                    // 1. The Body: The triangle 'weight' you liked remains untouched
+                    osc.type = 'triangle'; 
+                    osc.frequency.setValueAtTime(65, t); 
+                    osc.frequency.exponentialRampToValueAtTime(30, t + 0.3); 
+                    
+                    og.gain.setValueAtTime(0.6, t);
+                    og.gain.exponentialRampToValueAtTime(0.01, t + 0.9);
+
+                    // 2. The Chaos (Distortion Effect): Keeping the 50ms 'tear'
+                    const distortionGain = this.ctx.createGain();
+                    distortionGain.gain.setValueAtTime(1.0, t);
+                    distortionGain.gain.linearRampToValueAtTime(0, t + 0.05); 
+                    
+                    // 3. The Atmosphere: Surgical adjustment for clarity
+                    const nf = this.ctx.createBiquadFilter();
+                    nf.type = 'lowpass';
+                    
+                    // Nudging from 300Hz up to 450Hz. 
+                    // This is the "Goldilocks" zone: above the mud, below the gunshot "snap."
+                    nf.frequency.setValueAtTime(450, t); 
+                    nf.frequency.linearRampToValueAtTime(60, t + 0.6);
+                    
+                    // Returning to a lower Q (1.0). 
+                    // A lower Q keeps the sound "warm" and prevents the "metallic" peak.
+                    nf.Q.value = 1.0; 
+                    
+                    ng.gain.setValueAtTime(0.7, t);
+                    ng.gain.linearRampToValueAtTime(0, t + 1.5); 
+                    
                     n.connect(nf); nf.connect(ng);
                 }
 
@@ -909,32 +1064,54 @@
             playThrow: function() {
                 if(!this.ctx) return;
                 const t = this.ctx.currentTime;
-                // Mechanical 'Thwip'
                 const osc = this.ctx.createOscillator();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(600, t);
-                osc.frequency.exponentialRampToValueAtTime(1200, t + 0.1);
                 const gain = this.ctx.createGain();
-                gain.gain.setValueAtTime(0.1, t);
-                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
+                
+                osc.type = 'triangle'; 
+                
+                // Refined Elastic Arc: 
+                // We keep the curve you liked but lower the peak to 600Hz 
+                // and the floor to 60Hz for a "weightier" air displacement.
+                osc.frequency.setValueAtTime(180, t);
+                osc.frequency.exponentialRampToValueAtTime(600, t + 0.03); 
+                osc.frequency.exponentialRampToValueAtTime(60, t + 0.12);
+
+                gain.gain.setValueAtTime(0, t);
+                gain.gain.linearRampToValueAtTime(0.12, t + 0.005); // Micro-fade for softness
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.12);
+
                 osc.connect(gain); gain.connect(this.ctx.destination);
-                osc.start(); osc.stop(t+0.15);
+                osc.start(); osc.stop(t + 0.15);
             },
 
             playHeartbeat: function(speed) {
                 if(!this.ctx) return;
                 const t = this.ctx.currentTime;
-                const osc = this.ctx.createOscillator();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(60, t);
-                osc.frequency.exponentialRampToValueAtTime(1, t + 0.1);
-                const gain = this.ctx.createGain();
-                gain.gain.setValueAtTime(0.5, t);
-                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
-                osc.start();
-                osc.stop(t + 0.15);
+
+                const playThump = (time, freq, vol, duration) => {
+                    const osc = this.ctx.createOscillator();
+                    const g = this.ctx.createGain();
+                    const filter = this.ctx.createBiquadFilter();
+
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, time);
+                    osc.frequency.exponentialRampToValueAtTime(1, time + duration);
+                    
+                    filter.type = 'lowpass';
+                    filter.frequency.setValueAtTime(120, time);
+                    
+                    g.gain.setValueAtTime(vol, time);
+                    g.gain.exponentialRampToValueAtTime(0.001, time + duration);
+                    
+                    osc.connect(filter);
+                    filter.connect(g);
+                    g.connect(this.ctx.destination);
+                    
+                    osc.start(time); osc.stop(time + duration + 0.05);
+                };
+
+                playThump(t, 60, 0.6, 0.12);
+                playThump(t + 0.14, 45, 0.4, 0.15);
             },
             
             playUI: function(active) { this.playTone(active ? 800 : 400, 'sine', 0.05, 0.05); },
@@ -953,7 +1130,15 @@
         let comboTimer = 0;
         let lastSlashID = 0; 
         let slashActive = false;
-        let sessionStartTime = 0;
+        
+        // --- SESSION TIMING VARIABLES ---
+        let segmentStartTime = 0;      // Start of the current alive run
+        let bankedActiveTime = 0;      // Time stored from previous runs
+        let totalBreakTime = 0;        // Time spent in menus
+        let breakStartTime = 0;        // When the pause started
+        let breakCount = 0;            // Number of times paused
+        let lastSegmentDuration = 0;   // Snapshot of the last run (for display)
+        
         let lastHeartbeatTime = 0;
         let lastHoveredEnemy = null;
         let windTimer = 0;
@@ -1765,25 +1950,56 @@ if (this.wantsToJump) {
             }
         }
 
-        // --- GADGETS / PROJECTILES (v46.1) ---
+// --- GADGETS / PROJECTILES (v46.8 Refined) ---
         class Projectile {
             constructor(type, pos, vel) {
                 this.type = type;
                 this.velocity = vel.clone();
                 this.radius = 0.2;
                 this.stuckTo = null;
-                this.life = type === 'STICKY' ? 1.5 : (type === 'IMPULSE' ? 10.0 : 3.5); // v46.7 tune for fuse timer
-                
-                let color = 0x00ff00; // FRAG
-                if(type === 'STICKY') color = 0xff0000;
-                if(type === 'IMPULSE') color = 0x00ffff;
+                // v46.7 tune for fuse timer
+                this.life = type === 'STICKY' ? 1.5 : (type === 'IMPULSE' ? 10.0 : 3.5);
+
+                // --- 1. BARREL CLEARANCE CHECK ---
+                // Prevent spawning inside walls if standing too close
+                const eyePos = camera.position.clone();
+                const distToSpawn = eyePos.distanceTo(pos);
+                if (distToSpawn > 0.1) {
+                    const dirToSpawn = pos.clone().sub(eyePos).normalize();
+                    globalRaycaster.set(eyePos, dirToSpawn);
+                    globalRaycaster.far = distToSpawn;
+                    const hits = globalRaycaster.intersectObjects(worldObjects);
+                    
+                    if (hits.length > 0) {
+                        // Spawn slightly back from the wall hit
+                        this.meshPos = hits[0].point.sub(dirToSpawn.multiplyScalar(0.1));
+                    } else {
+                        this.meshPos = pos.clone();
+                    }
+                } else {
+                    this.meshPos = pos.clone();
+                }
+
+                // --- VISUALS ---
+                let color = 0xff0000; // Red (Frag)
+                let roughness = 0.4;  // Default glossy
+                let emissiveInt = 0.8;
+
+                if (type === 'STICKY') {
+                    color = 0x8A2BE2; // "Blue Violet" - Deep Void Color
+                    roughness = 1.0;  // CRITICAL: Matte finish stops it from reflecting the Cyan sky
+                    emissiveInt = 2.0; // High glow to force the purple to show through
+                }
+                if (type === 'IMPULSE') {
+                    color = 0x00ffff; 
+                }
 
                 const geo = new THREE.DodecahedronGeometry(0.2);
                 const mat = new THREE.MeshStandardMaterial({ 
                     color: color, 
                     emissive: color, 
-                    emissiveIntensity: 0.5,
-                    roughness: 0.4 
+                    emissiveIntensity: emissiveInt, 
+                    roughness: roughness 
                 });
                 
                 this.mesh = new THREE.Mesh(geo, mat);
@@ -1794,10 +2010,9 @@ if (this.wantsToJump) {
                 this.wire = new THREE.Mesh(wireGeo, wireMat);
                 this.mesh.add(this.wire);
                 
-                this.mesh.position.copy(pos);
+                this.mesh.position.copy(this.meshPos);
                 scene.add(this.mesh);
                 this.active = true;
-                
                 this.portalCooldown = 0;
             }
 
@@ -1805,6 +2020,12 @@ if (this.wantsToJump) {
                 if (!this.active) return;
                 
                 this.life -= dt;
+                
+                // Visual Fuse: Flicker the wireframe as life gets low
+                if (this.life < 1.0) {
+                     this.wire.material.opacity = Math.random() > 0.5 ? 0.8 : 0.2;
+                }
+
                 if (this.life <= 0) {
                     this.explode();
                     return;
@@ -1816,7 +2037,10 @@ if (this.wantsToJump) {
                     if (this.stuckTo.isDeadCorpse || this.stuckTo.health <= 0) {
                          this.stuckTo = null; 
                     } else {
-                         this.mesh.position.copy(this.stuckTo.mesh.position).add(this.stuckOffset);
+                         // Check if stuckTo is a world point (dummy object) or an enemy
+                         if(this.stuckTo.mesh) {
+                            this.mesh.position.copy(this.stuckTo.mesh.position).add(this.stuckOffset);
+                         }
                     }
                     return; 
                 }
@@ -1863,8 +2087,7 @@ if (this.wantsToJump) {
                              return;
                          }
                          if (this.type === 'FRAG') {
-                             // Bounce off enemy
-                             this.velocity.negate().multiplyScalar(0.6);
+                             this.velocity.negate().multiplyScalar(0.4);
                          }
                     }
 
@@ -1873,22 +2096,25 @@ if (this.wantsToJump) {
                              this.active = false; this.explode(); return;
                          }
                          if (this.type === 'STICKY') {
-                             // Stick to wall/floor
                              this.active = false; 
-                             // this.life = 2.0; // resets fuse timer on landing to 2 second, v46.7 disabled
                              this.mesh.position.copy(hits[0].point);
                              this.velocity.set(0,0,0);
                              this.active = true; 
+                             // Dummy object to simulate "sticking" to world
                              this.stuckTo = { mesh: { position: hits[0].point }, isDeadCorpse: false, health: 1 };
                              this.stuckOffset = new THREE.Vector3(0,0,0);
                              return;
                          }
-                         if (this.type === 'FRAG') {
-                             // Bouncy physics
-                             const n = hits[0].face.normal;
-                             this.velocity.reflect(n).multiplyScalar(0.75); // v46.7 tune for higher bounciness
-                             this.mesh.position.copy(hits[0].point).addScaledVector(n, 0.2);
-                         }
+                        if (this.type === 'FRAG') {
+                            const n = hits[0].face.normal;
+                            this.velocity.reflect(n).multiplyScalar(0.5); 
+                            if (n.y > 0.5) { 
+                                this.velocity.x *= 0.6; 
+                                this.velocity.z *= 0.6;
+                                if (this.velocity.y < 0.5) this.velocity.y = 0;
+                            }
+                            this.mesh.position.copy(hits[0].point).addScaledVector(n, 0.2);
+                        }
                     } else {
                          this.mesh.position.copy(nextPos);
                     }
@@ -1906,47 +2132,67 @@ if (this.wantsToJump) {
                 this.mesh.geometry.dispose();
                 this.mesh.material.dispose();
                 
-                const pos = this.mesh.position;
+                const pos = this.mesh.position.clone();
                 let range = 10;
                 let damage = 100;
                 let force = 20;
                 let color = 0x00ff00;
 
-                if (this.type === 'FRAG') { range=15; damage=150; force=30; color=0x00ff00; }
-                if (this.type === 'STICKY') { range=20; damage=120; force=-60; color=0xff0000; } // Implosion // v46.7 tune for higher pull force
-                if (this.type === 'IMPULSE') { range=20; damage=10; force=60; color=0x00ffff; }
-
-                AudioSys.playExplosion(this.type);
-                spawnImpact(pos, color, range/3);
+                // --- CONFIGURATION ---
+                if (this.type === 'FRAG') { 
+                    range = 30; damage = 200; force = 50; color = 0xffaa00; // Gold/Orange core
+                    this.spawnFirework(pos, range);
+                } 
+                else if (this.type === 'STICKY') { 
+                    range = 25; damage = 150; force = -70; color = 0x8A2BE2; // Match the projectile
+                    this.spawnImplosion(pos, range, color);
+                } 
+                else if (this.type === 'IMPULSE') { 
+                    range = 20; damage = 10; force = 60; color = 0x00ffff; 
+                    spawnImpact(pos, color, range/2); // Original sphere
+                    this.spawnShockwaveRing(pos, range, color);
+                }
+                
+                if(this.type !== 'STICKY' && this.type !== 'IMPULSE') {
+                    spawnImpact(pos, color, range/2); // Standard sphere for Frag
+                }
+                
+                // Generic Ripple (Ground effect)
                 spawnRipple(pos, new THREE.Vector3(0,1,0), color);
+                AudioSys.playExplosion(this.type);
 
-                // Hits Enemies
+                // --- DAMAGE & PHYSICS LOGIC ---
                 for (let e of enemies) {
                     if (e.isDeadCorpse) continue;
                     const dist = e.mesh.position.distanceTo(pos);
+                    
                     if (dist < range) {
                         const falloff = 1 - (dist / range);
+                        
+                        // Damage Calculation
                         if (damage > 0) e.takeHit(damage * falloff);
                         
                         const dir = e.mesh.position.clone().sub(pos).normalize();
-                        dir.y = 0.8; dir.normalize(); // v46.7 tune for more upward force to blast bots up
                         
-                        // Force
                         if(this.type === 'STICKY') {
-                            e.velocity.addScaledVector(dir, force * falloff); // Sucks in (force is negative)
-                            // e.state = 'CONFUSED'; // v46.7 disabled
-                            // e.confusedTimer = 3.0; // v46.7 disabled
+                            // --- NEW "BLACK HOLE" PHYSICS ---
+                            // We flip the falloff logic for the force.
+                            // Strong pull at edge (dist ~ range), Zero pull at center (dist ~ 0).
+                            // This stops the "infinite force" at the center that causes slingshotting.
+                            const pullStrength = (dist / range); 
+                            
+                            // Remove upward bias for Sticky so they drag along ground/air directly to center
+                            // Apply force
+                            e.velocity.addScaledVector(dir, force * pullStrength); 
                         } else {
+                             // Standard Explosion Physics
+                             dir.y = 0.8; dir.normalize(); // Upward pop
                              e.velocity.addScaledVector(dir, force * falloff);
-                             if(this.type === 'IMPULSE' || damage > 80) {
-                                // e.state = 'CONFUSED'; // v46.7 disabled
-                                // e.confusedTimer = 2.0; // v46.7 disabled
-                            }
                         }
                     }
                 }
                 
-                // Hits Player
+                // Player Logic (Mirrored)
                 const pDist = camera.position.distanceTo(pos);
                 if (pDist < range) {
                      const falloff = 1 - (pDist / range);
@@ -1955,12 +2201,111 @@ if (this.wantsToJump) {
                      if(damage > 0) damagePlayer(damage * 0.1 * falloff);
                      
                      if(this.type === 'STICKY') {
-                         player.velocity.addScaledVector(dir, force * falloff * 0.5); // Sucks in
+                         const pullStrength = (pDist / range);
+                         player.velocity.addScaledVector(dir, force * pullStrength * 0.5);
                      } else {
                          player.velocity.addScaledVector(dir, force * falloff);
                      }
                      player.onGround = false; 
                 }
+            }
+
+            // --- SPECIAL FX HELPERS ---
+            
+            spawnFirework(pos, range) {
+                // Efficient Points Material for "Sparks"
+                const pCount = 24;
+                const geo = new THREE.BufferGeometry();
+                const positions = [];
+                const velocities = [];
+
+                for(let i=0; i<pCount; i++) {
+                    positions.push(pos.x, pos.y, pos.z);
+                    // Random spherical burst
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos(Math.random() * 2 - 1);
+                    const speed = (Math.random() * 0.5 + 0.5) * (range * 0.8); // Fast burst
+                    
+                    velocities.push(
+                        speed * Math.sin(phi) * Math.cos(theta),
+                        speed * Math.sin(phi) * Math.sin(theta),
+                        speed * Math.cos(phi)
+                    );
+                }
+                geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+                
+                const mat = new THREE.PointsMaterial({
+                    color: 0xffd700, // Gold
+                    size: 0.8,
+                    transparent: true,
+                    opacity: 1
+                });
+                
+                const sparks = new THREE.Points(geo, mat);
+                scene.add(sparks);
+                
+                // Simple animation loop for sparks
+                let time = 0;
+                const animateSparks = () => {
+                    time += 0.05; // dt simulation
+                    if(time > 1.0) { scene.remove(sparks); geo.dispose(); mat.dispose(); return; }
+                    
+                    const posAttr = sparks.geometry.attributes.position;
+                    for(let i=0; i<pCount; i++) {
+                        // Apply Velocity
+                        posAttr.array[i*3] += velocities[i*3] * 0.05; // x
+                        posAttr.array[i*3+1] += (velocities[i*3+1] - 9.8 * time) * 0.05; // y + gravity
+                        posAttr.array[i*3+2] += velocities[i*3+2] * 0.05; // z
+                    }
+                    posAttr.needsUpdate = true;
+                    sparks.material.opacity = 1 - time; // Fade out
+                    requestAnimationFrame(animateSparks);
+                };
+                animateSparks();
+            }
+
+            spawnImplosion(pos, range, color) {
+                // Large wireframe sphere that shrinks
+                const geo = new THREE.SphereGeometry(range, 16, 16);
+                const mat = new THREE.MeshBasicMaterial({ 
+                    color: color, 
+                    wireframe: true, 
+                    transparent: true, 
+                    opacity: 0.5 
+                });
+                const sphere = new THREE.Mesh(geo, mat);
+                sphere.position.copy(pos);
+                scene.add(sphere);
+
+                let s = 1.0;
+                const anim = () => {
+                    s -= 0.05; // Fast shrink
+                    if (s <= 0) { scene.remove(sphere); geo.dispose(); mat.dispose(); return; }
+                    sphere.scale.set(s, s, s);
+                    requestAnimationFrame(anim);
+                };
+                anim();
+            }
+
+            spawnShockwaveRing(pos, range, color) {
+                const geo = new THREE.TorusGeometry(1, 0.2, 8, 32); // Flat ring base size 1
+                const mat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.8 });
+                const ring = new THREE.Mesh(geo, mat);
+                
+                // Orient ring flat on ground logic roughly, or just flat Y
+                ring.rotation.x = Math.PI / 2; 
+                ring.position.copy(pos);
+                scene.add(ring);
+
+                let s = 1.0;
+                const anim = () => {
+                    s += (range * 2) * 0.02; // Expand to double range quickly
+                    if (s > range * 1.5) { scene.remove(ring); geo.dispose(); mat.dispose(); return; }
+                    ring.scale.set(s, s, s);
+                    ring.material.opacity -= 0.05;
+                    requestAnimationFrame(anim);
+                };
+                anim();
             }
         }
 
@@ -2402,13 +2747,35 @@ if (this.wantsToJump) {
             document.addEventListener('pointerlockchange', () => {
                 isLocked = document.pointerLockElement === document.body;
                 const screen = document.getElementById('start-screen');
+                
                 if (isLocked) {
+                    // --- RESUME GAME ---
                     screen.style.display = 'none';
+                    
+                    // Calculate Break Time
+                    if (breakStartTime > 0) {
+                        totalBreakTime += (performance.now() - breakStartTime);
+                        // Increment break count (unless it's the very first start)
+                        if (bankedActiveTime > 0) breakCount++;
+                        breakStartTime = 0;
+                    }
+                    segmentStartTime = performance.now();
+
                     if(player.isDead) resetGame();
                 } else {
+                    // --- PAUSE GAME ---
                     lastUnlockTime = performance.now();
                     screen.style.display = 'flex';
                     AudioSys.stopAll();
+                    
+                    // Bank the Active Time
+                    if (segmentStartTime > 0) {
+                        lastSegmentDuration = performance.now() - segmentStartTime;
+                        bankedActiveTime += lastSegmentDuration;
+                        segmentStartTime = 0;
+                    }
+                    breakStartTime = performance.now();
+                    
                     updatePauseScreenStats();
                     InputManager.mouseDown = false; 
                 }
@@ -2468,24 +2835,20 @@ if (this.wantsToJump) {
             const timerDisplay = document.getElementById('session-timer');
             const playerTitleDisplay = document.getElementById('player-title-display');
             
+            // 1. Handle Title & Colors
             if(player.isDead) {
-                // v45.6.11 Ascension Protocol Score Titles
                 let termStatus = "DISCONNECTED";
                 let color = "#ff3333";
-                
-                // Find rank
                 for(let i=SCORE_STEPS.length-1; i>=0; i--) {
                     if (player.score >= SCORE_STEPS[i]) {
                         termStatus = SCORE_TITLES[i];
                         break;
                     }
                 }
-                
-                // Color grades
-                if (player.score > 850000) color = "#aa00ff"; // Ultra
-                else if (player.score > 250000) color = "#00ffff"; // High
-                else if (player.score > 50000) color = "#ffff00"; // Mid
-                else if (player.score > 10000) color = "#ff8800"; // Low-Mid
+                if (player.score > 850000) color = "#aa00ff";
+                else if (player.score > 250000) color = "#00ffff";
+                else if (player.score > 50000) color = "#ffff00";
+                else if (player.score > 10000) color = "#ff8800";
                 
                 h1.innerText = termStatus;
                 h1.style.color = color;
@@ -2493,69 +2856,87 @@ if (this.wantsToJump) {
                 
                 playerTitleDisplay.innerText = generatePlayerTitle();
                 playerTitleDisplay.style.display = "block";
-                
                 timerDisplay.style.display = "block";
             } else {
                 h1.innerText = "PAUSED";
                 h1.style.color = "#33ccff";
                 h1.style.textShadow = "4px 4px 0px #33ccff";
                 playerTitleDisplay.style.display = "none";
-                timerDisplay.style.display = "none";
+                timerDisplay.style.display = "block";
             }
 
-            // v45.7.4 Filter to show only latest 3 achievements per category
+            // 2. Generate Achievement Tags (CYAN BOXES)
             const rawList = GameStats.persistentAchievements;
             const filteredList = [];
             const typeCounts = {};
-            
-            // Helper to get type (e.g. "SLIDE" from "SLIDE NOVICE")
-            const getAchType = (name) => {
-                 // Remove known ranks to get base type
-                 return name.replace(/ (NOVICE|APPRENTICE|ADEPT|EXPERT|MASTER|GRANDMASTER|LEGEND|DEMIGOD|GODLIKE|OMNIPOTENT)$/, '');
-            };
+            const getAchType = (name) => name.replace(/ (NOVICE|APPRENTICE|ADEPT|EXPERT|MASTER|GRANDMASTER|LEGEND|DEMIGOD|GODLIKE|OMNIPOTENT)$/, '');
 
-            // Iterate backwards
             for(let i = rawList.length - 1; i >= 0; i--) {
                 const name = rawList[i];
                 const type = getAchType(name);
-                
-                if (type !== name) { // It matched a mastery rank pattern
+                if (type !== name) { 
                     if (!typeCounts[type]) typeCounts[type] = 0;
                     if (typeCounts[type] < 3) {
                         filteredList.push(name);
                         typeCounts[type]++;
                     }
                 } else {
-                    // Not a ranked mastery (e.g. "SLAUGHTERHOUSE"), always show
                     filteredList.push(name);
                 }
             }
-            
-            // Reverse back to chronological order
             filteredList.reverse();
 
-            let achStr = filteredList.join(', ');
-            if(!achStr) achStr = "None yet";
+            // Box HTML
+            let achHtml = "None yet";
+            if (filteredList.length > 0) {
+                achHtml = `<div class="achievement-list">` + 
+                    filteredList.map(a => `<span class="achievement-tag">${a}</span>`).join('') + 
+                    `</div>`;
+            }
 
+            // 3. Inject Score/Combo
             const statSession = document.getElementById('stat-session');
             statSession.innerHTML = `
                 <strong>SCORE:</strong> ${player.score}<br>
                 <strong>MAX COMBO:</strong> ${GameStats.highestCombo}<br>
-                <strong>ACHIEVEMENTS:</strong><br><span style="font-size: 0.8em">${achStr}</span>
+                <strong>ACHIEVEMENTS:</strong><br>
+                ${achHtml}
             `;
 
             const statMoves = document.getElementById('stat-moves');
             let movesHtml = "";
-            movesHtml += `<strong>KILLS:</strong> ${GameStats.botKills}<br>`; // v45.7.6 Removed extra gap
-            
+            movesHtml += `<strong>KILLS:</strong> ${GameStats.botKills}<br>`;
             if(GameStats.moves.slideHit > 0) movesHtml += `Slide Strikes: ${GameStats.moves.slideHit}<br>`;
             if(GameStats.moves.midAirHit > 0) movesHtml += `Aerial Strikes: ${GameStats.moves.midAirHit}<br>`;
             if(GameStats.moves.longAirHit > 0) movesHtml += `Long Air Strikes: ${GameStats.moves.longAirHit}<br>`;
             if(GameStats.moves.teleportHit > 0) movesHtml += `Teleport Strikes: ${GameStats.moves.teleportHit}<br>`;
             if(GameStats.moves.wallJumpHit > 0) movesHtml += `Wall Jump Strikes: ${GameStats.moves.wallJumpHit}<br>`;
-
             if(movesHtml === "") movesHtml = "No style points yet.";
             statMoves.innerHTML = movesHtml;
+
+            // 4. THE CLEVER SESSION TIMER (Logic from Backup)
+            const format = (ms) => {
+                const totalSec = Math.floor(ms / 1000);
+                const m = Math.floor(totalSec / 60).toString().padStart(2, '0');
+                const s = (totalSec % 60).toString().padStart(2, '0');
+                return `${m}:${s}`;
+            };
+
+            const primaryLabel = player.isDead ? "Playtime" : "Current Session";
+            const primaryValue = player.isDead ? bankedActiveTime : lastSegmentDuration;
+            
+            const hoverLabel = player.isDead ? "Final Session" : "Playtime";
+            const hoverValue = player.isDead ? lastSegmentDuration : bankedActiveTime;
+
+            timerDisplay.innerHTML = `<strong>${primaryLabel}:</strong> ${format(primaryValue)}`;
+            
+            const tooltip = 
+                `${hoverLabel}: ${format(hoverValue)}\n` +
+                `Idle: ${format(totalBreakTime)}\n` +
+                `Breaks: ${breakCount}`;
+            
+            timerDisplay.setAttribute('data-details', tooltip);
+            timerDisplay.classList.add('session-info');
         }
 
         let ambientLight, hemiLight, dirLight;
@@ -4636,7 +5017,13 @@ function executeTeleport(target, normal) {
             player.velocity.set(0,0,0);
             player.totalHits = 0; 
             camera.position.set(0, 2, 0);
-            sessionStartTime = Date.now();
+            
+            // Reset Session Stats
+            bankedActiveTime = 0;
+            totalBreakTime = 0;
+            breakCount = 0;
+            lastSegmentDuration = 0;
+            segmentStartTime = performance.now();
             
             updateLivesDisplay();
             
