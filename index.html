@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v46.9 (Nice)</title>
+    <title>Neon Blade: Melee Arena v46.9.1 (Nice +1)</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -133,30 +133,88 @@
         
         #icon-q { width: 60px; height: 60px; border-color: #33ccff; }
 
-        /* MENUS */
+        /* MENUS */ /* v46.9.1 Fix: Responsive UI Overhaul */
+        /* --- 1. PARENT OVERLAY (Scroll Container) --- */
         #start-screen {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(5, 10, 20, 0.95); display: flex; flex-direction: column;
-            align-items: center; justify-content: center; color: white; z-index: 10;
-            pointer-events: auto; backdrop-filter: blur(5px);
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 10, 20, 0.95);
+            
+            /* Flex Layout for scrolling */
+            display: flex; 
+            flex-direction: column;
+            
+            /* Enable vertical scrolling */
+            overflow-y: auto; 
+            
+            /* Zero padding avoids the "phantom scrollbar" issue */
+            padding: 0; 
+
+            z-index: 10;
+            pointer-events: auto; 
+            backdrop-filter: blur(5px);
             background-image: 
                 linear-gradient(rgba(51, 204, 255, 0.03) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(51, 204, 255, 0.03) 1px, transparent 1px);
             background-size: 40px 40px;
         }
-        
+
+        /* --- 2. MODAL CONTENT (The Card) --- */
         #start-content {
             display: flex; flex-direction: column; align-items: center;
             padding: 50px 60px;
             background: linear-gradient(135deg, rgba(10,20,30,0.95), rgba(5,10,15,0.95));
             clip-path: polygon(30px 0, 100% 0, 100% calc(100% - 30px), calc(100% - 30px) 100%, 0 100%, 0 30px);
             position: relative;
-            /* FIX: Allow horizontal growth, remove fixed 80% width */
-            width: fit-content; 
-            min-width: 700px;
-            max-width: 85vw;
+            
+            /* Responsive Width Logic */
+            width: fit-content;
+            max-width: 90vw; /* Ensure it never touches screen edges on mobile */
+            min-width: 700px; /* Default desktop width */
+
+            height: auto;
+
+            /* Center vertically/horizontally and allow scrolling */
+            margin: auto; 
+            
             box-shadow: 0 0 50px rgba(0,0,0,0.8);
         }
+
+        /* --- 3. MOBILE RESPONSIVENESS --- */
+        @media (max-width: 768px) {
+            #start-content {
+                min-width: 95%; /* Shrink to fit phone screens */
+                padding: 30px 20px; /* Reduce padding so content fits */
+                clip-path: polygon(15px 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%, 0 15px);
+            }
+
+            h1 {
+                font-size: 3rem; /* Shrink title */
+            }
+
+            .btn {
+                min-width: 100%; /* Buttons take full width */
+                padding: 20px 30px;
+                font-size: 1.5rem;
+            }
+
+            #stats-container {
+                flex-direction: column; /* Stack stats vertically */
+                gap: 15px;
+            }
+            
+            .stat-box:last-child {
+                border-left: none;
+                border-top: 1px solid rgba(255,255,255,0.1);
+                padding-left: 0;
+                padding-top: 15px;
+            }
+        }
+
+        /* Chrome/Safari Scrollbar Hiding for the main menu */
+        #start-content::-webkit-scrollbar { 
+            display: none; 
+        }
+        
         #start-content::after {
             content: ''; position: absolute; top:0; left:0; width:100%; height:100%;
             box-shadow: inset 0 0 0 2px rgba(51, 204, 255, 0.3);
@@ -180,10 +238,24 @@
         
         p { font-size: 1.1rem; color: #aaa; margin-top: 5px; text-align: center; line-height: 1.5; font-family: monospace; }
         
-        .btn-row { display: flex; gap: 20px; margin-top: 40px; width: 100%; justify-content: center; flex-wrap: wrap; }
-        
+        .btn-row { 
+            display: flex; 
+            gap: 20px; 
+            margin-top: 10px; /* Keep your existing margin */
+            width: 100%; 
+            justify-content: center; 
+            flex-wrap: wrap;
+            
+            /* FIX: Ensure buttons stay on top of any potential render overflow */
+            position: relative;
+            z-index: 5; 
+        }
+                
         .btn {
-            padding: 25px 60px; background: #33ccff; border: none;
+            /* v46.9.1 Use transparent border instead of 'none' */
+            /* This stops the button from growing/pushing content on hover */
+            border: 2px solid transparent;
+            padding: 25px 60px; background: #33ccff;
             color: #000; font-size: 2rem; cursor: pointer; transition: all 0.5s; 
             font-weight: 900; text-transform: uppercase; letter-spacing: 2px;
             clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%);
@@ -207,27 +279,43 @@
         }
         .btn-secondary:hover { border-color: #fff; color: #fff; background: rgba(255,255,255,0.1); }
 
-        /* v46.8 Smarter Horizontal Stats */
-        /* 1. Main Stats Container */
+        /* v46.9.1 Smarter Horizontal Stats */
+        /* Update #stats-container */
         #stats-container {
-            margin-top: 30px; 
-            width: 100%;           /* Changed to 100% to fill the parent cleanly */
-            display: flex; 
+            margin-top: 10px; 
+            width: 100%;           
+            display: flex;
+            
+            /* CHANGE: Stop it from shrinking aggressively. 
+            Let it expand to fit content, pushing buttons down. */
+            flex: 0 0 auto;        
+                        
+            margin-bottom: 10px; 
             gap: 30px; 
-            border-top: 1px solid rgba(255,255,255,0.1);             
-            padding-top: 30px;
-            align-items: flex-start;
+            padding-top: 30px; 
+            align-items: stretch; 
             font-family: inherit; 
         }
 
-        /* 2. Left Column (Session & Achievements) - GIVES IT MORE SPACE */
+        #stat-session {
+            display: flex;
+            flex-direction: column;
+            flex: 1;                /* Occupy remaining space */
+            min-height: 60px;          /* Allow shrinking to a minimum height to show labels */
+            overflow: hidden;       /* Force children to scroll if they overflow */
+        }
+
+        /* Left Column (Session & Achievements) */
         .stat-box:first-child { 
             flex: 1; /* Grows to fill all unused space */
             text-align: left;
-            min-width: 0; /* Prevents layout break on small screens */
+            display: flex;
+            flex-direction: column; 
+            height: 100%; /* Force it to use the full height of the container */
+            min-height: 0; /* Allow the box to shrink, triggering the scrollbar */
         }
 
-        /* 3. Right Column (Style Matrix) - SNUG FIT */
+        /* Right Column (Style Matrix) - SNUG FIT */
         .stat-box:last-child { 
             flex: 0 0 auto; /* Only takes as much width as it needs */
             width: auto;    /* strict width control */
@@ -237,16 +325,7 @@
             white-space: nowrap; /* Ensures text stays neat on one line */
         }
 
-        /* 4. FORCE SCORE/COMBO TO SEPARATE LINES */
-        /* This overrides the inline JS style "display: flex" */
-        #statSession > div {
-            display: flex;
-            flex-direction: column !important; /* Forces vertical stack */
-            gap: 5px !important; /* Small gap between Score and Combo */
-            margin-bottom: 15px !important;
-        }
-
-        /* 5. Typography & Colors (Restored) */
+        /* Typography & Colors */
         .stat-title { 
             color: #33ccff; 
             font-size: 1rem; 
@@ -256,6 +335,7 @@
             letter-spacing: 1px; 
         }
 
+        /* Tighten the Text Spacing (Fixes Style Matrix Height) */
         .stat-value { 
             color: #fff; 
             font-size: 0.9rem; 
@@ -264,25 +344,40 @@
             opacity: 0.8; 
         }
 
-        /* Achievement Tags */
+        /* Fix Achievement Tag Centering */
         .achievement-tag {
-            display: inline-block;
+            /* CHANGED: Use Flexbox to perfectly center text inside the tag */
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 22px; /* Fixed height for consistency */
+            
             background: rgba(51, 204, 255, 0.1);
             border-left: 2px solid #33ccff;
-            padding: 2px 10px;
+            padding: 0 8px;
             font-size: 0.8rem;
             color: #fff;
             white-space: nowrap;
         }
 
         /* Scrollable List Container */
+        /* Update .achievement-list */
         .achievement-list {
             display: flex;
             flex-wrap: wrap;
             gap: 6px;
             margin-top: 5px;
-            max-height: 25vh; /* Safety limit: scrolls if too tall */
-            overflow-y: auto;
+            
+            /* Flex sponge logic */
+            flex: 1;
+            
+            /* CHANGE: Set a safe minimum height so a single row never gets cut off */
+            min-height: 40px; 
+            
+            overflow-y: auto; 
+            
+            /* CHANGE: Add padding to bottom so scrollbar doesn't clip the tag border */
+            padding-bottom: 4px; 
         }
 
         /* Scrollbar styling */
@@ -489,28 +584,25 @@
             <div id="stats-container">
                 <div class="stat-box">
                     <div class="stat-title">Current Session</div>
-                    <div class="stat-value" id="stat-session">
-                        <strong>SCORE:</strong> 0<br>
-                        <strong>MAX COMBO:</strong> 0
-                    </div>
+                    <!-- Empty container, JS fills structure -->
+                    <div class="stat-value" id="stat-session"></div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-title">Style Matrix</div>
-                    <div class="stat-value" id="stat-moves">
-                        <!-- Dynamically filled -->
-                    </div>
+                    <!-- Empty container, JS fills structure -->
+                    <div class="stat-value" id="stat-moves"></div>
                 </div>
             </div>
 
             <div id="session-timer">Session Time: 00:00</div>
 
-            <div class="btn-row" style="margin-top: 30px; gap: 15px;">
+            <div class="btn-row" style="margin-top: 10px; gap: 15px;">
                 <button class="btn-secondary" id="tp-mode-btn">TP MODE: AIM</button>
                 <button class="btn-secondary" id="theme-btn">THEME: LIGHT</button>
                 <button class="btn-secondary" id="fps-btn">SHOW FPS: OFF</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.9 (Nice)</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.9.1 (Nice +1)</div>
         </div>
     </div>
 
@@ -2742,6 +2834,9 @@ if (this.wantsToJump) {
             InputManager.init();
             player.init();
 
+            // v46.9.1 New Start Screen Stats
+            renderStatsContent();
+
             window.addEventListener('resize', onWindowResize);
             
             document.addEventListener('pointerlockchange', () => {
@@ -2830,20 +2925,75 @@ if (this.wantsToJump) {
             return (comboTitle ? comboTitle + " " : "") + styleTitle;
         }
 
+        // 1. NEW: pure layout renderer. Can be called anytime.
+        function renderStatsContent() {
+            // --- A. Generate Achievement Tags ---
+            const rawList = GameStats.persistentAchievements;
+            const filteredList = [];
+            const typeCounts = {};
+            const getAchType = (name) => name.replace(/ (NOVICE|APPRENTICE|ADEPT|EXPERT|MASTER|GRANDMASTER|LEGEND|DEMIGOD|GODLIKE|OMNIPOTENT)$/, '');
+
+            for(let i = rawList.length - 1; i >= 0; i--) {
+                const name = rawList[i];
+                const type = getAchType(name);
+                if (type !== name) { 
+                    if (!typeCounts[type]) typeCounts[type] = 0;
+                    if (typeCounts[type] < 3) { filteredList.push(name); typeCounts[type]++; }
+                } else { filteredList.push(name); }
+            }
+            filteredList.reverse();
+
+            let achHtml = "";
+            if (filteredList.length > 0) {
+                achHtml = `<div class="achievement-list">` + 
+                    filteredList.map(a => `<span class="achievement-tag">${a}</span>`).join('') + 
+                    `</div>`;
+            }
+
+            // --- B. Inject Session Stats (Left Column) ---
+            const statSession = document.getElementById('stat-session');
+            if (statSession) {
+                statSession.innerHTML = `
+                    <!-- Score/Combo Wrapper -->
+                    <div style="flex: 0 0 auto; margin-bottom: 2px;">
+                        <strong>SCORE:</strong> ${player.score}<br>
+                        <strong>MAX COMBO:</strong> ${GameStats.highestCombo}
+                    </div>
+                    
+                    <!-- Label -->
+                    <div style="flex: 0 0 auto; margin-bottom: 2px;"><strong>ACHIEVEMENTS:</strong></div>
+                    
+                    <!-- The List -->
+                    ${achHtml}
+                `;
+            }
+
+            // --- C. Inject Style Matrix (Right Column) ---
+            const statMoves = document.getElementById('stat-moves');
+            if (statMoves) {
+                let movesHtml = `<strong>KILLS:</strong> ${GameStats.botKills}<br>`;
+                if(GameStats.moves.slideHit > 0) movesHtml += `Slide Strikes: ${GameStats.moves.slideHit}<br>`;
+                if(GameStats.moves.midAirHit > 0) movesHtml += `Aerial Strikes: ${GameStats.moves.midAirHit}<br>`;
+                if(GameStats.moves.longAirHit > 0) movesHtml += `Long Air Strikes: ${GameStats.moves.longAirHit}<br>`;
+                if(GameStats.moves.teleportHit > 0) movesHtml += `Teleport Strikes: ${GameStats.moves.teleportHit}<br>`;
+                if(GameStats.moves.wallJumpHit > 0) movesHtml += `Wall Jump Strikes: ${GameStats.moves.wallJumpHit}<br>`;
+                if(movesHtml === `<strong>KILLS:</strong> ${GameStats.botKills}<br>`) movesHtml += "";
+                statMoves.innerHTML = movesHtml;
+            }
+        }
+
+        // 2. UPDATED: Handles Menu State (Title, Timer, Colors)
         function updatePauseScreenStats() {
             const h1 = document.getElementById('game-title');
             const timerDisplay = document.getElementById('session-timer');
             const playerTitleDisplay = document.getElementById('player-title-display');
             
-            // 1. Handle Title & Colors
+            // --- Title Logic ---
             if(player.isDead) {
                 let termStatus = "DISCONNECTED";
                 let color = "#ff3333";
                 for(let i=SCORE_STEPS.length-1; i>=0; i--) {
-                    if (player.score >= SCORE_STEPS[i]) {
-                        termStatus = SCORE_TITLES[i];
-                        break;
-                    }
+                    if (player.score >= SCORE_STEPS[i]) { termStatus = SCORE_TITLES[i]; break; }
                 }
                 if (player.score > 850000) color = "#aa00ff";
                 else if (player.score > 250000) color = "#00ffff";
@@ -2865,56 +3015,7 @@ if (this.wantsToJump) {
                 timerDisplay.style.display = "block";
             }
 
-            // 2. Generate Achievement Tags (CYAN BOXES)
-            const rawList = GameStats.persistentAchievements;
-            const filteredList = [];
-            const typeCounts = {};
-            const getAchType = (name) => name.replace(/ (NOVICE|APPRENTICE|ADEPT|EXPERT|MASTER|GRANDMASTER|LEGEND|DEMIGOD|GODLIKE|OMNIPOTENT)$/, '');
-
-            for(let i = rawList.length - 1; i >= 0; i--) {
-                const name = rawList[i];
-                const type = getAchType(name);
-                if (type !== name) { 
-                    if (!typeCounts[type]) typeCounts[type] = 0;
-                    if (typeCounts[type] < 3) {
-                        filteredList.push(name);
-                        typeCounts[type]++;
-                    }
-                } else {
-                    filteredList.push(name);
-                }
-            }
-            filteredList.reverse();
-
-            // Box HTML
-            let achHtml = "None yet";
-            if (filteredList.length > 0) {
-                achHtml = `<div class="achievement-list">` + 
-                    filteredList.map(a => `<span class="achievement-tag">${a}</span>`).join('') + 
-                    `</div>`;
-            }
-
-            // 3. Inject Score/Combo
-            const statSession = document.getElementById('stat-session');
-            statSession.innerHTML = `
-                <strong>SCORE:</strong> ${player.score}<br>
-                <strong>MAX COMBO:</strong> ${GameStats.highestCombo}<br>
-                <strong>ACHIEVEMENTS:</strong><br>
-                ${achHtml}
-            `;
-
-            const statMoves = document.getElementById('stat-moves');
-            let movesHtml = "";
-            movesHtml += `<strong>KILLS:</strong> ${GameStats.botKills}<br>`;
-            if(GameStats.moves.slideHit > 0) movesHtml += `Slide Strikes: ${GameStats.moves.slideHit}<br>`;
-            if(GameStats.moves.midAirHit > 0) movesHtml += `Aerial Strikes: ${GameStats.moves.midAirHit}<br>`;
-            if(GameStats.moves.longAirHit > 0) movesHtml += `Long Air Strikes: ${GameStats.moves.longAirHit}<br>`;
-            if(GameStats.moves.teleportHit > 0) movesHtml += `Teleport Strikes: ${GameStats.moves.teleportHit}<br>`;
-            if(GameStats.moves.wallJumpHit > 0) movesHtml += `Wall Jump Strikes: ${GameStats.moves.wallJumpHit}<br>`;
-            if(movesHtml === "") movesHtml = "No style points yet.";
-            statMoves.innerHTML = movesHtml;
-
-            // 4. THE CLEVER SESSION TIMER (Logic from Backup)
+            // --- Timer Logic ---
             const format = (ms) => {
                 const totalSec = Math.floor(ms / 1000);
                 const m = Math.floor(totalSec / 60).toString().padStart(2, '0');
@@ -2924,7 +3025,6 @@ if (this.wantsToJump) {
 
             const primaryLabel = player.isDead ? "Playtime" : "Current Session";
             const primaryValue = player.isDead ? bankedActiveTime : lastSegmentDuration;
-            
             const hoverLabel = player.isDead ? "Final Session" : "Playtime";
             const hoverValue = player.isDead ? lastSegmentDuration : bankedActiveTime;
 
@@ -2937,6 +3037,9 @@ if (this.wantsToJump) {
             
             timerDisplay.setAttribute('data-details', tooltip);
             timerDisplay.classList.add('session-info');
+
+            // --- RENDER CONTENT ---
+            renderStatsContent(); 
         }
 
         let ambientLight, hemiLight, dirLight;
