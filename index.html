@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v47.0.0 (World Update)</title>
+    <title>Neon Blade: Melee Arena v47.1.0 (Performance Fix)</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -476,7 +476,7 @@
                 <button class="btn-secondary" id="fps-btn">SHOW FPS: OFF</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v47.0.0</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v47.1.0</div>
         </div>
     </div>
 
@@ -1027,6 +1027,7 @@
         let lastFpsTime = 0;
         let sharedSnowGeo = null;
         let sharedLeafGeo = null;
+        let frameCounter = 0;
         const globalRaycaster = new THREE.Raycaster();
         
         const sharedEnemyGeo = new THREE.BoxGeometry(1, 2, 1);
@@ -1236,7 +1237,15 @@
                 const geo = new THREE.BoxGeometry(w, h, d);
                 const mesh = new THREE.Mesh(geo, mat);
                 mesh.position.set(x, y, z);
-                mesh.castShadow = true;
+                
+                // Shadow Optimization: Only cast shadows on small maps or for big structures
+                // For big map with 400+ objects, reduce shadow casters
+                if (ws.config.bots > 100 && !isWall) {
+                    mesh.castShadow = false; 
+                } else {
+                    mesh.castShadow = true;
+                }
+                
                 mesh.receiveShadow = true;
                 mesh.userData.isFloor = isFloor;
                 
@@ -1753,13 +1762,20 @@
             handleTeleport(dt) {
                 if (teleportMode === 'AIM' && this.teleportActive) {
                     const result = getTeleportTarget();
+                    
+                    // 1. Position: Snap exactly to the hit point (Feet Location).
+                    // We do NOT add a normal offset here, so the ring sits exactly on the floor/surface.
                     teleportMarker.position.copy(result.point);
                     this.teleportTarget = result.point;
-                    if (result.hit && result.normal) {
-                        teleportMarker.position.addScaledVector(result.normal, 0.8);
-                    }
+
+                    // 2. Orientation: Force Upright (World Y-Up).
+                    // The marker represents the player's body and feet, which always stay upright 
+                    // regardless of the surface angle (walls/slopes).
+                    teleportMarker.rotation.set(0, 0, 0); 
+                    
                     teleportMarker.visible = true;
 
+                    // --- Enemy Highlighting Logic ---
                     let closestEnemy = null;
                     let closestDist = 999;
                     for (const enemy of enemies) {
@@ -1782,6 +1798,7 @@
                         lastHoveredEnemy = null;
                     }
                     
+                    // --- Visual Animation & Colors ---
                     const t = performance.now();
                     teleportMarker.userData.diamond.rotation.y += dt * 2.0;
                     
@@ -1804,8 +1821,12 @@
                     teleportMarker.userData.ringMat.emissive.copy(targetColor);
                     teleportMarker.userData.ringMat.emissiveIntensity = 2.0 * cycle;
 
+                    // 3. Diamond Animation: Relative to the Ring
+                    // The Ring is at 0 (Feet). The Diamond floats at body height (~1.5m).
+                    // This maintains the correct relative distance regardless of where the marker is.
                     const pulse = Math.sin(t * 0.003); 
                     const hoverY = 1.5 + pulse * 0.2;
+                    
                     teleportMarker.userData.diamond.position.y = hoverY;
                     teleportMarker.userData.ring.scale.setScalar(1 + pulse * 0.05);
 
@@ -3040,7 +3061,14 @@
                 const visualGeo = new THREE.BoxGeometry(size, size, size);
                 this.mat = materials.obstacle.clone();
                 this.visualMesh = new THREE.Mesh(visualGeo, this.mat);
-                this.visualMesh.castShadow = true;
+                
+                // Shadow Optimization for Decorations
+                if (ws && ws.config.bots > 100) {
+                    this.visualMesh.castShadow = false;
+                } else {
+                    this.visualMesh.castShadow = true;
+                }
+                
                 this.visualMesh.receiveShadow = true;
                 this.visualMesh.position.copy(this.colliderMesh.position);
                 this.visualMesh.scale.setScalar(scale);
@@ -3774,6 +3802,15 @@
                     color: this.type.color, metalness: 0.1, roughness: 0.2, clearcoat: 0.5
                 });
                 this.body = new THREE.Mesh(sharedEnemyGeo, bodyMat);
+                
+                // Shadow Optimization: On Big maps with many bots, disable enemy shadows
+                if (ws && ws.config.bots > 100) {
+                    this.body.castShadow = false;
+                } else {
+                    this.body.castShadow = true;
+                }
+                
+                this.body.receiveShadow = true;
                 this.mesh.add(this.body);
 
                 this.outline = new THREE.LineSegments(sharedEnemyEdgeGeo, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3 }));
@@ -3857,6 +3894,8 @@
                 this.staminaRegen = 3; 
                 this.visionTimer = Math.random() * 0.5; 
                 this.canSeePlayerCached = false;
+                this.groundCheckTimer = 0; 
+                this.lastGroundHeight = 0;
                 this.updateTheme(currentTheme);
             }
 
@@ -3938,7 +3977,7 @@
                 if (this.isDeadCorpse) {
                     this.corpseTimer -= dt;
                     this.mesh.rotation.x = Math.PI / 2; 
-                    this.mesh.position.y = getGroundHeight(this.mesh.position.x, this.mesh.position.z) + 0.5; 
+                    this.mesh.position.y = this.lastGroundHeight + 0.5; 
                     this.body.material.opacity = this.corpseTimer / 3.0;
                     this.body.material.transparent = true;
                     this.eyeMat.opacity = this.corpseTimer / 3.0;
@@ -3969,7 +4008,7 @@
                 if (this.state === 'CONFUSED') {
                     this.confusedTimer -= dt;
                     this.mesh.rotation.x = -Math.PI / 2; 
-                    this.mesh.position.y = getGroundHeight(this.mesh.position.x, this.mesh.position.z) + 0.5;
+                    this.mesh.position.y = this.lastGroundHeight + 0.5;
                     if (this.confusedTimer <= 0) {
                         this.state = this.hasAggroed ? 'AGGRO' : 'ROAM';
                         this.mesh.rotation.x = 0;
@@ -3985,7 +4024,19 @@
                          }
                      }
                 }
-                const groundY = getGroundHeight(this.mesh.position.x, this.mesh.position.z);
+                
+                // Optimized Ground Check: Only raycast if moved > 1.0m or heavily in air
+                const distMoved = Math.hypot(this.mesh.position.x - this.lastPos.x, this.mesh.position.z - this.lastPos.y);
+                const isInAir = Math.abs(this.mesh.position.y - this.lastGroundHeight) > 2.0;
+                
+                if (distMoved > 1.0 || isInAir || this.groundCheckTimer <= 0) {
+                    this.lastGroundHeight = getGroundHeight(this.mesh.position.x, this.mesh.position.z);
+                    this.groundCheckTimer = 0.5; // Force check every 0.5s regardless
+                } else {
+                    this.groundCheckTimer -= dt;
+                }
+                
+                const groundY = this.lastGroundHeight;
                 const currentY = this.mesh.position.y;
                 const floorThreshold = groundY + (1 * this.type.scale);
                 const hpPct = this.health / this.maxHealth;
@@ -4281,9 +4332,11 @@
                                 }
                             }
                         }
-                        const distMoved = Math.hypot(this.mesh.position.x - this.lastPos.x, this.mesh.position.z - this.lastPos.y);
+                        
+                        // Optimized movement check using squared distance
+                        const distMovedSq = (this.mesh.position.x - this.lastPos.x)**2 + (this.mesh.position.z - this.lastPos.y)**2;
                         const isMovingHorizontal = _vec3_1.lengthSq() > 0.1;
-                        if (isMovingHorizontal && distMoved < 0.01 && this.state !== 'SEARCH') {
+                        if (isMovingHorizontal && distMovedSq < 0.0001 && this.state !== 'SEARCH') {
                              if (this.onGroundSafe(groundY)) {
                                  this.velocity.y = 18;
                                  this.jumps = 1;
@@ -4566,6 +4619,7 @@
             const now = performance.now();
             const dt = Math.min((now - lastTime) / 1000, 0.1);
             lastTime = now;
+            frameCounter++;
             
             if(showFPS) {
                 fpsFrames++;
@@ -4596,8 +4650,22 @@
                     }
                 }
                 
+                // Optimized Enemy Updates with Logic LOD (Level of Detail)
+                const playerPos = camera.position;
                 for (let i = enemies.length - 1; i >= 0; i--) {
-                    enemies[i].update(dt, camera.position);
+                    const e = enemies[i];
+                    const distSq = e.mesh.position.distanceToSquared(playerPos);
+                    
+                    // Logic Throttling based on distance
+                    let skip = 1;
+                    if (distSq > 22500) skip = 10; // > 150m
+                    else if (distSq > 3600) skip = 3; // > 60m
+                    
+                    // Use modulo of frameCounter with ID variance to distribute load
+                    // Multiply ID by 100 to get a varied integer offset
+                    if ((frameCounter + Math.floor(e.id * 100)) % skip === 0) {
+                        e.update(dt * skip, playerPos);
+                    }
                 }
 
                 for (let i = particles.length - 1; i >= 0; i--) {
