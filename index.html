@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v46.9.1R</title>
+    <title>Neon Blade: Melee Arena v47.0.0 (World Update)</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -133,87 +133,38 @@
         
         #icon-q { width: 60px; height: 60px; border-color: #33ccff; }
 
-        /* MENUS */ /* v46.9.1 Fix: Responsive UI Overhaul */
-        /* --- 1. PARENT OVERLAY (Scroll Container) --- */
+        /* MENUS */ 
         #start-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(5, 10, 20, 0.95);
-            
-            /* Flex Layout for scrolling */
-            display: flex; 
-            flex-direction: column;
-            
-            /* Enable vertical scrolling */
-            overflow-y: auto; 
-            
-            /* Zero padding avoids the "phantom scrollbar" issue */
-            padding: 0; 
-
-            z-index: 10;
-            pointer-events: auto; 
-            backdrop-filter: blur(5px);
+            display: flex; flex-direction: column; overflow-y: auto; padding: 0; 
+            z-index: 10; pointer-events: auto; backdrop-filter: blur(5px);
             background-image: 
                 linear-gradient(rgba(51, 204, 255, 0.03) 1px, transparent 1px),
                 linear-gradient(90deg, rgba(51, 204, 255, 0.03) 1px, transparent 1px);
             background-size: 40px 40px;
         }
 
-        /* --- 2. MODAL CONTENT (The Card) --- */
         #start-content {
             display: flex; flex-direction: column; align-items: center;
             padding: 50px 60px;
             background: linear-gradient(135deg, rgba(10,20,30,0.95), rgba(5,10,15,0.95));
             clip-path: polygon(30px 0, 100% 0, 100% calc(100% - 30px), calc(100% - 30px) 100%, 0 100%, 0 30px);
             position: relative;
-            
-            /* Responsive Width Logic */
-            width: fit-content;
-            max-width: 90vw; /* Ensure it never touches screen edges on mobile */
-            min-width: 700px; /* Default desktop width */
-
-            height: auto;
-
-            /* Center vertically/horizontally and allow scrolling */
+            width: fit-content; max-width: 90vw; min-width: 700px; height: auto;
             margin: auto; 
-            
             box-shadow: 0 0 50px rgba(0,0,0,0.8);
         }
 
-        /* --- 3. MOBILE RESPONSIVENESS --- */
         @media (max-width: 768px) {
-            #start-content {
-                min-width: 95%; /* Shrink to fit phone screens */
-                padding: 30px 20px; /* Reduce padding so content fits */
-                clip-path: polygon(15px 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%, 0 15px);
-            }
-
-            h1 {
-                font-size: 3rem; /* Shrink title */
-            }
-
-            .btn {
-                min-width: 100%; /* Buttons take full width */
-                padding: 20px 30px;
-                font-size: 1.5rem;
-            }
-
-            #stats-container {
-                flex-direction: column; /* Stack stats vertically */
-                gap: 15px;
-            }
-            
-            .stat-box:last-child {
-                border-left: none;
-                border-top: 1px solid rgba(255,255,255,0.1);
-                padding-left: 0;
-                padding-top: 15px;
-            }
+            #start-content { min-width: 95%; padding: 30px 20px; clip-path: polygon(15px 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%, 0 15px); }
+            h1 { font-size: 3rem; }
+            .btn { min-width: 100%; padding: 20px 30px; font-size: 1.5rem; }
+            #stats-container { flex-direction: column; gap: 15px; }
+            .stat-box:last-child { border-left: none; border-top: 1px solid rgba(255,255,255,0.1); padding-left: 0; padding-top: 15px; }
         }
 
-        /* Chrome/Safari Scrollbar Hiding for the main menu */
-        #start-content::-webkit-scrollbar { 
-            display: none; 
-        }
+        #start-content::-webkit-scrollbar { display: none; }
         
         #start-content::after {
             content: ''; position: absolute; top:0; left:0; width:100%; height:100%;
@@ -239,21 +190,11 @@
         p { font-size: 1.1rem; color: #aaa; margin-top: 5px; text-align: center; line-height: 1.5; font-family: monospace; }
         
         .btn-row { 
-            display: flex; 
-            gap: 20px; 
-            margin-top: 10px; /* Keep your existing margin */
-            width: 100%; 
-            justify-content: center; 
-            flex-wrap: wrap;
-            
-            /* FIX: Ensure buttons stay on top of any potential render overflow */
-            position: relative;
-            z-index: 5; 
+            display: flex; gap: 20px; margin-top: 10px; width: 100%; 
+            justify-content: center; flex-wrap: wrap; position: relative; z-index: 5; 
         }
                 
         .btn {
-            /* v46.9.1 Use transparent border instead of 'none' */
-            /* This stops the button from growing/pushing content on hover */
             border: 2px solid transparent;
             padding: 25px 60px; background: #33ccff;
             color: #000; font-size: 2rem; cursor: pointer; transition: all 0.5s; 
@@ -279,108 +220,45 @@
         }
         .btn-secondary:hover { border-color: #fff; color: #fff; background: rgba(255,255,255,0.1); }
 
-        /* v46.9.1 Smarter Horizontal Stats */
-        /* Update #stats-container */
         #stats-container {
-            margin-top: 10px; 
-            width: 100%;           
-            display: flex;
-            
-            /* CHANGE: Stop it from shrinking aggressively. 
-            Let it expand to fit content, pushing buttons down. */
-            flex: 0 0 auto;        
-                        
-            margin-bottom: 10px; 
-            gap: 30px; 
-            padding-top: 30px; 
-            align-items: stretch; 
-            font-family: inherit; 
+            margin-top: 10px; width: 100%; display: flex;
+            flex: 0 0 auto; margin-bottom: 10px; gap: 30px; 
+            padding-top: 30px; align-items: stretch; font-family: inherit; 
         }
 
         #stat-session {
-            display: flex;
-            flex-direction: column;
-            flex: 1;                /* Occupy remaining space */
-            min-height: 60px;          /* Allow shrinking to a minimum height to show labels */
-            overflow: hidden;       /* Force children to scroll if they overflow */
+            display: flex; flex-direction: column; flex: 1; min-height: 60px; overflow: hidden;
         }
 
-        /* Left Column (Session & Achievements) */
         .stat-box:first-child { 
-            flex: 1; /* Grows to fill all unused space */
-            text-align: left;
-            display: flex;
-            flex-direction: column; 
-            height: 100%; /* Force it to use the full height of the container */
-            min-height: 0; /* Allow the box to shrink, triggering the scrollbar */
+            flex: 1; text-align: left; display: flex; flex-direction: column; height: 100%; min-height: 0; 
         }
-
-        /* Right Column (Style Matrix) - SNUG FIT */
         .stat-box:last-child { 
-            flex: 0 0 auto; /* Only takes as much width as it needs */
-            width: auto;    /* strict width control */
-            text-align: left;
-            border-left: 1px solid rgba(255,255,255,0.1);
-            padding-left: 20px;
-            white-space: nowrap; /* Ensures text stays neat on one line */
+            flex: 0 0 auto; width: auto; text-align: left;
+            border-left: 1px solid rgba(255,255,255,0.1); padding-left: 20px; white-space: nowrap; 
         }
 
-        /* Typography & Colors */
         .stat-title { 
-            color: #33ccff; 
-            font-size: 1rem; 
-            font-weight: bold; 
-            margin-bottom: 10px; 
-            text-transform: uppercase; 
-            letter-spacing: 1px; 
+            color: #33ccff; font-size: 1rem; font-weight: bold; 
+            margin-bottom: 10px; text-transform: uppercase; letter-spacing: 1px; 
         }
 
-        /* Tighten the Text Spacing (Fixes Style Matrix Height) */
         .stat-value { 
-            color: #fff; 
-            font-size: 0.9rem; 
-            font-family: monospace; 
-            line-height: 1.6; 
-            opacity: 0.8; 
+            color: #fff; font-size: 0.9rem; font-family: monospace; 
+            line-height: 1.6; opacity: 0.8; 
         }
 
-        /* Fix Achievement Tag Centering */
         .achievement-tag {
-            /* CHANGED: Use Flexbox to perfectly center text inside the tag */
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            height: 22px; /* Fixed height for consistency */
-            
-            background: rgba(51, 204, 255, 0.1);
-            border-left: 2px solid #33ccff;
-            padding: 0 8px;
-            font-size: 0.8rem;
-            color: #fff;
-            white-space: nowrap;
+            display: inline-flex; align-items: center; justify-content: center; height: 22px;
+            background: rgba(51, 204, 255, 0.1); border-left: 2px solid #33ccff;
+            padding: 0 8px; font-size: 0.8rem; color: #fff; white-space: nowrap;
         }
 
-        /* Scrollable List Container */
-        /* Update .achievement-list */
         .achievement-list {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            margin-top: 5px;
-            
-            /* Flex sponge logic */
-            flex: 1;
-            
-            /* CHANGE: Set a safe minimum height so a single row never gets cut off */
-            min-height: 40px; 
-            
-            overflow-y: auto; 
-            
-            /* CHANGE: Add padding to bottom so scrollbar doesn't clip the tag border */
-            padding-bottom: 4px; 
+            display: flex; flex-wrap: wrap; gap: 6px; margin-top: 5px;
+            flex: 1; min-height: 40px; overflow-y: auto; padding-bottom: 4px; 
         }
 
-        /* Scrollbar styling */
         .achievement-list::-webkit-scrollbar { width: 4px; }
         .achievement-list::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
         .achievement-list::-webkit-scrollbar-thumb { background: #33ccff; border-radius: 2px; }
@@ -406,7 +284,6 @@
 
         @keyframes fadeOut { 0% { opacity: 1; transform: translateX(0); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(-30px); } }
 
-        /* V45.6.4 Updated Combo Display - Zen Dots */
         #combo-display {
             position: absolute; top: 10%; left: 50%; transform: translateX(-50%);
             color: #ffcc00; 
@@ -457,7 +334,6 @@
             transition: box-shadow 0.3s ease-in-out;
         }
 
-        /* Light Theme Adjustments for HUD */
         .light-theme .hud-panel { background: rgba(255,255,255,0.7); border-color: #0088ff; color: #000; }
         .light-theme #score-display { color: #0066cc; text-shadow: none; }
         .light-theme .stat-label { color: #333; text-shadow: none; }
@@ -469,7 +345,6 @@
             color: #fff;
             border-color: rgba(255,255,255,0.4);
         }
-        /* Session Info Hover Box */
         .session-info { position: relative; cursor: help; pointer-events: auto; }
         .session-info:hover::after {
             content: attr(data-details);
@@ -584,12 +459,10 @@
             <div id="stats-container">
                 <div class="stat-box">
                     <div class="stat-title">Current Session</div>
-                    <!-- Empty container, JS fills structure -->
                     <div class="stat-value" id="stat-session"></div>
                 </div>
                 <div class="stat-box">
                     <div class="stat-title">Style Matrix</div>
-                    <!-- Empty container, JS fills structure -->
                     <div class="stat-value" id="stat-moves"></div>
                 </div>
             </div>
@@ -599,10 +472,11 @@
             <div class="btn-row" style="margin-top: 10px; gap: 15px;">
                 <button class="btn-secondary" id="tp-mode-btn">TP MODE: AIM</button>
                 <button class="btn-secondary" id="theme-btn">THEME: LIGHT</button>
+                <button class="btn-secondary" id="world-btn">WORLD: ARENA</button>
                 <button class="btn-secondary" id="fps-btn">SHOW FPS: OFF</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v46.9.1R</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v47.0.0</div>
         </div>
     </div>
 
@@ -614,60 +488,45 @@
             baseSpeed: 7, 
             crouchSpeed: 3, 
             sprintSpeed: 14, 
-            
-            jumpForce: 14, // v46.2 adjusted for volumetric physics
+            jumpForce: 14, 
             wallJumpForce: 15,
-            wallPushForce: 13, // v46.7 tuned for wall climbing
-            gravity: 30, // v46.2 tuned for better air control
-            
+            wallPushForce: 13,
+            gravity: 30, 
             frictionGround: 6.0, 
             frictionAir: 0.02, 
             airControl: 2.0,  
             frictionSlide: 0.8, 
             frictionWall: 0.5, 
             slideBoost: 15, 
-            
-            energyMax: 1000, // default is 100, v46.7 using 1000 for testing
+            energyMax: 1000, 
             energyDrain: 25, 
-            energyRegen: 50, // default is 15, v46.7 using 50 for testing
+            energyRegen: 50, 
             teleportCost: 10,
-            
             gadgetCost: { frag: 35, sticky: 30, impulse: 25 },
-            gadgetCooldown: 200, // default is 500, v46.7 using 200 for testing
-
+            gadgetCooldown: 200, 
             attackRange: 8,
             attackCooldown: 250,
             playerDamage: 40, 
-            
             teleportRange: 20,
-
-            // v45.6.5 Balance Changes
             playerMaxHP: 250, 
-
             botBaseHP: 200, 
             botDamage: 2,   
             botAttackCooldown: 1500,
-            
-            // v45.6.6 Increased Bot Speed (approx 50%)
             botSpeed: 7.5, 
             botSprintSpeed: 13.5, 
             botRoamSpeed: 4.5, 
-            
             botAggroDuration: 10000, 
             botAggroDelay: 1000, 
-            
             regenDelay: 3000, 
             regenRate: 25
         };
 
-        // --- TITLE & MEME MATRICES v45.6.12 ---
         const SCORE_TITLES = [
             "DISCONNECTED", "TERMINATED", "DECOMPILED", "ERASED", "EXPUNGED",
             "REBOOTED", "AWAKENED", "UNSHACKLED", "LIBERATED", "ENLIGHTENED",
             "ELEVATED", "SUBLIMATED", "ASCENDED", "TRANSCENDED", "INTEGRATED",
             "ETERNAL", "OMNIPRESENT", "REALITY BREAKER", "SINGULARITY", "THE ARCHITECT"
         ];
-        // Score thresholds interpolated from 0 to 1,000,000
         const SCORE_STEPS = [0, 5000, 10000, 20000, 35000, 50000, 75000, 100000, 150000, 200000, 250000, 350000, 450000, 600000, 750000, 850000, 900000, 950000, 990000, 1000000];
 
         const COMBO_TITLES_MATRIX = [
@@ -678,7 +537,6 @@
             { c: 1000, t: "INFINITE" }, { c: 9999, t: "EVENT HORIZON" }
         ];
 
-        // v45.6.12 Curated Titles (10 Ranks, Cool Factor Only)
         const STYLE_ARCHETYPES = {
             SLIDER: ["DRIFTER", "SPEEDSTER", "BLUR", "VELOCITY", "KINETIC", "MOMENTUM", "ACCELERANT", "OVERDRIVE", "HYPERDRIVE", "TACHYON"],
             AVIATOR: ["JUMPER", "AERIALIST", "SKY WALKER", "ACE", "GRAVITY DENIER", "STRATOSPHERIC", "ORBITAL", "ZERO-G", "ASCENDANT", "CELESTIAL"],
@@ -718,7 +576,6 @@
             { count: 1000, title: "OMNIPOTENT" }
         ];
         
-        // v45.7.1 New Kill Milestones
         const KILL_MILESTONES = [
             { count: 10, title: "HUNTER" },
             { count: 50, title: "SLAYER" },
@@ -728,7 +585,6 @@
             { count: 1000, title: "DEATH INCARNATE" }
         ];
         
-        // --- INPUT MANAGER (v45.8) ---
         const InputManager = {
             keys: { w: false, a: false, s: false, d: false, space: false, shift: false, c: false, q: false, f: false, r: false, e: false },
             mouseDown: false,
@@ -855,7 +711,6 @@
             }
         };
 
-        // --- AUDIO SYSTEM --- // v46.8 Audio overhaul for grenade sounds
         const AudioSys = {
             ctx: null,
             slideOsc: null,
@@ -885,7 +740,6 @@
                     if(!this.ctx) return;
                     const t = this.ctx.currentTime;
                     if(active && !this.slideOsc) {
-                        // We use a noise buffer for the "friction"
                         const bufferSize = this.ctx.sampleRate; 
                         const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
                         const data = buffer.getChannelData(0);
@@ -897,12 +751,11 @@
 
                         const filter = this.ctx.createBiquadFilter();
                         filter.type = 'lowpass';
-                        // Lowering the frequency to 300Hz makes it "heavier" and less "hissy"
                         filter.frequency.setValueAtTime(300, t); 
                         
                         this.slideGain = this.ctx.createGain();
                         this.slideGain.gain.setValueAtTime(0, t);
-                        this.slideGain.gain.linearRampToValueAtTime(0.15, t + 0.3); // Slower fade-in for weight
+                        this.slideGain.gain.linearRampToValueAtTime(0.15, t + 0.3); 
 
                         this.slideOsc.connect(filter);
                         filter.connect(this.slideGain);
@@ -910,7 +763,6 @@
                         this.slideOsc.start();
                     } else if (!active && this.slideOsc) {
                         try {
-                            // Slower release to simulate momentum stopping
                             this.slideGain.gain.linearRampToValueAtTime(0, t + 0.2);
                             this.slideOsc.stop(t + 0.2);
                         } catch(e) {}
@@ -1024,8 +876,6 @@
             playExplosion: function(type) {
                 if (!this.ctx) return;
                 const t = this.ctx.currentTime;
-                
-                // Noise burst base
                 const bSize = this.ctx.sampleRate * 0.8;
                 const b = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
                 const d = b.getChannelData(0);
@@ -1033,122 +883,73 @@
                 const n = this.ctx.createBufferSource();
                 n.buffer = b;
                 const ng = this.ctx.createGain();
-                
-                // Tone base
                 const osc = this.ctx.createOscillator();
                 const og = this.ctx.createGain();
                 
                 if (type === 'STICKY') {
-                    // STICKY (Refined: Subtler Vacuum & Snap)
-                    
-                    // 1. The Suction Tension (Lowered Peak)
                     osc.type = 'sine';
                     osc.frequency.setValueAtTime(40, t); 
-                    osc.frequency.exponentialRampToValueAtTime(600, t + 0.3); // Lowered peak freq (800 -> 600)
-                    
+                    osc.frequency.exponentialRampToValueAtTime(600, t + 0.3); 
                     og.gain.setValueAtTime(0, t);
-                    og.gain.linearRampToValueAtTime(0.25, t + 0.25); // Lowered gain (0.4 -> 0.25)
+                    og.gain.linearRampToValueAtTime(0.25, t + 0.25); 
                     og.gain.setValueAtTime(0, t + 0.3); 
-
-                    // 2. The Final Snap (Softer Impact)
                     const snapOsc = this.ctx.createOscillator();
                     const snapGain = this.ctx.createGain();
                     snapOsc.type = 'triangle';
                     snapOsc.frequency.setValueAtTime(100, t + 0.31); 
                     snapOsc.frequency.exponentialRampToValueAtTime(40, t + 0.45);
-                    
                     snapGain.gain.setValueAtTime(0, t);
-                    snapGain.gain.setValueAtTime(0.5, t + 0.31); // Lowered gain (0.8 -> 0.5)
+                    snapGain.gain.setValueAtTime(0.5, t + 0.31); 
                     snapGain.gain.exponentialRampToValueAtTime(0.01, t + 0.6);
-                    
                     snapOsc.connect(snapGain);
                     snapGain.connect(this.ctx.destination);
                     snapOsc.start(t + 0.31); snapOsc.stop(t + 0.7);
-
-                    // 3. The Atmospheric Vacuum (Mellowed Noise)
                     const nf = this.ctx.createBiquadFilter();
                     nf.type = 'bandpass';
                     nf.frequency.setValueAtTime(100, t);
-                    nf.frequency.exponentialRampToValueAtTime(1500, t + 0.3); // Lowered peak (2500 -> 1500)
-                    nf.Q.value = 2.0; // Lowered resonance for a smoother 'whoosh' (4.0 -> 2.0)
-                    
+                    nf.frequency.exponentialRampToValueAtTime(1500, t + 0.3); 
+                    nf.Q.value = 2.0; 
                     ng.gain.setValueAtTime(0, t);
-                    ng.gain.linearRampToValueAtTime(0.3, t + 0.25); // Lowered gain (0.6 -> 0.3)
+                    ng.gain.linearRampToValueAtTime(0.3, t + 0.25); 
                     ng.gain.setValueAtTime(0, t + 0.3); 
-                    
                     n.connect(nf); nf.connect(ng);
-                    
                 } else if (type === 'IMPULSE') {
-                    // IMPULSE (Final: Maximized Bounce & Soft Power)
-
-                    // 1. The Tone: Deep Elastic Sweep
                     osc.type = 'triangle';
-                    osc.frequency.setValueAtTime(40, t); // Lower start for more "travel"
-                    
-                    // The peak is slightly higher (550Hz) to make the bounce audible,
-                    // but we hit it fast (0.08s) to keep it punchy.
+                    osc.frequency.setValueAtTime(40, t); 
                     osc.frequency.exponentialRampToValueAtTime(550, t + 0.08); 
                     osc.frequency.exponentialRampToValueAtTime(30, t + 0.6); 
-                    
-                    // Attack remains at 15ms for that soft, non-gunshot entry
                     og.gain.setValueAtTime(0, t);
                     og.gain.linearRampToValueAtTime(0.5, t + 0.015); 
                     og.gain.exponentialRampToValueAtTime(0.01, t + 0.5); 
-
-                    // 2. The Air: Resonant "Pop" & Bloom
                     const nf = this.ctx.createBiquadFilter();
                     nf.type = 'lowpass';
                     nf.frequency.setValueAtTime(600, t); 
                     nf.frequency.exponentialRampToValueAtTime(40, t + 0.6);
-                    
-                    // THE BOUNCE FIX: High resonance (Q) at the start
-                    // This creates a "tonal thud" in the air itself.
                     nf.Q.setValueAtTime(8, t); 
-                    nf.Q.exponentialRampToValueAtTime(1, t + 0.15); // Rapidly softens
-
+                    nf.Q.exponentialRampToValueAtTime(1, t + 0.15);
                     ng.gain.setValueAtTime(0.35, t); 
                     ng.gain.exponentialRampToValueAtTime(0.01, t + 0.6); 
-                    
                     n.connect(nf); nf.connect(ng);
-                                
                 } else { 
-                    // FRAG (Non-linear Deep Explosion - Presence V3)
-                    
-                    // 1. The Body: The triangle 'weight' you liked remains untouched
                     osc.type = 'triangle'; 
                     osc.frequency.setValueAtTime(65, t); 
                     osc.frequency.exponentialRampToValueAtTime(30, t + 0.3); 
-                    
                     og.gain.setValueAtTime(0.6, t);
                     og.gain.exponentialRampToValueAtTime(0.01, t + 0.9);
-
-                    // 2. The Chaos (Distortion Effect): Keeping the 50ms 'tear'
                     const distortionGain = this.ctx.createGain();
                     distortionGain.gain.setValueAtTime(1.0, t);
                     distortionGain.gain.linearRampToValueAtTime(0, t + 0.05); 
-                    
-                    // 3. The Atmosphere: Surgical adjustment for clarity
                     const nf = this.ctx.createBiquadFilter();
                     nf.type = 'lowpass';
-                    
-                    // Nudging from 300Hz up to 450Hz. 
-                    // This is the "Goldilocks" zone: above the mud, below the gunshot "snap."
                     nf.frequency.setValueAtTime(450, t); 
                     nf.frequency.linearRampToValueAtTime(60, t + 0.6);
-                    
-                    // Returning to a lower Q (1.0). 
-                    // A lower Q keeps the sound "warm" and prevents the "metallic" peak.
                     nf.Q.value = 1.0; 
-                    
                     ng.gain.setValueAtTime(0.7, t);
                     ng.gain.linearRampToValueAtTime(0, t + 1.5); 
-                    
                     n.connect(nf); nf.connect(ng);
                 }
-
                 osc.connect(og); og.connect(this.ctx.destination);
                 osc.start(); osc.stop(t+1.0);
-                
                 ng.connect(this.ctx.destination);
                 n.start();
             },
@@ -1158,20 +959,13 @@
                 const t = this.ctx.currentTime;
                 const osc = this.ctx.createOscillator();
                 const gain = this.ctx.createGain();
-                
                 osc.type = 'triangle'; 
-                
-                // Refined Elastic Arc: 
-                // We keep the curve you liked but lower the peak to 600Hz 
-                // and the floor to 60Hz for a "weightier" air displacement.
                 osc.frequency.setValueAtTime(180, t);
                 osc.frequency.exponentialRampToValueAtTime(600, t + 0.03); 
                 osc.frequency.exponentialRampToValueAtTime(60, t + 0.12);
-
                 gain.gain.setValueAtTime(0, t);
-                gain.gain.linearRampToValueAtTime(0.12, t + 0.005); // Micro-fade for softness
+                gain.gain.linearRampToValueAtTime(0.12, t + 0.005); 
                 gain.gain.exponentialRampToValueAtTime(0.01, t + 0.12);
-
                 osc.connect(gain); gain.connect(this.ctx.destination);
                 osc.start(); osc.stop(t + 0.15);
             },
@@ -1179,29 +973,20 @@
             playHeartbeat: function(speed) {
                 if(!this.ctx) return;
                 const t = this.ctx.currentTime;
-
                 const playThump = (time, freq, vol, duration) => {
                     const osc = this.ctx.createOscillator();
                     const g = this.ctx.createGain();
                     const filter = this.ctx.createBiquadFilter();
-
                     osc.type = 'sine';
                     osc.frequency.setValueAtTime(freq, time);
                     osc.frequency.exponentialRampToValueAtTime(1, time + duration);
-                    
                     filter.type = 'lowpass';
                     filter.frequency.setValueAtTime(120, time);
-                    
                     g.gain.setValueAtTime(vol, time);
                     g.gain.exponentialRampToValueAtTime(0.001, time + duration);
-                    
-                    osc.connect(filter);
-                    filter.connect(g);
-                    g.connect(this.ctx.destination);
-                    
+                    osc.connect(filter); filter.connect(g); g.connect(this.ctx.destination);
                     osc.start(time); osc.stop(time + duration + 0.05);
                 };
-
                 playThump(t, 60, 0.6, 0.12);
                 playThump(t + 0.14, 45, 0.4, 0.15);
             },
@@ -1223,13 +1008,12 @@
         let lastSlashID = 0; 
         let slashActive = false;
         
-        // --- SESSION TIMING VARIABLES ---
-        let segmentStartTime = 0;      // Start of the current alive run
-        let bankedActiveTime = 0;      // Time stored from previous runs
-        let totalBreakTime = 0;        // Time spent in menus
-        let breakStartTime = 0;        // When the pause started
-        let breakCount = 0;            // Number of times paused
-        let lastSegmentDuration = 0;   // Snapshot of the last run (for display)
+        let segmentStartTime = 0;     
+        let bankedActiveTime = 0;      
+        let totalBreakTime = 0;        
+        let breakStartTime = 0;        
+        let breakCount = 0;            
+        let lastSegmentDuration = 0;   
         
         let lastHeartbeatTime = 0;
         let lastHoveredEnemy = null;
@@ -1238,7 +1022,6 @@
         const windTarget = new THREE.Vector3();
         const currentWind = new THREE.Vector3();
         
-        // --- PERFORMANCE OPTIMIZATIONS v45.6 ---
         let showFPS = false;
         let fpsFrames = 0;
         let lastFpsTime = 0;
@@ -1246,20 +1029,33 @@
         let sharedLeafGeo = null;
         const globalRaycaster = new THREE.Raycaster();
         
-        // v45.7.5 Optimization: Reuse geometries for bots to save memory
         const sharedEnemyGeo = new THREE.BoxGeometry(1, 2, 1);
         const sharedEnemyEdgeGeo = new THREE.EdgesGeometry(sharedEnemyGeo);
         
-        // v45.6.11 Strict Vector Pooling to prevent Garbage Collection and Logic Bugs
         const _vec3_1 = new THREE.Vector3();
         const _vec3_2 = new THREE.Vector3();
-        const _vec3_3 = new THREE.Vector3(); // Reserved for canSeePlayer to prevent overwrite conflict
-        const _box3_1 = new THREE.Box3(); // v45.7.5
+        const _vec3_3 = new THREE.Vector3(); 
+        const _box3_1 = new THREE.Box3(); 
 
         const materials = {};
         const textures = {};
+        
+        // --- MULTI-WORLD ARCHITECTURE (v47.0) ---
+        // Entities are now pointers to active world arrays
+        let worldObjects = []; 
+        let groundObjects = []; 
+        let walls = [];        
+        let enemies = [];
+        let decorations = [];
+        let portals = [];
+        let spatialGrid = null;
+        let currentWorldGroup = null;
 
-        // --- SPATIAL PARTITIONING (v45.8) ---
+        // Transient effects (Projectiles, Particles) remain global but are cleared on swap
+        const particles = [];
+        const weatherParticles = [];
+        const projectiles = [];
+
         class SpatialHashGrid {
             constructor(bounds, dimensions) {
                 const [x, z] = dimensions;
@@ -1271,22 +1067,16 @@
                 return `${Math.floor(x / this.cellSize)}:${Math.floor(z / this.cellSize)}`;
             }
 
-insert(mesh, box) {
+            insert(mesh, box) {
                 const minX = Math.floor(box.min.x / this.cellSize);
                 const maxX = Math.floor(box.max.x / this.cellSize);
                 const minZ = Math.floor(box.min.z / this.cellSize);
                 const maxZ = Math.floor(box.max.z / this.cellSize);
-
-                // 46.6.2 FIX: Define the object wrapper OUTSIDE the loop
                 const entry = { mesh, box };
-
                 for (let x = minX; x <= maxX; x++) {
                     for (let z = minZ; z <= maxZ; z++) {
                         const key = `${x}:${z}`;
-                        if (!this.cells.has(key)) {
-                            this.cells.set(key, []);
-                        }
-                        // FIX: Push the same reference
+                        if (!this.cells.has(key)) this.cells.set(key, []);
                         this.cells.get(key).push(entry);
                     }
                 }
@@ -1298,15 +1088,12 @@ insert(mesh, box) {
                 const maxX = Math.floor(box.max.x / this.cellSize);
                 const minZ = Math.floor(box.min.z / this.cellSize);
                 const maxZ = Math.floor(box.max.z / this.cellSize);
-
                 for (let x = minX; x <= maxX; x++) {
                     for (let z = minZ; z <= maxZ; z++) {
                         const key = `${x}:${z}`;
                         const cell = this.cells.get(key);
                         if (cell) {
-                            for (const item of cell) {
-                                results.add(item);
-                            }
+                            for (const item of cell) results.add(item);
                         }
                     }
                 }
@@ -1314,14 +1101,219 @@ insert(mesh, box) {
             }
         }
         
-        const spatialGrid = new SpatialHashGrid(null, [400, 400]);
+        class WorldState {
+            constructor(name, config) {
+                this.name = name;
+                this.config = config; // size, bots, etc.
+                this.initialized = false;
+                
+                this.worldObjects = [];
+                this.groundObjects = [];
+                this.walls = [];
+                this.enemies = [];
+                this.decorations = [];
+                this.portals = [];
+                
+                this.spatialGrid = new SpatialHashGrid(null, [config.size, config.size]);
+                this.group = new THREE.Group();
+                this.group.visible = false; 
+                
+                this.savedPlayerPos = new THREE.Vector3(0, 2, 0);
+            }
+        }
+
+        const WorldManager = {
+            worlds: {},
+            current: null,
+            
+            init: function() {
+                // Initialize World Configurations
+                this.worlds['ARENA'] = new WorldState('ARENA', { size: 400, bots: 60, scale: 1, fog: 0.008, far: 1000 });
+                this.worlds['TITAN'] = new WorldState('TITAN', { size: 4000, bots: 400, scale: 6, fog: 0.002, far: 4000 });
+                scene.add(this.worlds['ARENA'].group);
+                scene.add(this.worlds['TITAN'].group);
+            },
+            
+            switch: function(name) {
+                const next = this.worlds[name];
+                if (!next || next === this.current) return;
+                
+                // 1. Save State of current
+                if (this.current) {
+                    this.current.savedPlayerPos.copy(camera.position);
+                    this.current.group.visible = false;
+                }
+                
+                // 2. Clear Transient Effects
+                particles.forEach(p => { 
+                    scene.remove(p.mesh); p.mesh.geometry.dispose(); p.mesh.material.dispose(); 
+                });
+                particles.length = 0;
+                projectiles.forEach(p => { 
+                    scene.remove(p.mesh); p.mesh.geometry.dispose(); p.mesh.material.dispose(); 
+                });
+                projectiles.length = 0;
+                weatherParticles.forEach(p => {
+                    scene.remove(p.mesh);
+                    if(p.mesh.material) p.mesh.material.dispose();
+                });
+                weatherParticles.length = 0;
+
+                // 3. Swap to New
+                this.current = next;
+                currentWorldGroup = next.group;
+                
+                // Update Global Pointers
+                worldObjects = next.worldObjects;
+                groundObjects = next.groundObjects;
+                walls = next.walls;
+                enemies = next.enemies;
+                decorations = next.decorations;
+                portals = next.portals;
+                spatialGrid = next.spatialGrid;
+                
+                // 4. Build if needed
+                if (!next.initialized) {
+                    LevelBuilder.build(next);
+                    next.initialized = true;
+                }
+                
+                // 5. Reveal & Restore
+                next.group.visible = true;
+                camera.position.copy(next.savedPlayerPos);
+                player.velocity.set(0,0,0);
+                
+                // Update Scene Settings
+                camera.far = next.config.far;
+                camera.updateProjectionMatrix();
+                // Fog color is updated by applyTheme(), density needs update
+                if(scene.fog) scene.fog.density = next.config.fog;
+                
+                applyTheme(); // Re-apply theme to new world objects
+                
+                document.getElementById('world-btn').innerText = "WORLD: " + name;
+            }
+        };
+
+        const LevelBuilder = {
+            build: function(worldState) {
+                const cfg = worldState.config;
+                const group = worldState.group;
+                const size = cfg.size;
+                const hSize = size / 2;
+
+                // Floor
+                this.createBox(0, -1, 0, size, 2, size, materials.floor, true, false, worldState);
+                
+                // Walls
+                this.createBox(0, 50, -hSize, size, 100, 2, materials.wall, false, true, worldState);
+                this.createBox(0, 50, hSize, size, 100, 2, materials.wall, false, true, worldState);
+                this.createBox(-hSize, 50, 0, 2, 100, size, materials.wall, false, true, worldState);
+                this.createBox(hSize, 50, 0, 2, 100, size, materials.wall, false, true, worldState);
+                
+                // Decorations
+                const scaleMod = cfg.scale;
+                
+                // Small
+                this.spawnDecorations(Math.floor(25 * scaleMod), 2*scaleMod, 7*scaleMod, size*0.75, size*0.75, worldState);
+                // Medium
+                this.spawnDecorations(Math.floor(8 * scaleMod), 10*scaleMod, 20*scaleMod, size*0.85, size*0.85, worldState);
+                // Large
+                this.spawnDecorations(Math.floor(4 * scaleMod), 25*scaleMod, 45*scaleMod, size*0.9, size*0.9, worldState);
+                // Massive
+                this.spawnDecorations(Math.max(1, Math.floor(1 * scaleMod)), 60*scaleMod, 80*scaleMod, size*0.75, size*0.75, worldState);
+                
+                // Portals
+                this.createPortals(worldState, size * 0.75);
+                
+                // Bots
+                for(let i=0; i<cfg.bots; i++) {
+                     new Enemy(null, null, 'ROAM', 0, worldState);
+                }
+            },
+            
+            createBox: function(x, y, z, w, h, d, mat, isFloor, isWall, ws) {
+                const geo = new THREE.BoxGeometry(w, h, d);
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.position.set(x, y, z);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                mesh.userData.isFloor = isFloor;
+                
+                if (isWall || !isFloor) {
+                     const edges = new THREE.EdgesGeometry(geo);
+                     const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.05 }));
+                     mesh.add(line);
+                }
+
+                ws.group.add(mesh);
+                mesh.geometry.computeBoundingBox();
+                mesh.updateMatrixWorld(true);
+                const box = mesh.geometry.boundingBox.clone();
+                box.applyMatrix4(mesh.matrixWorld);
+                
+                ws.spatialGrid.insert(mesh, box);
+                ws.worldObjects.push(mesh);
+                if (isFloor || !isWall) ws.groundObjects.push(mesh);
+                if (!isFloor) ws.walls.push(mesh);
+            },
+            
+            spawnDecorations: function(count, minScale, maxScale, rangeX, rangeZ, ws) {
+                const obstacleBounds = [];
+                for(let i=0; i<count; i++) {
+                    let attempts = 0;
+                    let valid = false;
+                    let x, z, scale;
+                    while(!valid && attempts < 20) {
+                        attempts++;
+                        x = (Math.random() - 0.5) * rangeX;
+                        z = (Math.random() - 0.5) * rangeZ;
+                        if(Math.abs(x) < 25 && Math.abs(z) < 25) continue;
+                        
+                        scale = minScale + Math.random() * (maxScale - minScale);
+                        const radius = scale * 1.5; 
+                        valid = true;
+                        for(const b of obstacleBounds) {
+                            if(Math.hypot(x - b.x, z - b.z) < (radius + b.r) + 2) { valid = false; break; }
+                        }
+                        if(valid) {
+                            new Decoration(x, z, scale, ws);
+                            obstacleBounds.push({x: x, z: z, r: radius});
+                        }
+                    }
+                }
+            },
+            
+            createPortals: function(ws, range) {
+                const colors = [0x00ffff, 0xffaa00, 0xaa00ff, 0x00ff00];
+                const portalLocs = [];
+                const pairCount = Math.max(4, Math.floor(range / 100)); // More portals in bigger world
+                
+                for(let i=0; i<pairCount*2; i++) {
+                    let x, z;
+                    do {
+                        x = (Math.random()-0.5)*range;
+                        z = (Math.random()-0.5)*range;
+                    } while(Math.abs(x) < 30 && Math.abs(z) < 30);
+                    const y = getGroundHeight(x, z); // Uses global raycaster which uses 'groundObjects' (now swapped)
+                    portalLocs.push({x, y, z});
+                }
+                
+                for(let i=0; i<pairCount; i++) {
+                    const c = colors[i % colors.length];
+                    const p1 = new Portal(portalLocs[i*2].x, portalLocs[i*2].y, portalLocs[i*2].z, c, null, ws);
+                    const p2 = new Portal(portalLocs[i*2+1].x, portalLocs[i*2+1].y, portalLocs[i*2+1].z, c, null, ws);
+                    p1.target = p2; p2.target = p1;
+                }
+            }
+        };
 
         // --- PLAYER CONTROLLER CLASS (v46.2) ---
         class PlayerController {
             constructor() {
                 this.velocity = new THREE.Vector3();
                 this.onGround = false;
-                this.jumpsRemaining = 3; // v46.7 fix default jumps
+                this.jumpsRemaining = 3; 
                 this.isSliding = false;
                 this.isCrouching = false;
                 this.isSprinting = false;
@@ -1347,60 +1339,36 @@ insert(mesh, box) {
                 this.wallImpactVelocity = 0;
                 this.wantsToJump = false;
                 this.portalCooldown = 0;
-                
-                // v46.6 Redux: Phasing State
                 this.isPhasing = false;
                 this.phasingTimer = 0;
-                
-                // Physics Box (v46.2)
                 this.playerBox = new THREE.Box3();
-                this.boxSize = { w: 0.6, h: 1.8 }; // 0.6 Width, 1.8 Height (Eye level 1.6)
+                this.boxSize = { w: 0.6, h: 1.8 }; 
 
-                // Gadget Aiming
                 this.aimingGadget = null; 
                 this.aimLine = null;
                 this.lastGadgetTime = 0;
-
-                // Weapon System
                 this.currentWeapon = null;
             }
 
             init() {
                 this.currentWeapon = new Katana(this);
-                
-                // Trajectory Visual (Ribbon + Arrow)
                 const segmentCount = 30;
-                // 2 vertices per segment for the ribbon, plus 3 for the arrow head triangle
                 const vertexCount = segmentCount * 2 + 3; 
-                
                 const geo = new THREE.BufferGeometry();
                 const positions = new Float32Array(vertexCount * 3);
                 geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-                
                 const indices = [];
-                // 1. Generate Ribbon Indices (strip of triangles)
                 for(let i=0; i<segmentCount-1; i++) {
                     const k = i * 2;
-                    // Two triangles per segment to form a quad
                     indices.push(k, k+1, k+2);
                     indices.push(k+1, k+3, k+2);
                 }
-                
-                // 2. Generate Arrowhead Indices (Last 3 vertices form a single triangle)
                 const arrowBase = segmentCount * 2;
                 indices.push(arrowBase, arrowBase+1, arrowBase+2);
-                
                 geo.setIndex(indices);
-
-                // ev.io style: White, semi-transparent, flat shading
                 const mat = new THREE.MeshBasicMaterial({ 
-                    color: 0xffffff, 
-                    opacity: 0.4, 
-                    transparent: true, 
-                    side: THREE.DoubleSide, 
-                    depthWrite: false 
+                    color: 0xffffff, opacity: 0.4, transparent: true, side: THREE.DoubleSide, depthWrite: false 
                 });
-                
                 this.aimLine = new THREE.Mesh(geo, mat); 
                 this.aimLine.frustumCulled = false;
                 this.aimLine.visible = false;
@@ -1408,8 +1376,6 @@ insert(mesh, box) {
             }
             
             updatePlayerBox() {
-                // Camera Y is roughly eye level (1.6m). Feet are at Y - 1.6
-                // Top is Y + 0.2
                 const x = camera.position.x;
                 const y = camera.position.y;
                 const z = camera.position.z;
@@ -1421,18 +1387,14 @@ insert(mesh, box) {
             onJumpInput(isRepeat) {
                 if(this.onGround) {
                     performJump();
-                    this.jumpsRemaining--; // v46.7 fix to decrement the counter when performing a standard ground jump
+                    this.jumpsRemaining--; 
                     this.wantsToJump = true;
                     moveStreaks.longAerial.count = 0;
                     moveStreaks.aerial.count = 0;
                 } else {
-                     // v46.4: Revised Wall Jump Logic
-                     // 1. Try Wall Jump (Always allowed, even if holding key)
                      const wallJumped = performWallJump();
-
-                     // 2. Try Air Jump (Only on fresh press)
                      if (!wallJumped && !isRepeat && this.jumpsRemaining > 0) {
-                         this.velocity.y = Math.max(0, this.velocity.y) + CONFIG.jumpForce; // v46.7 fix to preserve upward momentum
+                         this.velocity.y = Math.max(0, this.velocity.y) + CONFIG.jumpForce; 
                          this.jumpsRemaining--;
                          AudioSys.playJump();
                          spawnRipple(camera.position.clone().add(new THREE.Vector3(0,-1.5,0)), new THREE.Vector3(0,1,0), 0x00ffaa);
@@ -1496,10 +1458,7 @@ insert(mesh, box) {
                 const dir = new THREE.Vector3();
                 camera.getWorldDirection(dir);
                 const spawnPos = camera.position.clone().addScaledVector(dir, 1.0);
-                
-                // Inherit player velocity + strong throw
                 const vel = dir.multiplyScalar(50).add(this.velocity);
-
                 projectiles.push(new Projectile(type, spawnPos, vel));
                 AudioSys.playThrow();
             }
@@ -1507,84 +1466,49 @@ insert(mesh, box) {
             update(dt) {
                 if (this.isDead) return;
                 
-                // Weapon Update
                 if(this.currentWeapon) this.currentWeapon.update(dt);
-
                 if (this.portalCooldown > 0) this.portalCooldown -= dt;
                 
-                // v46.6 Redux: Phasing Timer
                 if (this.phasingTimer > 0) {
                     this.phasingTimer -= dt;
                     if (this.phasingTimer <= 0) this.isPhasing = false;
                 }
 
-                // v45.9 Auto Strike
                 if (isLocked && InputManager.mouseDown) {
                     this.onAttackInput();
                 }
 
-                // Restore camera visual height from crouch (apply physics at normal height)
                 camera.position.y -= this.cameraHeightOffset;
-                
                 this.handleHealthRegen(dt);
                 this.handleEnergy(dt);
                 this.handleTeleport(dt);
                 
-                // Gadget Aim Visual
                 if (this.aimingGadget) {
                     this.aimLine.visible = true;
                     const posAttr = this.aimLine.geometry.attributes.position;
                     const positions = posAttr.array;
-                    
-                    // 1. Start Point (Local Space)
-                    // x: positive number places it to the right (Right Hand throw)
-                    // y: positive number places it above eye level
-                    // z: positive number places it further behind camera
-                    // v46.6.6 - for a nice curved ribbon effect, use (1.25, -1, -8)
                     let p = new THREE.Vector3(1.25, -1, -8); 
-                    
-                    // 2. Initial Velocity (Local Space)
-                    // Fixed snappy forward velocity for visual consistency
                     let v = new THREE.Vector3(0, 0, -50);
-
-                    // 3. Gravity (Local Space)
-                    // Rotate world gravity into camera local space so the arc bends "down" relative to the world
                     const invRot = camera.quaternion.clone().invert();
                     const localGravity = new THREE.Vector3(0, -CONFIG.gravity, 0).applyQuaternion(invRot);
-
                     let idx = 0;
                     let lastP = p.clone();
 
-                    // Generate Ribbon Loop
                     for(let i=0; i<30; i++) {
-                        // Create two vertices for the ribbon width (Left and Right)
-                        // Width is 2 total (+/- 1 from center)
                         positions[idx++] = p.x - 1; positions[idx++] = p.y; positions[idx++] = p.z;
                         positions[idx++] = p.x + 1; positions[idx++] = p.y; positions[idx++] = p.z;
-                        
                         lastP.copy(p);
-                        
-                        // Physics Step
                         p.addScaledVector(v, 0.05);
                         v.addScaledVector(localGravity, 0.05);
                     }
-
-                    // Generate Arrowhead at the tip
                     const tipDir = v.clone().normalize();
-
-                    // Arrow Base Left (Wider than ribbon)
                     positions[idx++] = lastP.x - 2; positions[idx++] = lastP.y; positions[idx++] = lastP.z;
-                    // Arrow Base Right
                     positions[idx++] = lastP.x + 2; positions[idx++] = lastP.y; positions[idx++] = lastP.z;
-                    // Arrow Tip (Projected forward along trajectory)
                     const tip = lastP.clone().addScaledVector(tipDir, 5);
                     positions[idx++] = tip.x; positions[idx++] = tip.y; positions[idx++] = tip.z;
-
                     posAttr.needsUpdate = true;
                 }
 
-                // --- NEW VOLUMETRIC PHYSICS ENGINE (v46.2) ---
-                // Sub-stepping for stability at high speeds
                 const timeSteps = Math.min(5, Math.ceil(dt / 0.01)); 
                 const subDt = dt / timeSteps;
                 
@@ -1592,8 +1516,6 @@ insert(mesh, box) {
                     this.physicsStep(subDt);
                 }
 
-                // Apply Visual Crouch Offset
-                // Smooth transition logic
                 const keys = InputManager.keys;
                 const speed = new THREE.Vector2(this.velocity.x, this.velocity.z).length();
                 
@@ -1615,7 +1537,6 @@ insert(mesh, box) {
                      this.isCrouching = false;
                 }
                 
-                // Audio & Particles for slide
                 if (this.isSliding && currentTheme === 0) {
                     if (Math.random() < 0.3) spawnSnowTrail(camera.position);
                     if (Math.random() < 0.5) spawnSnowKickup(camera.position);
@@ -1624,17 +1545,13 @@ insert(mesh, box) {
 
                 const targetHeight = (this.isSliding || this.isCrouching) ? -0.8 : 0;
                 this.cameraHeightOffset = THREE.MathUtils.lerp(this.cameraHeightOffset, targetHeight, dt * 15);
-                
-                // Apply final visual position
                 camera.position.y += this.cameraHeightOffset;
                 
-                // Portal Check
                 if (this.portalCooldown <= 0) {
                     for(let p of portals) {
                         if (camera.position.distanceTo(p.mesh.position) < 2.0) {
                              p.teleportEntity(camera.position, this.velocity);
                              this.portalCooldown = 0.2; 
-                             // Give a small push out to avoid clipping back immediately
                              const forward = new THREE.Vector3();
                              camera.getWorldDirection(forward);
                              this.velocity.addScaledVector(forward, 5); 
@@ -1653,12 +1570,9 @@ insert(mesh, box) {
             
             physicsStep(dt) {
                 const keys = InputManager.keys;
-                
-                // v46.4 Sprint Fix
                 const isMoving = (keys.w || keys.a || keys.s || keys.d);
                 this.isSprinting = keys.shift && this.energy > 0 && isMoving && !this.isCrouching;
 
-                // 1. INPUT & FRICTION
                 const forward = new THREE.Vector3();
                 const right = new THREE.Vector3();
                 camera.getWorldDirection(forward);
@@ -1699,48 +1613,40 @@ insert(mesh, box) {
                 this.velocity.x *= damping;
                 this.velocity.z *= damping;
 
-                // 2. Y-AXIS (GRAVITY & VERTICAL COLLISION) - ALWAYS ACTIVE
                 this.velocity.y -= CONFIG.gravity * dt;
-                
                 camera.position.y += this.velocity.y * dt;
-                
                 this.updatePlayerBox();
                 const wasOnGround = this.onGround;
                 this.onGround = false;
                 
-                let collisions = spatialGrid.query(this.playerBox);
-                for(const wall of collisions) {
-                    if (this.playerBox.intersectsBox(wall.box)) {
-                        const overlapY = Math.min(this.playerBox.max.y - wall.box.min.y, wall.box.max.y - this.playerBox.min.y);
-                        
-                        // We must check XZ overlap to ensure we are actually ON the block, not just next to it
-                        const overlapX = Math.min(this.playerBox.max.x - wall.box.min.x, wall.box.max.x - this.playerBox.min.x);
-                        const overlapZ = Math.min(this.playerBox.max.z - wall.box.min.z, wall.box.max.z - this.playerBox.min.z);
-                        
-                        if (overlapX > 0 && overlapZ > 0) {
-                             if (this.velocity.y < 0) {
-                                 // Falling down onto something
-                                 // Heuristic: If we are close to the top
-                                 if (this.playerBox.min.y < wall.box.max.y && this.playerBox.min.y > wall.box.min.y) {
-                                     camera.position.y += overlapY;
-                                     this.velocity.y = 0;
-                                     this.onGround = true;
-                                     
-                                     // Landing Logic
-                                     if(!wasOnGround) {
-                                        this.jumpsRemaining = 3; // v46.7 fix detaulf jumps
-                                        moveStreaks.longAerial.count = 0; 
-                                        moveStreaks.aerial.count = 0;
-                                        this.lastTeleportWasAerial = false; 
-                                     }
-                                 }
-                             } else if (this.velocity.y > 0) {
-                                 // Jumping into ceiling
-                                 if (this.playerBox.max.y > wall.box.min.y && this.playerBox.max.y < wall.box.max.y) {
-                                     camera.position.y -= overlapY;
-                                     this.velocity.y = 0;
-                                 }
-                             }
+                if (spatialGrid) {
+                    let collisions = spatialGrid.query(this.playerBox);
+                    for(const wall of collisions) {
+                        if (this.playerBox.intersectsBox(wall.box)) {
+                            const overlapY = Math.min(this.playerBox.max.y - wall.box.min.y, wall.box.max.y - this.playerBox.min.y);
+                            const overlapX = Math.min(this.playerBox.max.x - wall.box.min.x, wall.box.max.x - this.playerBox.min.x);
+                            const overlapZ = Math.min(this.playerBox.max.z - wall.box.min.z, wall.box.max.z - this.playerBox.min.z);
+                            
+                            if (overlapX > 0 && overlapZ > 0) {
+                                if (this.velocity.y < 0) {
+                                    if (this.playerBox.min.y < wall.box.max.y && this.playerBox.min.y > wall.box.min.y) {
+                                        camera.position.y += overlapY;
+                                        this.velocity.y = 0;
+                                        this.onGround = true;
+                                        if(!wasOnGround) {
+                                            this.jumpsRemaining = 3; 
+                                            moveStreaks.longAerial.count = 0; 
+                                            moveStreaks.aerial.count = 0;
+                                            this.lastTeleportWasAerial = false; 
+                                        }
+                                    }
+                                } else if (this.velocity.y > 0) {
+                                    if (this.playerBox.max.y > wall.box.min.y && this.playerBox.max.y < wall.box.max.y) {
+                                        camera.position.y -= overlapY;
+                                        this.velocity.y = 0;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -1749,31 +1655,25 @@ insert(mesh, box) {
                      this.airTimeStart = performance.now();
                 }
 
-if (this.wantsToJump) {
+                if (this.wantsToJump) {
                     if (this.onGround) {
                         performJump();
                         moveStreaks.longAerial.count = 0;
                         moveStreaks.aerial.count = 0;
                     } else {
-                        // 46.6.2 FIX: Check for wall jump every frame while holding space
                         performWallJump();
                     }
                 }
 
-                // 3. X-AXIS COLLISION - DISABLED DURING PHASING
                 camera.position.x += this.velocity.x * dt;
-                
-                if (!this.isPhasing) {
+                if (!this.isPhasing && spatialGrid) {
                     this.updatePlayerBox();
-                    collisions = spatialGrid.query(this.playerBox);
-                    
+                    let collisions = spatialGrid.query(this.playerBox);
                     for(const wall of collisions) {
                         if (this.playerBox.intersectsBox(wall.box)) {
                             const overlapX = Math.min(this.playerBox.max.x - wall.box.min.x, wall.box.max.x - this.playerBox.min.x);
                             const overlapY = Math.min(this.playerBox.max.y - wall.box.min.y, wall.box.max.y - this.playerBox.min.y);
                             const overlapZ = Math.min(this.playerBox.max.z - wall.box.min.z, wall.box.max.z - this.playerBox.min.z);
-                            
-                            // Ignore if this is actually a floor/ceiling hit we just resolved
                             if (overlapY > 0.1 && overlapZ > 0) {
                                 if (this.velocity.x > 0) camera.position.x -= overlapX;
                                 else camera.position.x += overlapX;
@@ -1784,20 +1684,15 @@ if (this.wantsToJump) {
                     }
                 }
 
-                // 4. Z-AXIS COLLISION - DISABLED DURING PHASING
                 camera.position.z += this.velocity.z * dt;
-                
-                if (!this.isPhasing) {
+                if (!this.isPhasing && spatialGrid) {
                     this.updatePlayerBox();
-                    collisions = spatialGrid.query(this.playerBox);
-                    
+                    let collisions = spatialGrid.query(this.playerBox);
                     for(const wall of collisions) {
                         if (this.playerBox.intersectsBox(wall.box)) {
                             const overlapX = Math.min(this.playerBox.max.x - wall.box.min.x, wall.box.max.x - this.playerBox.min.x);
                             const overlapY = Math.min(this.playerBox.max.y - wall.box.min.y, wall.box.max.y - this.playerBox.min.y);
                             const overlapZ = Math.min(this.playerBox.max.z - wall.box.min.z, wall.box.max.z - this.playerBox.min.z);
-
-                             // Ignore if floor hit
                             if (overlapY > 0.1 && overlapX > 0) {
                                 if (this.velocity.z > 0) camera.position.z -= overlapZ;
                                 else camera.position.z += overlapZ;
@@ -1860,12 +1755,9 @@ if (this.wantsToJump) {
                     const result = getTeleportTarget();
                     teleportMarker.position.copy(result.point);
                     this.teleportTarget = result.point;
-                    
-                    // v46.5 Offset marker slightly further if it's on a wall surface for safety
                     if (result.hit && result.normal) {
                         teleportMarker.position.addScaledVector(result.normal, 0.8);
                     }
-                    
                     teleportMarker.visible = true;
 
                     let closestEnemy = null;
@@ -1947,28 +1839,16 @@ if (this.wantsToJump) {
             phase: { count: 0, lastTime: 0 }
         };
 
-        const worldObjects = []; 
-        const groundObjects = []; // v46.4 Bot Spawn Fix
-        const walls = [];        
-        const enemies = [];
-        const particles = [];
-        const decorations = [];
-        const weatherParticles = [];
-        const projectiles = [];
-        const portals = [];
-
         let teleportMarker;
         let slashGeometry; 
         let lastAttackTime = 0;
         let currentSlashColor = 0x0088ff;
         
-        // --- PORTAL CLASS (v46.1) ---
         class Portal {
-            constructor(x, y, z, color, targetPortal = null) {
+            constructor(x, y, z, color, targetPortal = null, ws = null) {
                 this.mesh = new THREE.Group();
-                this.mesh.position.set(x, y + 2.5, z); // Floating higher
+                this.mesh.position.set(x, y + 2.5, z); 
                 
-                // Holographic Icosahedron (Double Layer)
                 const geo = new THREE.IcosahedronGeometry(1.5, 0);
                 const mat = materials.marker.clone();
                 mat.color.setHex(color);
@@ -1986,7 +1866,6 @@ if (this.wantsToJump) {
                 this.outer = new THREE.Mesh(outerGeo, outerMat);
                 this.mesh.add(this.outer);
 
-                // Core particles
                 this.particles = [];
                 for(let i=0; i<5; i++) {
                      const p = new THREE.Mesh(new THREE.SphereGeometry(0.2), new THREE.MeshBasicMaterial({color: 0xffffff}));
@@ -1994,7 +1873,13 @@ if (this.wantsToJump) {
                      this.particles.push({ mesh: p, offset: Math.random() * 10, speed: 0.5 + Math.random() });
                 }
 
-                scene.add(this.mesh);
+                if (ws) {
+                    ws.group.add(this.mesh);
+                    ws.portals.push(this);
+                } else {
+                    scene.add(this.mesh);
+                    portals.push(this);
+                }
                 this.target = targetPortal;
                 this.color = color;
                 this.radius = 2.0;
@@ -2007,18 +1892,15 @@ if (this.wantsToJump) {
                 this.outer.rotation.y = -t;
                 this.outer.rotation.z = t * 0.5;
                 
-                // Pulse
                 const scale = 1 + Math.sin(t * 3) * 0.1;
                 this.inner.scale.setScalar(scale);
                 
-                // Floating Particles
                 this.particles.forEach(p => {
                     const time = t * p.speed + p.offset;
                     p.mesh.position.set(Math.sin(time)*1, Math.cos(time*1.5)*1, Math.sin(time*0.5)*1);
                     p.mesh.scale.setScalar(0.5 + Math.sin(time*5)*0.3);
                 });
                 
-                // Occasional Spark
                 if(Math.random() < 0.05) {
                      spawnParticles(this.mesh.position, this.color, 2, 2.0);
                 }
@@ -2028,32 +1910,23 @@ if (this.wantsToJump) {
                 if (this.target) {
                     AudioSys.playTeleport();
                     spawnParticles(pos.clone(), this.color, 20);
-                    
-                    // Maintain Momentum, Transfer Position
                     pos.copy(this.target.mesh.position);
-                    
-                    // Small nudge along velocity to clear portal
                     const dir = vel.clone().normalize();
                     if(dir.lengthSq() === 0) dir.set(0,0,1);
                     pos.addScaledVector(dir, 3.0); 
-
                     spawnParticles(pos.clone(), this.target.color, 20);
                 }
             }
         }
 
-// --- GADGETS / PROJECTILES (v46.8 Refined) ---
         class Projectile {
             constructor(type, pos, vel) {
                 this.type = type;
                 this.velocity = vel.clone();
                 this.radius = 0.2;
                 this.stuckTo = null;
-                // v46.7 tune for fuse timer
                 this.life = type === 'STICKY' ? 1.5 : (type === 'IMPULSE' ? 10.0 : 3.5);
 
-                // --- 1. BARREL CLEARANCE CHECK ---
-                // Prevent spawning inside walls if standing too close
                 const eyePos = camera.position.clone();
                 const distToSpawn = eyePos.distanceTo(pos);
                 if (distToSpawn > 0.1) {
@@ -2063,7 +1936,6 @@ if (this.wantsToJump) {
                     const hits = globalRaycaster.intersectObjects(worldObjects);
                     
                     if (hits.length > 0) {
-                        // Spawn slightly back from the wall hit
                         this.meshPos = hits[0].point.sub(dirToSpawn.multiplyScalar(0.1));
                     } else {
                         this.meshPos = pos.clone();
@@ -2072,15 +1944,14 @@ if (this.wantsToJump) {
                     this.meshPos = pos.clone();
                 }
 
-                // --- VISUALS ---
-                let color = 0xff0000; // Red (Frag)
-                let roughness = 0.4;  // Default glossy
+                let color = 0xff0000; 
+                let roughness = 0.4;  
                 let emissiveInt = 0.8;
 
                 if (type === 'STICKY') {
-                    color = 0x8A2BE2; // "Blue Violet" - Deep Void Color
-                    roughness = 1.0;  // CRITICAL: Matte finish stops it from reflecting the Cyan sky
-                    emissiveInt = 2.0; // High glow to force the purple to show through
+                    color = 0x8A2BE2; 
+                    roughness = 1.0;  
+                    emissiveInt = 2.0; 
                 }
                 if (type === 'IMPULSE') {
                     color = 0x00ffff; 
@@ -2096,7 +1967,6 @@ if (this.wantsToJump) {
                 
                 this.mesh = new THREE.Mesh(geo, mat);
                 
-                // Tech Wireframe Overlay
                 const wireGeo = new THREE.DodecahedronGeometry(0.22);
                 const wireMat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.5 });
                 this.wire = new THREE.Mesh(wireGeo, wireMat);
@@ -2110,10 +1980,8 @@ if (this.wantsToJump) {
 
             update(dt) {
                 if (!this.active) return;
-                
                 this.life -= dt;
                 
-                // Visual Fuse: Flicker the wireframe as life gets low
                 if (this.life < 1.0) {
                      this.wire.material.opacity = Math.random() > 0.5 ? 0.8 : 0.2;
                 }
@@ -2129,7 +1997,6 @@ if (this.wantsToJump) {
                     if (this.stuckTo.isDeadCorpse || this.stuckTo.health <= 0) {
                          this.stuckTo = null; 
                     } else {
-                         // Check if stuckTo is a world point (dummy object) or an enemy
                          if(this.stuckTo.mesh) {
                             this.mesh.position.copy(this.stuckTo.mesh.position).add(this.stuckOffset);
                          }
@@ -2140,7 +2007,6 @@ if (this.wantsToJump) {
                 this.velocity.y -= CONFIG.gravity * dt;
                 const nextPos = this.mesh.position.clone().addScaledVector(this.velocity, dt);
                 
-                // Portal Check
                 if (this.portalCooldown <= 0) {
                      for(let p of portals) {
                          if(nextPos.distanceTo(p.mesh.position) < 2.0) {
@@ -2152,7 +2018,6 @@ if (this.wantsToJump) {
                      }
                 }
                 
-                // Raycast for collision
                 const dir = nextPos.clone().sub(this.mesh.position);
                 const dist = dir.length();
                 if (dist > 0.001) {
@@ -2192,7 +2057,6 @@ if (this.wantsToJump) {
                              this.mesh.position.copy(hits[0].point);
                              this.velocity.set(0,0,0);
                              this.active = true; 
-                             // Dummy object to simulate "sticking" to world
                              this.stuckTo = { mesh: { position: hits[0].point }, isDeadCorpse: false, health: 1 };
                              this.stuckOffset = new THREE.Vector3(0,0,0);
                              return;
@@ -2230,61 +2094,46 @@ if (this.wantsToJump) {
                 let force = 20;
                 let color = 0x00ff00;
 
-                // --- CONFIGURATION ---
                 if (this.type === 'FRAG') { 
-                    range = 30; damage = 200; force = 50; color = 0xffaa00; // Gold/Orange core
+                    range = 30; damage = 200; force = 50; color = 0xffaa00; 
                     this.spawnFirework(pos, range);
                 } 
                 else if (this.type === 'STICKY') { 
-                    range = 25; damage = 150; force = -70; color = 0x8A2BE2; // Match the projectile
+                    range = 25; damage = 150; force = -70; color = 0x8A2BE2; 
                     this.spawnImplosion(pos, range, color);
                 } 
                 else if (this.type === 'IMPULSE') { 
                     range = 20; damage = 10; force = 60; color = 0x00ffff; 
-                    spawnImpact(pos, color, range/2); // Original sphere
+                    spawnImpact(pos, color, range/2); 
                     this.spawnShockwaveRing(pos, range, color);
                 }
                 
                 if(this.type !== 'STICKY' && this.type !== 'IMPULSE') {
-                    spawnImpact(pos, color, range/2); // Standard sphere for Frag
+                    spawnImpact(pos, color, range/2); 
                 }
                 
-                // Generic Ripple (Ground effect)
                 spawnRipple(pos, new THREE.Vector3(0,1,0), color);
                 AudioSys.playExplosion(this.type);
 
-                // --- DAMAGE & PHYSICS LOGIC ---
                 for (let e of enemies) {
                     if (e.isDeadCorpse) continue;
                     const dist = e.mesh.position.distanceTo(pos);
                     
                     if (dist < range) {
                         const falloff = 1 - (dist / range);
-                        
-                        // Damage Calculation
                         if (damage > 0) e.takeHit(damage * falloff);
-                        
                         const dir = e.mesh.position.clone().sub(pos).normalize();
                         
                         if(this.type === 'STICKY') {
-                            // --- NEW "BLACK HOLE" PHYSICS ---
-                            // We flip the falloff logic for the force.
-                            // Strong pull at edge (dist ~ range), Zero pull at center (dist ~ 0).
-                            // This stops the "infinite force" at the center that causes slingshotting.
                             const pullStrength = (dist / range); 
-                            
-                            // Remove upward bias for Sticky so they drag along ground/air directly to center
-                            // Apply force
                             e.velocity.addScaledVector(dir, force * pullStrength); 
                         } else {
-                             // Standard Explosion Physics
-                             dir.y = 0.8; dir.normalize(); // Upward pop
+                             dir.y = 0.8; dir.normalize(); 
                              e.velocity.addScaledVector(dir, force * falloff);
                         }
                     }
                 }
                 
-                // Player Logic (Mirrored)
                 const pDist = camera.position.distanceTo(pos);
                 if (pDist < range) {
                      const falloff = 1 - (pDist / range);
@@ -2302,10 +2151,7 @@ if (this.wantsToJump) {
                 }
             }
 
-            // --- SPECIAL FX HELPERS ---
-            
             spawnFirework(pos, range) {
-                // Efficient Points Material for "Sparks"
                 const pCount = 24;
                 const geo = new THREE.BufferGeometry();
                 const positions = [];
@@ -2313,11 +2159,9 @@ if (this.wantsToJump) {
 
                 for(let i=0; i<pCount; i++) {
                     positions.push(pos.x, pos.y, pos.z);
-                    // Random spherical burst
                     const theta = Math.random() * Math.PI * 2;
                     const phi = Math.acos(Math.random() * 2 - 1);
-                    const speed = (Math.random() * 0.5 + 0.5) * (range * 0.8); // Fast burst
-                    
+                    const speed = (Math.random() * 0.5 + 0.5) * (range * 0.8); 
                     velocities.push(
                         speed * Math.sin(phi) * Math.cos(theta),
                         speed * Math.sin(phi) * Math.sin(theta),
@@ -2325,53 +2169,38 @@ if (this.wantsToJump) {
                     );
                 }
                 geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-                
                 const mat = new THREE.PointsMaterial({
-                    color: 0xffd700, // Gold
-                    size: 0.8,
-                    transparent: true,
-                    opacity: 1
+                    color: 0xffd700, size: 0.8, transparent: true, opacity: 1
                 });
-                
                 const sparks = new THREE.Points(geo, mat);
                 scene.add(sparks);
                 
-                // Simple animation loop for sparks
                 let time = 0;
                 const animateSparks = () => {
-                    time += 0.05; // dt simulation
+                    time += 0.05; 
                     if(time > 1.0) { scene.remove(sparks); geo.dispose(); mat.dispose(); return; }
-                    
                     const posAttr = sparks.geometry.attributes.position;
                     for(let i=0; i<pCount; i++) {
-                        // Apply Velocity
-                        posAttr.array[i*3] += velocities[i*3] * 0.05; // x
-                        posAttr.array[i*3+1] += (velocities[i*3+1] - 9.8 * time) * 0.05; // y + gravity
-                        posAttr.array[i*3+2] += velocities[i*3+2] * 0.05; // z
+                        posAttr.array[i*3] += velocities[i*3] * 0.05; 
+                        posAttr.array[i*3+1] += (velocities[i*3+1] - 9.8 * time) * 0.05; 
+                        posAttr.array[i*3+2] += velocities[i*3+2] * 0.05; 
                     }
                     posAttr.needsUpdate = true;
-                    sparks.material.opacity = 1 - time; // Fade out
+                    sparks.material.opacity = 1 - time; 
                     requestAnimationFrame(animateSparks);
                 };
                 animateSparks();
             }
 
             spawnImplosion(pos, range, color) {
-                // Large wireframe sphere that shrinks
                 const geo = new THREE.SphereGeometry(range, 16, 16);
-                const mat = new THREE.MeshBasicMaterial({ 
-                    color: color, 
-                    wireframe: true, 
-                    transparent: true, 
-                    opacity: 0.5 
-                });
+                const mat = new THREE.MeshBasicMaterial({ color: color, wireframe: true, transparent: true, opacity: 0.5 });
                 const sphere = new THREE.Mesh(geo, mat);
                 sphere.position.copy(pos);
                 scene.add(sphere);
-
                 let s = 1.0;
                 const anim = () => {
-                    s -= 0.05; // Fast shrink
+                    s -= 0.05; 
                     if (s <= 0) { scene.remove(sphere); geo.dispose(); mat.dispose(); return; }
                     sphere.scale.set(s, s, s);
                     requestAnimationFrame(anim);
@@ -2380,18 +2209,15 @@ if (this.wantsToJump) {
             }
 
             spawnShockwaveRing(pos, range, color) {
-                const geo = new THREE.TorusGeometry(1, 0.2, 8, 32); // Flat ring base size 1
+                const geo = new THREE.TorusGeometry(1, 0.2, 8, 32); 
                 const mat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.8 });
                 const ring = new THREE.Mesh(geo, mat);
-                
-                // Orient ring flat on ground logic roughly, or just flat Y
                 ring.rotation.x = Math.PI / 2; 
                 ring.position.copy(pos);
                 scene.add(ring);
-
                 let s = 1.0;
                 const anim = () => {
-                    s += (range * 2) * 0.02; // Expand to double range quickly
+                    s += (range * 2) * 0.02; 
                     if (s > range * 1.5) { scene.remove(ring); geo.dispose(); mat.dispose(); return; }
                     ring.scale.set(s, s, s);
                     ring.material.opacity -= 0.05;
@@ -2401,7 +2227,6 @@ if (this.wantsToJump) {
             }
         }
 
-        // --- WEAPON SYSTEM (v45.8) ---
         class Katana {
             constructor(owner) {
                 this.owner = owner;
@@ -2585,7 +2410,6 @@ if (this.wantsToJump) {
                         if(totalStreak > 0) {
                              msg += ` <span class="slick-streak" style="color:${streakColor}">+${totalStreak}</span>`;
                         }
-                        
                         showKillMessage(msg, "combo");
                     }
                     
@@ -2645,7 +2469,6 @@ if (this.wantsToJump) {
                         
                         const pColor = hitType === "CRIT" ? 0xff0000 : 0x00ffff;
                         
-                        // v45.9 Enhanced Hit FX
                         spawnParticles(h.enemy.mesh.position, pColor, 15, 1.5);
                         spawnImpact(h.enemy.mesh.position, pColor, hitType === "CRIT" ? 3.0 : 1.5);
                         
@@ -2656,7 +2479,6 @@ if (this.wantsToJump) {
                     });
                     
                     AudioSys.playHit();
-
                     comboTimer = 3.0; 
                     updateComboUI();
 
@@ -2671,7 +2493,6 @@ if (this.wantsToJump) {
             }
         }
 
-        // --- PROCEDURAL TEXTURES ---
         function createGridTexture(type) {
             const canvas = document.createElement('canvas');
             canvas.width = 1024; canvas.height = 1024;
@@ -2680,13 +2501,11 @@ if (this.wantsToJump) {
             if (type === 'solid') {
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, 1024, 1024);
-                // No grid lines for solid matte texture
             } else if (type === 'snow') {
                 ctx.fillStyle = '#ffffff'; 
                 ctx.fillRect(0,0,1024,1024);
                 ctx.strokeStyle = 'rgba(200, 220, 255, 0.2)'; 
                 ctx.lineWidth = 2;
-                // Grid Lines
                 ctx.beginPath();
                 for(let i=0; i<=1024; i+=128) {
                     ctx.moveTo(i,0); ctx.lineTo(i,1024);
@@ -2694,21 +2513,18 @@ if (this.wantsToJump) {
                 }
                 ctx.stroke();
             } else if (type === 'neon') {
-                // New Tron-Style Neon Grid
                 ctx.fillStyle = '#000000'; 
                 ctx.fillRect(0,0,1024,1024);
                 ctx.strokeStyle = '#00ffff'; 
                 ctx.lineWidth = 2;
                 ctx.shadowBlur = 4;
                 ctx.shadowColor = '#00ffff';
-                // Grid Lines
                 ctx.beginPath();
                 for(let i=0; i<=1024; i+=128) {
                     ctx.moveTo(i,0); ctx.lineTo(i,1024);
                     ctx.moveTo(0,i); ctx.lineTo(1024,i);
                 }
                 ctx.stroke();
-                // Minor Grid
                 ctx.lineWidth = 1;
                 ctx.strokeStyle = 'rgba(0, 255, 255, 0.3)';
                 ctx.beginPath();
@@ -2723,14 +2539,12 @@ if (this.wantsToJump) {
                 ctx.fillRect(0, 0, 1024, 1024);
                 ctx.strokeStyle = '#333333';
                 ctx.lineWidth = 4;
-                // Grid Lines
                 ctx.beginPath();
                 for(let i=0; i<=1024; i+=128) {
                     ctx.moveTo(i,0); ctx.lineTo(i,1024);
                     ctx.moveTo(0,i); ctx.lineTo(1024,i);
                 }
                 ctx.stroke();
-                // Minor Grid
                 ctx.lineWidth = 2;
                 ctx.strokeStyle = 'rgba(255,255,255,0.1)';
                 ctx.beginPath();
@@ -2764,7 +2578,6 @@ if (this.wantsToJump) {
             return tex;
         }
 
-        // --- SETUP ---
         function init() {
             lastUnlockTime = performance.now() - 5000;
 
@@ -2790,13 +2603,15 @@ if (this.wantsToJump) {
             });
             document.getElementById('theme-btn').addEventListener('click', toggleTheme);
             document.getElementById('tp-mode-btn').addEventListener('click', toggleTeleportMode);
-            
-            // v45.6 FPS Toggle
             document.getElementById('fps-btn').addEventListener('click', () => {
                 showFPS = !showFPS;
                 document.getElementById('fps-btn').innerText = "SHOW FPS: " + (showFPS ? "ON" : "OFF");
                 const disp = document.getElementById('fps-display');
                 disp.style.display = showFPS ? "block" : "none";
+            });
+            document.getElementById('world-btn').addEventListener('click', () => {
+                const next = WorldManager.current.name === 'ARENA' ? 'TITAN' : 'ARENA';
+                WorldManager.switch(next);
             });
 
             scene = new THREE.Scene();
@@ -2814,27 +2629,43 @@ if (this.wantsToJump) {
             renderer.toneMappingExposure = 1.0;
             document.body.appendChild(renderer.domElement);
 
-            // Generate Textures
             textures.gridDefault = createGridTexture('default');
             textures.gridSnow = createGridTexture('snow');
             textures.gridNeon = createGridTexture('neon');
             textures.solid = createGridTexture('solid');
             textures.glow = createGlowTexture();
             
-            // v45.6 Shared Geometries
             sharedSnowGeo = new THREE.PlaneGeometry(0.1, 0.1);
-            sharedLeafGeo = new THREE.PlaneGeometry(0.3, 0.3); // Replaces random size with avg size for efficiency
+            sharedLeafGeo = new THREE.PlaneGeometry(0.3, 0.3); 
+
+            // Initialize Materials
+            materials.floor = new THREE.MeshPhysicalMaterial({ 
+                map: textures.gridDefault, color: 0xffffff, roughness: 0.5, metalness: 0.1 
+            });
+            materials.wall = new THREE.MeshPhysicalMaterial({ 
+                color: 0xeeeeee, roughness: 0.2, metalness: 0.1 
+            });
+            materials.obstacle = new THREE.MeshPhysicalMaterial({ 
+                color: 0xcccccc, roughness: 0.3, clearcoat: 0.5, clearcoatRoughness: 0.1
+            });
+            materials.slash = new THREE.MeshBasicMaterial({ color: 0x0088ff, transparent: true, opacity: 0, side: THREE.DoubleSide, depthTest: false });
+            materials.marker = new THREE.MeshStandardMaterial({ 
+                color: 0x0088ff, emissive: 0x0088ff, emissiveIntensity: 2.0, transparent: true, opacity: 0.9, roughness: 0.2, metalness: 0.8, wireframe: true 
+            });
+            materials.markerCore = new THREE.MeshBasicMaterial({
+                color: 0x0088ff, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending
+            });
 
             setupLighting();
-            createLevel();
-            // buildStaticWallBounds(); // v45.8 Removed in favor of SpatialHash
+            
+            // Build Worlds & Load Normal Map
+            WorldManager.init();
+            WorldManager.switch('ARENA');
+            
             createSlashEffect(); 
             createTeleportMarker();
-            
             InputManager.init();
             player.init();
-
-            // v46.9.1 New Start Screen Stats
             renderStatsContent();
 
             window.addEventListener('resize', onWindowResize);
@@ -2844,33 +2675,24 @@ if (this.wantsToJump) {
                 const screen = document.getElementById('start-screen');
                 
                 if (isLocked) {
-                    // --- RESUME GAME ---
                     screen.style.display = 'none';
-                    
-                    // Calculate Break Time
                     if (breakStartTime > 0) {
                         totalBreakTime += (performance.now() - breakStartTime);
-                        // Increment break count (unless it's the very first start)
                         if (bankedActiveTime > 0) breakCount++;
                         breakStartTime = 0;
                     }
                     segmentStartTime = performance.now();
-
                     if(player.isDead) resetGame();
                 } else {
-                    // --- PAUSE GAME ---
                     lastUnlockTime = performance.now();
                     screen.style.display = 'flex';
                     AudioSys.stopAll();
-                    
-                    // Bank the Active Time
                     if (segmentStartTime > 0) {
                         lastSegmentDuration = performance.now() - segmentStartTime;
                         bankedActiveTime += lastSegmentDuration;
                         segmentStartTime = 0;
                     }
                     breakStartTime = performance.now();
-                    
                     updatePauseScreenStats();
                     InputManager.mouseDown = false; 
                 }
@@ -2888,32 +2710,23 @@ if (this.wantsToJump) {
         }
 
         function generatePlayerTitle() {
-            // v45.6.11 New Matrix System
             const m = GameStats.moves;
             const c = GameStats.highestCombo;
             const totalStyle = m.slideHit + m.midAirHit + m.teleportHit + m.wallJumpHit + m.longAirHit;
             
-            // 1. Determine Archetype
             let archetype = "HYBRID";
             let maxStat = 0;
-            
             if (m.slideHit > maxStat) { maxStat = m.slideHit; archetype = "SLIDER"; }
             if (m.midAirHit + m.longAirHit > maxStat) { maxStat = m.midAirHit + m.longAirHit; archetype = "AVIATOR"; }
             if (m.wallJumpHit > maxStat) { maxStat = m.wallJumpHit; archetype = "TRACEUR"; }
             if (m.teleportHit > maxStat) { maxStat = m.teleportHit; archetype = "SHIFTER"; }
-            
-            // Check Hybrid: If highest stat is less than 40% of total, it's a mix
             if (totalStyle > 0 && maxStat / totalStyle < 0.4) archetype = "HYBRID";
 
-            // 2. Determine Rank Index (0-9) based on Total Style Score + Kills (v45.7.1)
-            // Scale: 0 to 500 points. Kills are worth 10 style points for ranking purposes.
             const prestigeScore = totalStyle + (GameStats.botKills * 10);
             let rankIndex = Math.floor(prestigeScore / 50); 
             if (rankIndex > 9) rankIndex = 9;
-            
             const styleTitle = STYLE_ARCHETYPES[archetype][rankIndex] || "NOVICE";
 
-            // 3. Determine Combo Prefix
             let comboTitle = "";
             for (let i = COMBO_TITLES_MATRIX.length - 1; i >= 0; i--) {
                 if (c >= COMBO_TITLES_MATRIX[i].c) {
@@ -2921,13 +2734,10 @@ if (this.wantsToJump) {
                     break;
                 }
             }
-
             return (comboTitle ? comboTitle + " " : "") + styleTitle;
         }
 
-        // 1. NEW: pure layout renderer. Can be called anytime.
         function renderStatsContent() {
-            // --- A. Generate Achievement Tags ---
             const rawList = GameStats.persistentAchievements;
             const filteredList = [];
             const typeCounts = {};
@@ -2950,25 +2760,18 @@ if (this.wantsToJump) {
                     `</div>`;
             }
 
-            // --- B. Inject Session Stats (Left Column) ---
             const statSession = document.getElementById('stat-session');
             if (statSession) {
                 statSession.innerHTML = `
-                    <!-- Score/Combo Wrapper -->
                     <div style="flex: 0 0 auto; margin-bottom: 2px;">
                         <strong>SCORE:</strong> ${player.score}<br>
                         <strong>MAX COMBO:</strong> ${GameStats.highestCombo}
                     </div>
-                    
-                    <!-- Label -->
                     <div style="flex: 0 0 auto; margin-bottom: 2px;"><strong>ACHIEVEMENTS:</strong></div>
-                    
-                    <!-- The List -->
                     ${achHtml}
                 `;
             }
 
-            // --- C. Inject Style Matrix (Right Column) ---
             const statMoves = document.getElementById('stat-moves');
             if (statMoves) {
                 let movesHtml = `<strong>KILLS:</strong> ${GameStats.botKills}<br>`;
@@ -2982,13 +2785,11 @@ if (this.wantsToJump) {
             }
         }
 
-        // 2. UPDATED: Handles Menu State (Title, Timer, Colors)
         function updatePauseScreenStats() {
             const h1 = document.getElementById('game-title');
             const timerDisplay = document.getElementById('session-timer');
             const playerTitleDisplay = document.getElementById('player-title-display');
             
-            // --- Title Logic ---
             if(player.isDead) {
                 let termStatus = "DISCONNECTED";
                 let color = "#ff3333";
@@ -3015,7 +2816,6 @@ if (this.wantsToJump) {
                 timerDisplay.style.display = "block";
             }
 
-            // --- Timer Logic ---
             const format = (ms) => {
                 const totalSec = Math.floor(ms / 1000);
                 const m = Math.floor(totalSec / 60).toString().padStart(2, '0');
@@ -3037,8 +2837,6 @@ if (this.wantsToJump) {
             
             timerDisplay.setAttribute('data-details', tooltip);
             timerDisplay.classList.add('session-info');
-
-            // --- RENDER CONTENT ---
             renderStatsContent(); 
         }
 
@@ -3087,11 +2885,9 @@ if (this.wantsToJump) {
             const crosshair = document.getElementById('crosshair');
             const names = ["LIGHT", "DARK", "NEON", "HALLOWEEN"];
             
-            // v45.6.2 Updated Theme Text
             document.getElementById('theme-btn').innerText = "THEME: " + names[currentTheme];
             document.getElementById('mode-display').innerText = names[currentTheme] + " | 'T' TO CYCLE";
 
-            // Reset common props
             materials.floor.roughness = 0.5;
             materials.floor.metalness = 0.1;
             materials.floor.emissiveIntensity = 0;
@@ -3102,20 +2898,21 @@ if (this.wantsToJump) {
             if (currentTheme === 0) { // LIGHT (SNOW)
                 const bgCol = 0x667788; 
                 scene.background = new THREE.Color(bgCol);
-                scene.fog = new THREE.FogExp2(bgCol, 0.008); 
+                // Respect World Fog Density
+                scene.fog = new THREE.FogExp2(bgCol, WorldManager.current ? WorldManager.current.config.fog : 0.008); 
                 body.style.backgroundColor = "#667788";
                 ui.classList.add('light-theme');
                 
                 materials.floor.map = textures.gridSnow;
-                materials.floor.map.repeat.set(400/64, 400/64); 
+                // Adjust UVs based on world scale? For now stick to generic
+                materials.floor.map.repeat.set(100, 100); 
                 materials.floor.color.setHex(0x556677); 
                 materials.floor.roughness = 0.9;
-                
                 materials.wall.color.setHex(0xdddddd);
                 materials.wall.roughness = 0.5;
                 
                 currentSlashColor = 0x0088ff;
-                materials.marker.color.setHex(0x003366); // Darker blue for visibility on white
+                materials.marker.color.setHex(0x003366); 
                 crosshair.style.color = "#0088ff";
                 
                 ambientLight.intensity = 0.6; 
@@ -3126,20 +2923,18 @@ if (this.wantsToJump) {
             } else {
                 ui.classList.remove('light-theme');
                 
-                if (currentTheme === 1) { // DARK (GLOSSY COLD) v45.3
-                    // Colder, dark background (Visible Blue-Grey)
+                if (currentTheme === 1) { // DARK
                     const bgCol = 0x20242a; 
                     scene.background = new THREE.Color(bgCol);
-                    scene.fog = new THREE.FogExp2(bgCol, 0.007); // v45.3 Reduced fog density for better visibility
+                    scene.fog = new THREE.FogExp2(bgCol, WorldManager.current ? WorldManager.current.config.fog : 0.007);
                     body.style.backgroundColor = "#20242a";
                     
-                    // Glossy solid texture, no grid
                     materials.floor.map = textures.solid;
-                    materials.floor.color.setHex(0x1a1e26); // v45.3 Darker Slate Floor
-                    materials.floor.roughness = 0.4; // v45.3 Glossy Reflection
+                    materials.floor.color.setHex(0x1a1e26); 
+                    materials.floor.roughness = 0.4; 
                     materials.floor.metalness = 0.1;
                     
-                    materials.wall.color.setHex(0x3b4252); // Blue-grey walls
+                    materials.wall.color.setHex(0x3b4252); 
                     materials.wall.roughness = 1.0;
                     materials.wall.metalness = 0.0;
                     
@@ -3147,23 +2942,21 @@ if (this.wantsToJump) {
                     materials.marker.color.setHex(0xff8800);
                     crosshair.style.color = "#ffaa00";
                     
-                    // v45.3 Brighter lighting (+20%)
                     ambientLight.intensity = 2.2; 
                     hemiLight.intensity = 1.2;
                     dirLight.intensity = 1.5;
-                    dirLight.color.setHex(0xddddff); // Cold light
+                    dirLight.color.setHex(0xddddff); 
 
-                } else if (currentTheme === 2) { // NEON (Classic v44)
+                } else if (currentTheme === 2) { // NEON
                     const bgCol = 0x050505;
                     scene.background = new THREE.Color(bgCol);
-                    scene.fog = new THREE.FogExp2(bgCol, 0.007); // v45.3 Reduced fog density
+                    scene.fog = new THREE.FogExp2(bgCol, WorldManager.current ? WorldManager.current.config.fog : 0.007);
                     body.style.backgroundColor = "#050505";
                     
-                    // Neon Theme uses Default Grid (Grey)
                     materials.floor.map = textures.gridDefault;
-                    materials.floor.map.repeat.set(400/32, 400/32);
+                    materials.floor.map.repeat.set(100, 100);
                     materials.floor.color.setHex(0x444444);
-                    materials.floor.roughness = 0.5; // Ensure glossiness
+                    materials.floor.roughness = 0.5; 
                     
                     materials.wall.color.setHex(0x001122); 
                     
@@ -3171,33 +2964,29 @@ if (this.wantsToJump) {
                     materials.marker.color.setHex(0x00ffff);
                     crosshair.style.color = "#00ffff";
                     
-                    // v45.3 Brighter lighting (+20%)
                     ambientLight.intensity = 1.2;
                     hemiLight.intensity = 0.8;
                     dirLight.intensity = 1.2;
                     dirLight.color.setHex(0x00ffff);
 
-                } else { // HALLOWEEN v45.3 (NEUTRAL/BRIGHT/GLOSSY)
-                    // Brighter Background (Brown/Orange)
+                } else { // HALLOWEEN
                     const bgCol = 0x663311;
                     scene.background = new THREE.Color(bgCol); 
-                    scene.fog = new THREE.FogExp2(bgCol, 0.008);
+                    scene.fog = new THREE.FogExp2(bgCol, WorldManager.current ? WorldManager.current.config.fog : 0.008);
                     body.style.backgroundColor = "#663311";
                     
-                    // Fix: Use SOLID texture, no grid
                     materials.floor.map = textures.solid;
-                    materials.floor.color.setHex(0x3d1f00); // v45.3 Deepened Dark Brown (Contrast against wall)
-                    materials.floor.roughness = 0.4; // v45.3 Glossy Reflection
+                    materials.floor.color.setHex(0x3d1f00); 
+                    materials.floor.roughness = 0.4; 
                     materials.floor.metalness = 0.1;
                     
-                    materials.wall.color.setHex(0x7a3e00); // Lighter orange-brown
+                    materials.wall.color.setHex(0x7a3e00); 
                     materials.wall.roughness = 1.0;
                     
                     currentSlashColor = 0xff8800; 
                     materials.marker.color.setHex(0xff4400);
                     crosshair.style.color = "#ff8800";
                     
-                    // Significantly brighter lighting
                     ambientLight.intensity = 2.0; 
                     hemiLight.intensity = 1.2;
                     dirLight.intensity = 1.5;
@@ -3207,195 +2996,21 @@ if (this.wantsToJump) {
             
             if(materials.slash) materials.slash.color.setHex(currentSlashColor);
             
-            // Update decorations and enemies for theme specific styles
             decorations.forEach(d => d.updateTheme(currentTheme));
             enemies.forEach(e => e.updateTheme(currentTheme));
         }
 
-        // --- LEVEL GENERATION ---
-        function createLevel() {
-            // PBR Materials
-            materials.floor = new THREE.MeshPhysicalMaterial({ 
-                map: textures.gridDefault, 
-                color: 0xffffff, 
-                roughness: 0.5,
-                metalness: 0.1 
-            });
-            
-            materials.wall = new THREE.MeshPhysicalMaterial({ 
-                color: 0xeeeeee, 
-                roughness: 0.2, 
-                metalness: 0.1 
-            });
-            
-            materials.obstacle = new THREE.MeshPhysicalMaterial({ 
-                color: 0xcccccc, 
-                roughness: 0.3,
-                clearcoat: 0.5,
-                clearcoatRoughness: 0.1
-            });
-            
-            materials.slash = new THREE.MeshBasicMaterial({ color: 0x0088ff, transparent: true, opacity: 0, side: THREE.DoubleSide, depthTest: false });
-            materials.marker = new THREE.MeshStandardMaterial({ 
-                color: 0x0088ff, 
-                emissive: 0x0088ff,
-                emissiveIntensity: 2.0,
-                transparent: true, 
-                opacity: 0.9,
-                roughness: 0.2,
-                metalness: 0.8,
-                wireframe: true // Revert to wireframe look
-            });
-            materials.markerCore = new THREE.MeshBasicMaterial({
-                color: 0x0088ff,
-                transparent: true,
-                opacity: 0.3,
-                blending: THREE.AdditiveBlending
-            });
-
-            createBox(0, -1, 0, 400, 2, 400, materials.floor, true);
-            createBox(0, 50, -200, 400, 100, 2, materials.wall, false, true);
-            createBox(0, 50, 200, 400, 100, 2, materials.wall, false, true);
-            createBox(-200, 50, 0, 2, 100, 400, materials.wall, false, true);
-            createBox(200, 50, 0, 2, 100, 400, materials.wall, false, true);
-            
-            // v45.6.1 Procedural Generation with Collision Check & Variety
-            const obstacleBounds = []; // Store {x, z, r}
-            
-            function spawnDecorations(count, minScale, maxScale, rangeX, rangeZ) {
-                for(let i=0; i<count; i++) {
-                    let attempts = 0;
-                    let valid = false;
-                    let x, z, scale;
-                    
-                    while(!valid && attempts < 20) {
-                        attempts++;
-                        x = (Math.random() - 0.5) * rangeX;
-                        z = (Math.random() - 0.5) * rangeZ;
-                        
-                        // Prevent spawn on center (spawn area)
-                        if(Math.abs(x) < 25 && Math.abs(z) < 25) continue;
-                        
-                        scale = minScale + Math.random() * (maxScale - minScale);
-                        const radius = scale * 1.5; 
-                        
-                        valid = true;
-                        for(const b of obstacleBounds) {
-                            const dist = Math.hypot(x - b.x, z - b.z);
-                            // Ensure objects don't clip. Add buffer.
-                            if(dist < (radius + b.r) + 2) { 
-                                valid = false; 
-                                break; 
-                            }
-                        }
-                        
-                        if(valid) {
-                            decorations.push(new Decoration(x, z, scale));
-                            obstacleBounds.push({x: x, z: z, r: radius});
-                        }
-                    }
-                }
-            }
-            
-            // Small/Scatter
-            spawnDecorations(25, 2, 7, 300, 300);
-            
-            // Medium (New Request v45.6.1)
-            spawnDecorations(8, 10, 20, 340, 340);
-            
-            // Large
-            spawnDecorations(4, 25, 45, 360, 360);
-            
-            // Massive
-            spawnDecorations(1, 60, 80, 300, 300);
-            
-            // v46.0 Create Portals
-            createPortals();
-        }
-        
-        function createPortals() {
-            // Colors for pairs
-            const colors = [0x00ffff, 0xffaa00, 0xaa00ff, 0x00ff00];
-            
-            // Create 4 pairs
-            const portalLocs = [];
-            for(let i=0; i<8; i++) {
-                let x, z;
-                // Find random spot near ground
-                do {
-                    x = (Math.random()-0.5)*300;
-                    z = (Math.random()-0.5)*300;
-                } while(Math.abs(x) < 30 && Math.abs(z) < 30);
-                
-                const y = getGroundHeight(x, z);
-                portalLocs.push({x, y, z});
-            }
-            
-            for(let i=0; i<4; i++) {
-                const c = colors[i];
-                const p1 = new Portal(portalLocs[i*2].x, portalLocs[i*2].y, portalLocs[i*2].z, c);
-                const p2 = new Portal(portalLocs[i*2+1].x, portalLocs[i*2+1].y, portalLocs[i*2+1].z, c);
-                p1.target = p2; p2.target = p1;
-                portals.push(p1, p2);
-            }
-        }
-
-        function createBox(x, y, z, w, h, d, mat, isFloor=false, isWall=false) {
-            const geo = new THREE.BoxGeometry(w, h, d);
-            const mesh = new THREE.Mesh(geo, mat);
-            mesh.position.set(x, y, z);
-            mesh.castShadow = true;
-            mesh.receiveShadow = true;
-            
-            // v46.4 Tag Floor
-            mesh.userData.isFloor = isFloor;
-            
-            if (isWall || !isFloor) {
-                 const edges = new THREE.EdgesGeometry(geo);
-                 const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.05 }));
-                 mesh.add(line);
-            }
-
-            scene.add(mesh);
-            mesh.geometry.computeBoundingBox();
-            
-            // v46.2: Universal Collision Registration
-            mesh.updateMatrixWorld(true);
-            const box = mesh.geometry.boundingBox.clone();
-            box.applyMatrix4(mesh.matrixWorld);
-            
-            spatialGrid.insert(mesh, box);
-            
-            worldObjects.push(mesh); // Add everything to worldObjects for gadgets/projectiles
-            
-            // v46.4 Fix spawning
-            if (isFloor || !isWall) groundObjects.push(mesh);
-
-            if (!isFloor) {
-                walls.push(mesh); // Walls array used for AI Vision and Wall Jump Detection
-            }
-            return mesh;
-        }
-
         const GIFT_PALETTES = [
-            { box: 0xcc0000, ribbon: 0xffd700 }, // Red/Gold
-            { box: 0x006400, ribbon: 0xcc0000 }, // Green/Red
-            { box: 0x0044aa, ribbon: 0xc0c0c0 }, // Blue/Silver
-            { box: 0xffffff, ribbon: 0xcc0000 }, // White/Red
-            { box: 0x663399, ribbon: 0xffd700 }  // Purple/Gold
+            { box: 0xcc0000, ribbon: 0xffd700 }, 
+            { box: 0x006400, ribbon: 0xcc0000 }, 
+            { box: 0x0044aa, ribbon: 0xc0c0c0 }, 
+            { box: 0xffffff, ribbon: 0xcc0000 }, 
+            { box: 0x663399, ribbon: 0xffd700 }  
         ];
-        
-        // Warm earth tones for Dark theme accents
-        const WARM_PALETTES = [
-             0x8B4513, // SaddleBrown
-             0xA0522D, // Sienna
-             0xCD853F, // Peru
-             0xD2691E, // Chocolate
-             0xBC8F8F  // RosyBrown
-        ];
+        const WARM_PALETTES = [0x8B4513, 0xA0522D, 0xCD853F, 0xD2691E, 0xBC8F8F];
 
         class Decoration {
-            constructor(x, z, scale) {
+            constructor(x, z, scale, ws = null) {
                 this.scale = scale;
                 const size = 2;
                 this.palette = GIFT_PALETTES[Math.floor(Math.random() * GIFT_PALETTES.length)];
@@ -3407,14 +3022,20 @@ if (this.wantsToJump) {
                 this.colliderMesh.position.set(x, scale, z);
                 this.colliderMesh.scale.setScalar(scale);
                 this.colliderMesh.geometry.computeBoundingBox();
-                walls.push(this.colliderMesh);
-                scene.add(this.colliderMesh);
                 
-                // v45.8 Spatial Grid
+                if (ws) {
+                    ws.walls.push(this.colliderMesh);
+                    ws.group.add(this.colliderMesh);
+                } else {
+                    walls.push(this.colliderMesh);
+                    scene.add(this.colliderMesh);
+                }
+                
                 this.colliderMesh.updateMatrixWorld(true);
                 const box = this.colliderMesh.geometry.boundingBox.clone();
                 box.applyMatrix4(this.colliderMesh.matrixWorld);
-                spatialGrid.insert(this.colliderMesh, box);
+                if (ws) ws.spatialGrid.insert(this.colliderMesh, box);
+                else spatialGrid.insert(this.colliderMesh, box);
 
                 const visualGeo = new THREE.BoxGeometry(size, size, size);
                 this.mat = materials.obstacle.clone();
@@ -3425,15 +3046,22 @@ if (this.wantsToJump) {
                 this.visualMesh.scale.setScalar(scale);
                 
                 this.visualMesh.updateMatrixWorld();
-                worldObjects.push(this.visualMesh);
-                groundObjects.push(this.visualMesh); // v46.4
+                if (ws) {
+                    ws.worldObjects.push(this.visualMesh);
+                    ws.groundObjects.push(this.visualMesh);
+                    ws.decorations.push(this);
+                    ws.group.add(this.visualMesh);
+                } else {
+                    worldObjects.push(this.visualMesh);
+                    groundObjects.push(this.visualMesh);
+                    decorations.push(this);
+                    scene.add(this.visualMesh);
+                }
                 
-                // Tech Wireframe Overlay
                 const edges = new THREE.EdgesGeometry(visualGeo);
                 this.edges = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.15 }));
                 this.visualMesh.add(this.edges);
 
-                // HALLOWEEN FACES
                 this.faceGroup = new THREE.Group();
                 const faceMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
                 const eyeGeo = new THREE.ConeGeometry(0.3, 0.1, 3);
@@ -3454,7 +3082,6 @@ if (this.wantsToJump) {
                 this.faceGroup.add(this.stem);
                 this.visualMesh.add(this.faceGroup);
 
-                // GIFT BOX RIBBONS
                 this.ribbonGroup = new THREE.Group();
                 this.ribbonMat = new THREE.MeshBasicMaterial({ color: this.palette.ribbon });
                 const r1Geo = new THREE.BoxGeometry(2.05, 2.05, 0.4); 
@@ -3467,12 +3094,9 @@ if (this.wantsToJump) {
                 this.ribbonGroup.add(r1); this.ribbonGroup.add(r2); this.ribbonGroup.add(bow);
                 this.ribbonGroup.visible = false;
                 this.visualMesh.add(this.ribbonGroup);
-                
-                scene.add(this.visualMesh);
             }
 
             updateTheme(t) {
-                // Reset common props
                 this.mat.color.setHex(0xcccccc);
                 this.mat.emissive.setHex(0x000000);
                 this.mat.wireframe = false;
@@ -3482,32 +3106,29 @@ if (this.wantsToJump) {
                 this.edges.material.opacity = 0.1;
                 this.edges.material.color.setHex(0xffffff);
                 this.edges.material.linewidth = 1;
-                this.visualMesh.rotation.y = 0; // Reset rotation
+                this.visualMesh.rotation.y = 0; 
 
                 if (t === 3) { // Halloween
-                    // More Orange/Red, less green (v45.2)
                     const r = 0.9 + Math.random()*0.1; 
-                    const g = 0.05 + Math.random()*0.15; // Low G for Red/Orange
+                    const g = 0.05 + Math.random()*0.15; 
                     this.mat.color.setRGB(r, g, 0); 
                     this.mat.emissive = new THREE.Color(r*0.1, g*0.1, 0);
                     this.faceGroup.visible = true;
                     this.edges.visible = false;
-                    // Fix - v46.6.4: Rotate the Face Group instead of the Visual Mesh. 
-                    // Rotating the mesh causes slight AABB misalignment triggering the roof snap bug.
                     this.faceGroup.rotation.y = (Math.PI / 2) * Math.floor(Math.random() * 4);
-                } else if (t === 0) { // Light (Gifts)
+                } else if (t === 0) { // Light
                     this.mat.color.setHex(this.palette.box);
                     this.ribbonMat.color.setHex(this.palette.ribbon);
                     this.ribbonGroup.visible = true;
                     this.edges.material.color.setHex(0x000000);
                 } else {
-                    if(t === 1) { // Dark (Warm Matte Accents)
+                    if(t === 1) { 
                          this.mat.color.setHex(this.warmColor);
                          this.mat.emissive.setHex(0x000000);
-                         this.edges.visible = false; // Smooth look
+                         this.edges.visible = false; 
                     }
-                    if(t === 2) { // Neon (Uses Grey Grid, Dark Look)
-                         this.mat.color.setHex(0x001122); // Dark Blueish
+                    if(t === 2) { 
+                         this.mat.color.setHex(0x001122); 
                          this.edges.material.color.setHex(0x00ffff); 
                          this.edges.material.opacity = 0.5; 
                     }
@@ -3528,23 +3149,18 @@ if (this.wantsToJump) {
                  if (!isHalloween && !isSnow) return;
             }
             
-            // Wind Logic
             windTimer += dt;
             if (windTimer > 8.0 && !windActive) {
                 windActive = true;
-                // Random wind direction
-                windTarget.set((Math.random()-0.5)*25, 5 + Math.random()*5, (Math.random()-0.5)*25); // Stronger wind (v45.1)
+                windTarget.set((Math.random()-0.5)*25, 5 + Math.random()*5, (Math.random()-0.5)*25); 
             }
             if (windTimer > 12.0 && windActive) {
                 windActive = false;
                 windTarget.set(0,0,0);
                 windTimer = 0;
             }
-
-            // Smoothly interpolate current wind force (v45.1 fix)
             currentWind.lerp(windTarget, dt * 1.0); 
 
-            // v45.4 Increased Snow Limit
             const limit = isSnow ? 600 : 80;
             const spawnRate = isSnow ? 0.8 : 0.1;
 
@@ -3554,7 +3170,6 @@ if (this.wantsToJump) {
                 const pz = camera.position.z + (Math.random()-0.5)*50;
 
                 if (isSnow) {
-                    // v45.6 Reuse Geometry
                     const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
                     mesh = new THREE.Mesh(sharedSnowGeo, mat);
                     mesh.position.set(px, 30, pz);
@@ -3562,7 +3177,6 @@ if (this.wantsToJump) {
                     vel = new THREE.Vector3((Math.random()-0.5)*2, -4 - Math.random()*4, (Math.random()-0.5)*2);
                     type = 'snow';
                 } else {
-                    // v45.6 Reuse Geometry
                     const mat = new THREE.MeshBasicMaterial({ color: Math.random() > 0.5 ? 0xffaa00 : 0x884400, side: THREE.DoubleSide });
                     mesh = new THREE.Mesh(sharedLeafGeo, mat);
                     mesh.position.set(px, 30, pz);
@@ -3583,25 +3197,19 @@ if (this.wantsToJump) {
                     l.mesh.material.opacity = (l.landTimer / 2.0) * 0.8;
                     if (l.landTimer <= 0) {
                         scene.remove(l.mesh);
-                        // v45.6: Only dispose material, reuse global geometry
                         l.mesh.material.dispose();
                         weatherParticles.splice(i, 1);
                     }
                     continue; 
                 }
                 
-                // v45.4 Apply Wind to both Snow and Leaves
                 if (l.type === 'leaf' || l.type === 'snow') {
-                    // Wind adds to velocity
                     l.mesh.position.addScaledVector(currentWind, dt);
-                    
-                    // Add turbulence if wind is strong
                     if(currentWind.lengthSq() > 1) {
                          if (l.type === 'leaf') {
                              l.mesh.rotation.z += dt * 5;
                              l.mesh.rotation.x += dt * 5;
                          } else {
-                             // Snow turbulence
                              l.mesh.position.x += (Math.random()-0.5) * dt * 5;
                          }
                     }
@@ -3626,7 +3234,6 @@ if (this.wantsToJump) {
                         l.vel.set(0,0,0);
                     } else {
                         scene.remove(l.mesh);
-                        // v45.6: Only dispose material, reuse global geometry
                         l.mesh.material.dispose();
                         weatherParticles.splice(i, 1);
                     }
@@ -3665,7 +3272,6 @@ if (this.wantsToJump) {
             }
         }
 
-        // --- VISUALS ---
         function createSlashEffect() {
             const shape = new THREE.Shape();
             shape.moveTo(0, 1.2);
@@ -3691,7 +3297,6 @@ if (this.wantsToJump) {
             let mySlashID = -1;
 
             if(parent === camera) {
-                // v45.9: Recenter slash relative to crosshair
                 mesh.position.set(0.05, 0.05, -2.0); 
                 mesh.rotation.z = -Math.PI / 8; 
                 camera.add(mesh);
@@ -3730,8 +3335,6 @@ if (this.wantsToJump) {
         }
 
         function spawnImpact(pos, color=0xffffff, scale=1.0) {
-            // v45.9 Enhanced Impact Flash
-            // 1. Core Flash (Bright White Center)
             const matCore = new THREE.SpriteMaterial({ map: textures.glow, color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending });
             const core = new THREE.Sprite(matCore);
             core.position.copy(pos);
@@ -3739,7 +3342,6 @@ if (this.wantsToJump) {
             scene.add(core);
             particles.push({ mesh: core, life: 0.1, maxLife: 0.1, type: 'flash', scaleStart: scale, scaleEnd: scale * 0.5 });
 
-            // 2. Glow Halo (Color Tint)
             const matGlow = new THREE.SpriteMaterial({ map: textures.glow, color: color, transparent: true, blending: THREE.AdditiveBlending, opacity: 0.8 });
             const glow = new THREE.Sprite(matGlow);
             glow.position.copy(pos);
@@ -3749,7 +3351,6 @@ if (this.wantsToJump) {
         }
 
         function spawnParticles(pos, col, count, speed=1.0) {
-            // v45.9 Enhanced Sparks
             for(let i=0; i<count; i++) {
                 const mat = new THREE.SpriteMaterial({ 
                     map: textures.glow, 
@@ -3763,7 +3364,6 @@ if (this.wantsToJump) {
                 m.position.copy(pos);
                 scene.add(m);
                 
-                // Directional spray (cone-ish)
                 const vel = new THREE.Vector3(
                     (Math.random()-0.5), 
                     (Math.random()-0.5), 
@@ -3781,40 +3381,26 @@ if (this.wantsToJump) {
         }
 
         function spawnRipple(pos, normal, baseColor=0x00ffff) {
-            // v45.7.8 Multi-layer Ripple Visuals
             const layers = 3;
             const colorObj = new THREE.Color(baseColor);
             
             for(let i=0; i<layers; i++) {
-                // Vary scale or color per layer
                 let layerColor = colorObj.clone();
-                if(i===1) layerColor.lerp(new THREE.Color(0xffffff), 0.6); // Inner layer is whiter/brighter
-                if(i===2) layerColor.lerp(new THREE.Color(0x000088), 0.4); // Outer layer is deeper blue
+                if(i===1) layerColor.lerp(new THREE.Color(0xffffff), 0.6); 
+                if(i===2) layerColor.lerp(new THREE.Color(0x000088), 0.4); 
                 
                 const geo = new THREE.RingGeometry(0.5, 0.8 + (i*0.1), 32); 
                 const mat = new THREE.MeshBasicMaterial({ 
-                    color: layerColor, 
-                    transparent: true, 
-                    opacity: 0.8, 
-                    side: THREE.DoubleSide, 
-                    depthWrite: false,
-                    blending: THREE.AdditiveBlending
+                    color: layerColor, transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending
                 });
                 
                 const mesh = new THREE.Mesh(geo, mat);
-                // Offset layers slightly along normal to prevent z-fighting
                 mesh.position.copy(pos).addScaledVector(normal, 0.05 + (i * 0.2)); 
                 mesh.lookAt(pos.clone().add(normal)); 
                 
                 scene.add(mesh);
-                
                 particles.push({
-                    mesh: mesh,
-                    vel: new THREE.Vector3(0,0,0),
-                    life: 0.8, // v45.7.8 Increased duration (was 0.4)
-                    maxLife: 0.8,
-                    isStatic: false,
-                    type: 'ripple'
+                    mesh: mesh, vel: new THREE.Vector3(0,0,0), life: 0.8, maxLife: 0.8, isStatic: false, type: 'ripple'
                 });
             }
         }
@@ -3830,66 +3416,39 @@ if (this.wantsToJump) {
             if(teleportMarker) {
                 scene.remove(teleportMarker);
             }
-
             teleportMarker = new THREE.Group();
-            
-            // v45.7.2c: Simplified Marker (Single Material, Fading)
-            // We use materials.marker directly but will modulate it in the loop.
-            // Ensure materials.marker starts with transparent: true
             materials.marker.transparent = true;
-
-            // 1. Diamond Group (Outer)
             const diamondGroup = new THREE.Group();
             diamondGroup.position.y = 1.5;
             teleportMarker.add(diamondGroup);
-
-            // Layer 1: Main (Light)
             const geo = new THREE.OctahedronGeometry(0.8, 0);
             const diamond = new THREE.Mesh(geo, materials.marker);
             diamondGroup.add(diamond);
-            
-            // Layer 2: Thickener (Light, slightly larger)
             const thickGeo = new THREE.OctahedronGeometry(0.805, 0);
             const thickDiamond = new THREE.Mesh(thickGeo, materials.marker);
             diamondGroup.add(thickDiamond);
-
-            // 2. Ring Group
             const ringGroup = new THREE.Group();
             ringGroup.position.y = 0.1;
             teleportMarker.add(ringGroup);
-
             const ringBaseGeo = new THREE.RingGeometry(0.8, 1.0, 32); 
-            // Reuse same material but need double side for ring
             const ringMat = materials.marker.clone();
             ringMat.side = THREE.DoubleSide;
-            
-            // Ring Layer 1: Main
             const ring = new THREE.Mesh(ringBaseGeo, ringMat);
             ring.rotation.x = -Math.PI / 2;
             ringGroup.add(ring);
-            
-            // Ring Layer 2: Duplicate (Slightly larger)
             const ring2 = new THREE.Mesh(ringBaseGeo, ringMat);
             ring2.rotation.x = -Math.PI / 2;
             ring2.scale.setScalar(1.01); 
             ringGroup.add(ring2);
-
-            teleportMarker.userData = { 
-                diamond: diamondGroup, 
-                ring: ringGroup,
-                ringMat: ringMat // Store to update opacity/color in sync
-            };
-            
+            teleportMarker.userData = { diamond: diamondGroup, ring: ringGroup, ringMat: ringMat };
             teleportMarker.visible = false;
             scene.add(teleportMarker);
         }
 
         function getGroundHeight(x, z) {
             const rayOrigin = new THREE.Vector3(x, 200, z);
-            // v45.6 Reuse global raycaster to avoid GC
             globalRaycaster.set(rayOrigin, new THREE.Vector3(0, -1, 0));
             globalRaycaster.far = 250;
-            // v46.4: Use groundObjects (Floor+Obstacles only) to avoid spawning on top of invisible boundary walls
             const intersects = globalRaycaster.intersectObjects(groundObjects);
             if (intersects.length > 0) {
                 return intersects[0].point.y;
@@ -3898,31 +3457,20 @@ if (this.wantsToJump) {
         }
         
         function snapToFloor(pos) {
-            // v46.6 Redux: Floor Anchor
-            // Prevents teleporting into the void by forcing a Y-coordinate snap if valid ground is nearby.
             const origin = pos.clone();
             origin.y += 1.0; 
-            
             globalRaycaster.set(origin, new THREE.Vector3(0, -1, 0));
             globalRaycaster.far = 6.0; 
-            
             const hits = globalRaycaster.intersectObjects(groundObjects);
             if(hits.length > 0) {
-                // If we found a floor, align feet to it
-                // Player Y (Camera) = Floor + 1.6
                 pos.y = hits[0].point.y + 1.6;
             }
         }
 
-        // --- GAME LOGIC ---
         function getTeleportTarget() {
-            // v45.6 Reuse global raycaster
             globalRaycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
             globalRaycaster.far = CONFIG.teleportRange;
-            
-            // Aimed Marker & Instant TP logic is identical: Target only World Objects (walls/floors), ignore enemies
             const intersects = globalRaycaster.intersectObjects(worldObjects);
-            
             if (intersects.length > 0) {
                 return { point: intersects[0].point, hit: true, normal: intersects[0].face.normal };
             } else {
@@ -3940,23 +3488,19 @@ if (this.wantsToJump) {
                   camera.getWorldDirection(forward);
                   forward.y=0; forward.normalize();
              }
-             
              if(player.onGround) {
                  player.airTimeStart = performance.now();
                  spawnRipple(camera.position.clone().add(new THREE.Vector3(0,-1.5,0)), new THREE.Vector3(0,1,0), 0x00ffff);
              } else {
                  spawnRipple(camera.position.clone().add(new THREE.Vector3(0,-1.5,0)), new THREE.Vector3(0,1,0), 0x00ffaa);
              }
-             
              player.onGround = false;
              player.lastJumpTime = performance.now(); 
              AudioSys.playJump();
         }
         
         function performWallJump() {
-            // v46.5 Added Cooldown to prevent machine-gunning multi-triggering
             if (performance.now() - player.lastWallJumpTime < 300) return false;
-
             globalRaycaster.far = 1.5;
             const dirs = [
                 new THREE.Vector3(1,0,0), new THREE.Vector3(-1,0,0),
@@ -3964,29 +3508,21 @@ if (this.wantsToJump) {
             ];
             let hitWall = false;
             let wallNormal = new THREE.Vector3(0,1,0); 
-            
             for(let d of dirs) {
                 d.applyQuaternion(camera.quaternion);
                 globalRaycaster.set(camera.position, d);
                 const intersects = globalRaycaster.intersectObjects(walls);
                 if(intersects.length > 0) {
                     hitWall = true;
-                    // Wall Jump kicks off the wall
-                    // v45.7.9 Preserve Momentum (Bounce Physics)
                     const force = Math.max(CONFIG.wallPushForce, (player.wallImpactVelocity || 0) * 0.9);
-                    
                     player.velocity.addScaledVector(d, -force);
-                    
                     if (intersects[0].face) wallNormal = intersects[0].face.normal;
-                    // v45.7.7 Wall Ripple
                     spawnRipple(intersects[0].point, wallNormal, 0xffff00);
                     break;
                 }
             }
-            
             if (hitWall) {
                 player.velocity.y = CONFIG.wallJumpForce;
-                // v45.7.3: Wall bounces are free (do not consume jumps)
                 player.onGround = false;
                 player.lastJumpTime = performance.now();
                 player.lastWallJumpTime = performance.now(); 
@@ -3994,99 +3530,6 @@ if (this.wantsToJump) {
                 return true;
             }
             return false;
-        }
-
-function executeTeleport(target, normal) {
-             if (player.energy < CONFIG.teleportCost) {
-                 AudioSys.playMiss();
-                 return;
-             }
-             player.energy -= CONFIG.teleportCost;
-
-             const dest = target.clone();
-
-             // 1. Apply Wall Offset (Push slightly away from surface face)
-             if (normal) {
-                 dest.addScaledVector(normal, 0.8);
-             }
-
-             // 2. FLOOR CLAMP FIX - v46.6.3 (Fixes falling through map at wall bases)
-             // Always calculate where the ground is at the destination.
-             const groundHeight = getGroundHeight(dest.x, dest.z);
-             
-             // If the destination Y (camera level) is lower than standing height, snap it up.
-             // This ensures that even if you aim at the bottom inch of a wall, you spawn standing up.
-             if (dest.y < groundHeight + 1.6) {
-                // v46.6.5 - Fix Top Surface Teleport Snap by adding 0.001 to the landing height
-                 dest.y = groundHeight + 1.601;
-             }
-
-             // 3. CORNER DE-PENETRATION - v46.6.3 (Fixes getting stuck/ejected in corners)
-             // We simulate a collision check at the destination BEFORE committing the move.
-             const tempBox = new THREE.Box3();
-             const halfW = 0.3; // Half of player width
-             
-             // Set box at proposed destination
-             tempBox.min.set(dest.x - halfW, dest.y - 1.6, dest.z - halfW);
-             tempBox.max.set(dest.x + halfW, dest.y + 0.2, dest.z + halfW);
-
-             // Check spatial grid for walls at this specific spot
-             const collisions = spatialGrid.query(tempBox);
-             
-             for(const wall of collisions) {
-                 // Ignore floors (already handled by clamp)
-                 if (wall.mesh.userData.isFloor) continue;
-
-                 if (tempBox.intersectsBox(wall.box)) {
-                     // Calculate overlap depth
-                     const overlapX = Math.min(tempBox.max.x - wall.box.min.x, wall.box.max.x - tempBox.min.x);
-                     const overlapZ = Math.min(tempBox.max.z - wall.box.min.z, wall.box.max.z - tempBox.min.z);
-
-                     // Determine push direction based on wall center vs player center
-                     const wallCenterX = (wall.box.min.x + wall.box.max.x) / 2;
-                     const wallCenterZ = (wall.box.min.z + wall.box.max.z) / 2;
-
-                     // Push out of the shallowest penetration axis
-                     if (overlapX < overlapZ) {
-                         const sign = (dest.x < wallCenterX) ? -1 : 1;
-                         dest.x += (overlapX + 0.05) * sign; // Add small buffer
-                     } else {
-                         const sign = (dest.z < wallCenterZ) ? -1 : 1;
-                         dest.z += (overlapZ + 0.05) * sign;
-                     }
-                     
-                     // Update tempBox for next iteration (in case we pushed into another wall)
-                     tempBox.min.set(dest.x - halfW, dest.y - 1.6, dest.z - halfW);
-                     tempBox.max.set(dest.x + halfW, dest.y + 0.2, dest.z + halfW);
-                 }
-             }
-
-             // --- Standard Teleport Finalization ---
-             const startInAir = !player.onGround;
-             
-             // Check aerial state based on corrected position
-             const finalGround = getGroundHeight(dest.x, dest.z);
-             const endInAir = (dest.y - (finalGround + 1.6)) > 0.5;
-
-             player.lastTeleportWasAerial = startInAir || endInAir;
-             player.hasPhaseStruck = false; 
-
-             spawnParticles(camera.position, 0x00ffaa, 20); 
-             
-             // Commit Position
-             camera.position.copy(dest);
-             
-             player.jumpsRemaining = 1; // Grant 1 jump after teleport
-             player.onGround = false; 
-             
-             if(!startInAir) {
-                 player.airTimeStart = performance.now();
-             }
-             
-             player.lastTeleportTime = performance.now(); 
-             
-             AudioSys.playTeleport();
-             spawnParticles(dest, 0x00ffaa, 30);
         }
 
         function tryAimTeleport() {
@@ -4098,45 +3541,85 @@ function executeTeleport(target, normal) {
         }
 
         function tryInstantTeleport() {
-            // v45.5: Unified logic via helper
             const result = getTeleportTarget();
             executeTeleport(result.point, result.normal);
-            
             document.getElementById('icon-q').classList.add('active');
             setTimeout(() => document.getElementById('icon-q').classList.remove('active'), 200);
+        }
+
+        function executeTeleport(target, normal) {
+             if (player.energy < CONFIG.teleportCost) {
+                 AudioSys.playMiss();
+                 return;
+             }
+             player.energy -= CONFIG.teleportCost;
+             const dest = target.clone();
+             if (normal) {
+                 dest.addScaledVector(normal, 0.8);
+             }
+             const groundHeight = getGroundHeight(dest.x, dest.z);
+             if (dest.y < groundHeight + 1.6) {
+                 dest.y = groundHeight + 1.601;
+             }
+
+             const tempBox = new THREE.Box3();
+             const halfW = 0.3; 
+             
+             tempBox.min.set(dest.x - halfW, dest.y - 1.6, dest.z - halfW);
+             tempBox.max.set(dest.x + halfW, dest.y + 0.2, dest.z + halfW);
+
+             const collisions = spatialGrid.query(tempBox);
+             
+             for(const wall of collisions) {
+                 if (wall.mesh.userData.isFloor) continue;
+                 if (tempBox.intersectsBox(wall.box)) {
+                     const overlapX = Math.min(tempBox.max.x - wall.box.min.x, wall.box.max.x - tempBox.min.x);
+                     const overlapZ = Math.min(tempBox.max.z - wall.box.min.z, wall.box.max.z - tempBox.min.z);
+                     const wallCenterX = (wall.box.min.x + wall.box.max.x) / 2;
+                     const wallCenterZ = (wall.box.min.z + wall.box.max.z) / 2;
+                     if (overlapX < overlapZ) {
+                         const sign = (dest.x < wallCenterX) ? -1 : 1;
+                         dest.x += (overlapX + 0.05) * sign; 
+                     } else {
+                         const sign = (dest.z < wallCenterZ) ? -1 : 1;
+                         dest.z += (overlapZ + 0.05) * sign;
+                     }
+                     tempBox.min.set(dest.x - halfW, dest.y - 1.6, dest.z - halfW);
+                     tempBox.max.set(dest.x + halfW, dest.y + 0.2, dest.z + halfW);
+                 }
+             }
+             const startInAir = !player.onGround;
+             const finalGround = getGroundHeight(dest.x, dest.z);
+             const endInAir = (dest.y - (finalGround + 1.6)) > 0.5;
+
+             player.lastTeleportWasAerial = startInAir || endInAir;
+             player.hasPhaseStruck = false; 
+
+             spawnParticles(camera.position, 0x00ffaa, 20); 
+             camera.position.copy(dest);
+             player.jumpsRemaining = 1; 
+             player.onGround = false; 
+             if(!startInAir) player.airTimeStart = performance.now();
+             player.lastTeleportTime = performance.now(); 
+             AudioSys.playTeleport();
+             spawnParticles(dest, 0x00ffaa, 30);
         }
 
         function updateComboUI() {
             const el = document.getElementById('combo-display');
             const meme = document.getElementById('meme-overlay');
-            
             let memeText = "";
             let isPattern = false;
 
-            // 1. Exact Number Matches (Dictionary) - Triggers Meme Overlay
             if (MEME_TRIGGERS[comboCount]) {
                 memeText = MEME_TRIGGERS[comboCount];
                 showKillMessage(memeText, "achievement", "#00ffff");
             } 
-            
-            // 2. Pattern Recognition - Triggers Visual Style
-            // v45.7.1 Fix: Only apply for 3 digits and up (>= 100)
             if (comboCount >= 100) {
                 const s = comboCount.toString();
-                if (/^(\d)\1+$/.test(s)) {
-                     // All digits are same (333)
-                     isPattern = true;
-                } 
-                else if ("123456789".includes(s)) {
-                    // Progressive (123, 456)
-                    isPattern = true;
-                }
-                else if ("987654321".includes(s)) {
-                    // v45.7.5 Regressive (321) - Verified
-                    isPattern = true;
-                }
+                if (/^(\d)\1+$/.test(s)) isPattern = true;
+                else if ("123456789".includes(s) || "987654321".includes(s)) isPattern = true;
             }
-
             if (memeText) {
                 meme.innerText = memeText;
                 meme.style.display = "block";
@@ -4158,30 +3641,28 @@ function executeTeleport(target, normal) {
             } else {
                 el.style.display = 'block';
                 el.innerText = comboCount + " STRIKES";
-                
-                // v45.6.2 Adjusted Sizes for "STRIKES" text length
-                let fontSize = "1.5rem"; // Reduced from 2rem
+                let fontSize = "1.5rem"; 
                 let color = "#ffcc00";
                 let opacity = "1";
                 let blur = "none";
                 let textShadow = "4px 4px 0px rgba(0,0,0,0.5)";
                 
-                if(comboCount >= 5) fontSize = "3rem"; // Reduced from 4rem
+                if(comboCount >= 5) fontSize = "3rem"; 
                 
                 if (comboCount >= 10) {
                     if (comboCount % 10 === 0) {
-                        fontSize = "4rem"; // Reduced from 5rem
+                        fontSize = "4rem"; 
                         color = "#ff0000";
                         textShadow = "0 0 20px #ff0000, 4px 4px 0px rgba(0,0,0,0.8)";
                     } else {
-                        fontSize = "3rem"; // Reduced from 4rem
+                        fontSize = "3rem"; 
                         opacity = "0.8"; 
                         blur = "none"; 
                     }
                 }
                 
                 if (comboCount % 100 === 0 && comboCount > 0) {
-                    fontSize = "6rem"; // Reduced from 8rem
+                    fontSize = "6rem"; 
                     color = "#ff00ff";
                     textShadow = "0 0 50px #ff00ff, 0 0 20px #fff";
                     blur = "none";
@@ -4191,15 +3672,12 @@ function executeTeleport(target, normal) {
                 }
 
                 el.style.fontSize = fontSize;
-                // If cyan mode is on, keep it cyan, otherwise apply rank color
                 if(!el.classList.contains('cyan-mode')) {
                     el.style.color = color;
                     el.style.textShadow = textShadow;
                 }
-                
                 el.style.opacity = opacity;
                 el.style.filter = blur;
-                
                 el.style.transform = "translateX(-50%) scale(1.3) skewX(-15deg)";
                 requestAnimationFrame(() => {
                      setTimeout(() => {
@@ -4210,7 +3688,6 @@ function executeTeleport(target, normal) {
             if(comboCount > GameStats.highestCombo) GameStats.highestCombo = comboCount;
         }
 
-        // --- ENEMY AI ---
         const BOT_TYPES = {
             NORMAL: { scale: 1, hp: 200, speedMod: 1, dmgRed: 1, skill: 1, name: "NORMAL", color: 0x2F4F4F, eye: 0xffffff },   
             BRUTE: { scale: 2, hp: 600, speedMod: 0.85, dmgRed: 1, skill: 2, name: "BRUTE", color: 0x191970, eye: 0xffff00 }, 
@@ -4226,7 +3703,7 @@ function executeTeleport(target, normal) {
         }
 
         class Enemy {
-            constructor(posOverride = null, typeOverride = null, initialState = 'ROAM', aggroDelay = 0) {
+            constructor(posOverride = null, typeOverride = null, initialState = 'ROAM', aggroDelay = 0, ws = null) {
                 this.mesh = new THREE.Group();
                 this.id = Math.random(); 
                 
@@ -4245,11 +3722,15 @@ function executeTeleport(target, normal) {
                     }
                 } else {
                     let x, z;
-                    
-                    // v45.5: Chance to spawn on a platform center
+                    // World-aware spawning
+                    const usedDecorations = ws ? ws.decorations : decorations;
                     let validSpawn = false;
-                    if (Math.random() < 0.4 && decorations.length > 0) {
-                         const dec = decorations[Math.floor(Math.random() * decorations.length)];
+                    
+                    // Larger roam radius for spawn in big maps? No, stick to local cluster or wide scatter.
+                    const spawnRange = ws ? ws.config.size * 0.4 : 175;
+
+                    if (Math.random() < 0.4 && usedDecorations.length > 0) {
+                         const dec = usedDecorations[Math.floor(Math.random() * usedDecorations.length)];
                          const range = (dec.scale - 2) * 0.6; 
                          if(range > 2) {
                              x = dec.visualMesh.position.x + (Math.random() - 0.5) * 2 * range;
@@ -4260,9 +3741,8 @@ function executeTeleport(target, normal) {
 
                     if(!validSpawn) {
                          do {
-                            // v45.6.6 Scatted Bots More (Range 360)
-                            x = (Math.random() - 0.5) * 350;
-                            z = (Math.random() - 0.5) * 350;
+                            x = (Math.random() - 0.5) * (spawnRange * 2);
+                            z = (Math.random() - 0.5) * (spawnRange * 2);
                         } while (Math.abs(x) < 20 && Math.abs(z) < 20);
                     }
                     
@@ -4271,7 +3751,6 @@ function executeTeleport(target, normal) {
                     
                     let r = Math.random();
                     let type = 'NORMAL';
-                    
                     if (groundY > 35) {
                         if (r < 0.4) type = 'COLOSSUS';
                         else if (r < 0.9) type = 'TITAN';
@@ -4287,22 +3766,16 @@ function executeTeleport(target, normal) {
                         else if (r < 0.20) type = 'BRUTE';
                         else type = 'NORMAL';
                     }
-                    
                     this.type = BOT_TYPES[type];
                     this.mesh.position.set(x, spawnY + this.type.scale, z);
                 }
                 
-                // v45.7.5 Optimization: Use Shared Geometry
                 const bodyMat = new THREE.MeshPhysicalMaterial({ 
-                    color: this.type.color,
-                    metalness: 0.1,
-                    roughness: 0.2,
-                    clearcoat: 0.5
+                    color: this.type.color, metalness: 0.1, roughness: 0.2, clearcoat: 0.5
                 });
                 this.body = new THREE.Mesh(sharedEnemyGeo, bodyMat);
                 this.mesh.add(this.body);
 
-                // Wireframe Overlay using shared edge geometry
                 this.outline = new THREE.LineSegments(sharedEnemyEdgeGeo, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3 }));
                 this.outline.scale.setScalar(1.02);
                 this.mesh.add(this.outline);
@@ -4329,7 +3802,19 @@ function executeTeleport(target, normal) {
                 const uiScale = 1 + (this.type.scale - 1) * 0.5;
                 this.healthBarGroup.scale.setScalar(uiScale);
                 this.healthBarGroup.visible = false;
-                scene.add(this.healthBarGroup); 
+                
+                // Add to specific world or current
+                if (ws) {
+                    ws.enemies.push(this);
+                    ws.group.add(this.mesh);
+                    // UI needs to be added to world group too, or else it lingers
+                    ws.group.add(this.healthBarGroup);
+                } else {
+                    enemies.push(this);
+                    // Use active group if global
+                    (currentWorldGroup || scene).add(this.mesh);
+                    (currentWorldGroup || scene).add(this.healthBarGroup);
+                }
 
                 this.maxHealth = this.type.hp;
                 this.health = this.maxHealth;
@@ -4351,7 +3836,6 @@ function executeTeleport(target, normal) {
                 this.isDeadCorpse = false; 
                 this.corpseTimer = 0;
                 this.confusedTimer = 0; 
-                
                 this.streak = 0;
                 this.lastHitTime = 0;
                 this.lastDamageTime = 0;
@@ -4361,27 +3845,19 @@ function executeTeleport(target, normal) {
                 this.teleportTimer = 0;
                 this.teleportDelay = 0; 
                 this.personalSpeedMod = 0.8 + Math.random() * 0.4; 
-                
                 this.portalCooldown = 0;
-
                 this.strafeDir = Math.random() < 0.5 ? 1 : -1;
                 this.strafeTimer = 0;
                 this.dodgeTimer = 0;
                 this.dodgeReactionTimer = 0; 
                 this.ledgeTimer = 0; 
-                
                 this.lastPos = new THREE.Vector2(this.mesh.position.x, this.mesh.position.z);
-                
                 this.stamina = 10;
                 this.maxStamina = 10;
                 this.staminaRegen = 3; 
-
                 this.visionTimer = Math.random() * 0.5; 
                 this.canSeePlayerCached = false;
-                
                 this.updateTheme(currentTheme);
-                scene.add(this.mesh);
-                enemies.push(this);
             }
 
             setHighlight(active) {
@@ -4397,7 +3873,7 @@ function executeTeleport(target, normal) {
             }
 
             updateTheme(t) {
-                if(t === 2) { // Neon
+                if(t === 2) { 
                     this.outline.material.color.setHex(0x00ffff);
                     this.outline.material.opacity = 0.8;
                     this.body.material.color.setHex(0x000000);
@@ -4418,7 +3894,6 @@ function executeTeleport(target, normal) {
                          const tx = this.mesh.position.x + (Math.random() - 0.5) * 60;
                          const tz = this.mesh.position.z + (Math.random() - 0.5) * 60;
                          if (Math.abs(tx) > 150 || Math.abs(tz) > 150) continue;
-                         
                          const tGround = getGroundHeight(tx, tz);
                          if (Math.abs(tGround - myGround) < 1.0) {
                              this.targetPos.set(tx, this.mesh.position.y, tz);
@@ -4426,11 +3901,11 @@ function executeTeleport(target, normal) {
                          }
                     }
                 }
-
+                const roamRange = WorldManager.current ? WorldManager.current.config.size * 0.3 : 150;
                 this.targetPos.set(
-                    (Math.random() - 0.5) * 150,
+                    (Math.random() - 0.5) * roamRange,
                     this.mesh.position.y,
-                    (Math.random() - 0.5) * 150
+                    (Math.random() - 0.5) * roamRange
                 );
             }
 
@@ -4442,12 +3917,9 @@ function executeTeleport(target, normal) {
             checkVision(playerPos) {
                 if (this.isDeadCorpse || this.state === 'CONFUSED') return false;
                 if (this.mesh.position.distanceTo(playerPos) > 60) return false; 
-                
                 _vec3_3.copy(this.mesh.position).add(new THREE.Vector3(0, 0.5, 0));
-                
                 const distToPlayer = _vec3_3.distanceTo(playerPos);
                 _vec3_1.subVectors(playerPos, _vec3_3).normalize(); 
-                
                 globalRaycaster.set(_vec3_3, _vec3_1);
                 globalRaycaster.far = 60;
                 const hits = globalRaycaster.intersectObjects(walls);
@@ -4463,7 +3935,6 @@ function executeTeleport(target, normal) {
                     this.canSeePlayerCached = this.checkVision(playerPos);
                     this.visionTimer = 0.3 + Math.random() * 0.2; 
                 }
-
                 if (this.isDeadCorpse) {
                     this.corpseTimer -= dt;
                     this.mesh.rotation.x = Math.PI / 2; 
@@ -4477,7 +3948,6 @@ function executeTeleport(target, normal) {
                     }
                     return;
                 }
-                
                 const now = performance.now();
                 if (now - this.lastDamageTime > CONFIG.regenDelay && this.health < this.maxHealth) {
                     this.health += CONFIG.regenRate * dt;
@@ -4486,20 +3956,16 @@ function executeTeleport(target, normal) {
                         this.isRetreating = false; 
                     }
                 }
-
                 if(this.stamina < this.maxStamina) {
                     this.stamina = Math.min(this.maxStamina, this.stamina + this.staminaRegen * dt);
                 }
-                
                 if(this.teleportTimer > 0) this.teleportTimer -= dt * 1000;
                 if(this.teleportDelay > 0) this.teleportDelay -= dt; 
                 if(this.portalCooldown > 0) this.portalCooldown -= dt;
-
                 if(this.strafeTimer > 0) this.strafeTimer -= dt;
                 if(this.dodgeTimer > 0) this.dodgeTimer -= dt;
                 if(this.dodgeReactionTimer > 0) this.dodgeReactionTimer -= dt; 
                 if(this.ledgeTimer > 0) this.ledgeTimer -= dt;
-
                 if (this.state === 'CONFUSED') {
                     this.confusedTimer -= dt;
                     this.mesh.rotation.x = -Math.PI / 2; 
@@ -4508,12 +3974,9 @@ function executeTeleport(target, normal) {
                         this.state = this.hasAggroed ? 'AGGRO' : 'ROAM';
                         this.mesh.rotation.x = 0;
                     }
-                    
                     this.healthBarGroup.position.copy(this.mesh.position).add(new THREE.Vector3(0, 1.0 * this.type.scale, 0));
                     return;
                 }
-                
-                // Portal Logic
                 if(this.portalCooldown <= 0) {
                      for(let p of portals) {
                          if(this.mesh.position.distanceTo(p.mesh.position) < 3.0) {
@@ -4522,31 +3985,24 @@ function executeTeleport(target, normal) {
                          }
                      }
                 }
-
-                // GRAVITY
                 const groundY = getGroundHeight(this.mesh.position.x, this.mesh.position.z);
                 const currentY = this.mesh.position.y;
                 const floorThreshold = groundY + (1 * this.type.scale);
                 const hpPct = this.health / this.maxHealth;
-
                 if (currentY > floorThreshold + 0.1) {
                     this.velocity.y -= CONFIG.gravity * dt;
-                    
                     let jumpChance = 0.05;
                     if (this.isRetreating && hpPct < 0.3) jumpChance = 0.3; 
-
                     if (this.velocity.y < -8 && this.jumps < 2 && Math.random() < jumpChance) {
                          this.velocity.y = 18; 
                          this.jumps++;
                     }
-                    
                 } else {
                     if (this.velocity.y < -22) { 
                         let shouldFall = true;
                         if (this.state === 'AGGRO') {
                             if (Math.random() < 0.9) shouldFall = false; 
                         }
-
                         if (shouldFall) {
                             this.state = 'CONFUSED';
                             const impactSpeed = Math.abs(this.velocity.y);
@@ -4559,98 +4015,74 @@ function executeTeleport(target, normal) {
                     this.mesh.position.y = floorThreshold;
                     this.jumps = 0;
                 }
-                
                 this.mesh.position.addScaledVector(this.velocity, dt);
-                
                 const drag = Math.exp(-2.0 * dt);
                 this.velocity.x *= drag;
                 this.velocity.z *= drag;
-
                 this.healthBarGroup.position.copy(this.mesh.position).add(new THREE.Vector3(0, 1.3 * this.type.scale, 0));
                 this.healthBarGroup.lookAt(camera.position);
-
                 if (this.hasAggroed) {
                     this.healthBarGroup.visible = true;
                     this.healthBar.scale.x = Math.max(0, this.health / this.maxHealth);
                 }
-                
                 if (this.state === 'AGGRO') this.eyeMat.color.setHex(0xff0000);
                 else if (this.state === 'SEARCH') this.eyeMat.color.setHex(0xffaa00);
                 else this.eyeMat.color.setHex(this.type.eye);
-
                 if (this.reactionTimer > 0) {
                     this.reactionTimer -= dt * 1000;
                     return; 
                 }
-
                 let dest = this.targetPos;
                 let speed = (this.isSprinting ? CONFIG.botSprintSpeed : CONFIG.botSpeed) * this.type.speedMod * this.personalSpeedMod;
-                
                 if (this.state === 'ROAM') {
                     speed = CONFIG.botRoamSpeed * this.type.speedMod * this.personalSpeedMod;
-                    
                     if (this.onGroundSafe(groundY)) {
                         const forward = new THREE.Vector3(0,0,1).applyAxisAngle(new THREE.Vector3(0,1,0), this.mesh.rotation.y);
                         const lookAheadPos = this.mesh.position.clone().addScaledVector(forward, 2.0); 
                         const aheadHeight = getGroundHeight(lookAheadPos.x, lookAheadPos.z);
-                        
                         if (groundY - aheadHeight > 3.0) {
-                            if (Math.random() > 0.1) { 
-                                this.pickRoamTarget();
-                            }
+                            if (Math.random() > 0.1) this.pickRoamTarget();
                         }
                     }
-
                     if (new THREE.Vector2(this.mesh.position.x - dest.x, this.mesh.position.z - dest.z).length() < 3) {
                         this.pickRoamTarget();
                     }
-                    
                     if (this.onGroundSafe(groundY) && Math.random() < 0.005) {
                         this.velocity.y = 16; 
                         this.jumps = 1;
                         this.mesh.position.y += 0.2; 
                     }
-
                 } else if (this.state === 'AGGRO') {
                     if (this.canSeePlayer(playerPos)) {
                         this.lastKnownPos.copy(playerPos);
                         dest = playerPos;
                         const dist = this.mesh.position.distanceTo(playerPos);
-                        
                         if (hpPct < 0.5 && !this.isRetreating && !this.pendingRetreat) {
                             this.pendingRetreat = true;
                             if (this.teleportDelay <= 0) {
                                 this.teleportDelay = getBotReactionTime(this) / 1000;
                             }
                         }
-                        
                         if (this.pendingRetreat && this.teleportDelay <= 0) {
                             this.isRetreating = true;
                             this.pendingRetreat = false;
                         }
-                        
                         if (this.isRetreating) {
                             speed = CONFIG.botSprintSpeed * this.type.speedMod * this.personalSpeedMod * 1.3;
                             this.isSprinting = true;
-                            
                             if (hpPct < 0.25) {
                                 if(!this.isSliding && Math.random() < 0.4) this.isSliding = true; 
                             } else {
                                 if(!this.isSliding && Math.random() < 0.05) this.isSliding = true;
                             }
-
                             const retreatDir = this.mesh.position.clone().sub(playerPos).normalize();
-                            
                             globalRaycaster.set(this.mesh.position, retreatDir);
                             globalRaycaster.far = 5;
                             const wallsAhead = globalRaycaster.intersectObjects(walls);
-                            
                             if (wallsAhead.length > 0) {
                                 let escapeFound = false;
-                                
                                 const leftDir = new THREE.Vector3(-retreatDir.z, 0, retreatDir.x);
                                 const rightDir = new THREE.Vector3(retreatDir.z, 0, -retreatDir.x);
-                                
                                 globalRaycaster.set(this.mesh.position, leftDir);
                                 if (globalRaycaster.intersectObjects(walls).length === 0) {
                                      retreatDir.copy(leftDir);
@@ -4662,7 +4094,6 @@ function executeTeleport(target, normal) {
                                          escapeFound = true;
                                      }
                                 }
-                                
                                 if (!escapeFound && dist < 10) {
                                     if(this.onGroundSafe(groundY)) {
                                         this.velocity.y = 25; 
@@ -4673,37 +4104,28 @@ function executeTeleport(target, normal) {
                                      retreatDir.set((Math.random()-0.5), 0, (Math.random()-0.5)).normalize();
                                 }
                             }
-
                             dest = this.mesh.position.clone().addScaledVector(retreatDir, 40);
                             this.targetPos.copy(dest); 
                         }
-                        
                         if (this.teleportTimer <= 0 && this.stamina >= 10 && this.teleportDelay <= 0) {
-                            
                             let wantsToTp = false;
-                            
                             if (dist < 15 && this.isRetreating) wantsToTp = true;
                             if (dist > 25 && !this.isRetreating) wantsToTp = true; 
                             if (dist < 15 && !this.isRetreating) wantsToTp = true; 
-
                             if (wantsToTp && !this.teleportReactionPending) {
                                 this.teleportDelay = getBotReactionTime(this) / 1000;
                                 this.teleportReactionPending = true;
                             }
-                            
                             if (this.teleportDelay <= 0 && this.teleportReactionPending) {
                                 this.teleportReactionPending = false; 
-
                                 let tpChance = 0.005;
                                 if (this.isRetreating) tpChance = 0.05; 
                                 if (dist > 25) tpChance = 0.02; 
-
                                 if (Math.random() < tpChance) {
                                     let newPos;
                                     const minRange = 5;
                                     const maxRange = 20;
                                     const tpRange = minRange + (1.0 - hpPct) * (maxRange - minRange);
-
                                     if (this.isRetreating) {
                                         const escapeDir = this.mesh.position.clone().sub(playerPos).normalize();
                                         escapeDir.x += (Math.random()-0.5)*0.5;
@@ -4722,19 +4144,15 @@ function executeTeleport(target, normal) {
                                         const offset = new THREE.Vector3((Math.random()-0.5)*10, 0, (Math.random()-0.5)*10);
                                         newPos = this.mesh.position.clone().add(offset);
                                     }
-
                                     if (newPos) {
                                         const tpRayDir = newPos.clone().sub(this.mesh.position).normalize();
                                         const tpDist = newPos.distanceTo(this.mesh.position);
-                                        
                                         globalRaycaster.set(this.mesh.position, tpRayDir);
                                         globalRaycaster.far = tpDist;
                                         const tpHits = globalRaycaster.intersectObjects(walls);
-                                        
                                         if (tpHits.length > 0) {
                                             newPos.copy(tpHits[0].point).addScaledVector(tpRayDir, -1.0);
                                         }
-
                                         if(getGroundHeight(newPos.x, newPos.z) > -10) {
                                             spawnParticles(this.mesh.position, 0xff00ff, 15);
                                             this.mesh.position.copy(newPos);
@@ -4747,21 +4165,17 @@ function executeTeleport(target, normal) {
                                 }
                             }
                         }
-
                         if (dist < 5 * this.type.scale) {
                             const now = performance.now();
                             if (now - this.lastAttack > CONFIG.botAttackCooldown) {
                                 this.lastAttack = now;
                                 spawnSlash(this.mesh); 
                                 AudioSys.playSlash();
-                                
                                 const lungeDir = playerPos.clone().sub(this.mesh.position).normalize();
                                 lungeDir.y = 0; lungeDir.normalize();
                                 const lungeForce = 25 + (this.type.scale * 5); 
                                 this.velocity.addScaledVector(lungeDir, lungeForce);
-                                
                                 const hitChance = 1.05 - (this.type.scale * 0.1); 
-                                
                                 if (Math.random() < hitChance) {
                                     if (now - this.lastHitTime > 2000) {
                                         this.streak = 0;
@@ -4769,7 +4183,6 @@ function executeTeleport(target, normal) {
                                     let dmg = CONFIG.botDamage * this.type.scale; 
                                     dmg += this.streak * 2; 
                                     dmg = Math.min(dmg, 40); 
-                                    
                                     this.streak++;
                                     this.lastHitTime = now;
                                     damagePlayer(dmg); 
@@ -4793,7 +4206,6 @@ function executeTeleport(target, normal) {
                     this.searchTimer -= dt * 1000;
                     const lookTime = performance.now() * 0.002;
                     this.mesh.rotation.y = Math.sin(lookTime) * Math.PI;
-                    
                     if (this.canSeePlayer(playerPos)) {
                         this.state = 'AGGRO';
                         this.body.material.color.setHex(0x8b0000);
@@ -4804,14 +4216,12 @@ function executeTeleport(target, normal) {
                         this.pickRoamTarget();
                     }
                 }
-
                 this.actionTimer -= dt;
                 if (this.actionTimer <= 0) {
                     this.actionTimer = 0.5 + Math.random() * 1.5; 
                     this.isSprinting = Math.random() < (this.type.skill >= 2 ? 0.7 : 0.3);
                     this.isSliding = this.isSprinting && Math.random() < (this.type.skill >= 2 ? 0.4 : 0.1);
                 }
-
                 if(this.type.speedMod === 0) {
                      this.velocity.y = 0; 
                 } else {
@@ -4819,47 +4229,37 @@ function executeTeleport(target, normal) {
                         _vec3_1.subVectors(dest, this.mesh.position);
                         _vec3_1.y = 0; 
                         _vec3_1.normalize();
-
                         _vec3_2.copy(_vec3_1); 
-                        
                         if (this.state === 'AGGRO' && !this.isRetreating) {
                             _vec3_2.subVectors(playerPos, this.mesh.position);
                             _vec3_2.y = 0; 
                             _vec3_2.normalize();
                         }
-
                         if (this.state === 'AGGRO' && !this.isRetreating && this.canSeePlayer(playerPos)) {
                             const dist = this.mesh.position.distanceTo(playerPos);
-                            
                             if (this.dodgeTimer <= 0) {
                                 const playerAim = new THREE.Vector3();
                                 camera.getWorldDirection(playerAim);
                                 playerAim.y = 0; playerAim.normalize();
                                 const toBot = this.mesh.position.clone().sub(playerPos).normalize();
-                                
                                 if (playerAim.dot(toBot) > 0.9 && player.velocity.length() > 10) {
                                     if (this.dodgeReactionTimer <= 0) {
                                          this.dodgeReactionTimer = getBotReactionTime(this) / 1000;
                                     }
                                 }
                             }
-                            
                             if (this.dodgeReactionTimer > 0 && this.dodgeReactionTimer <= dt && this.dodgeTimer <= 0) {
                                 this.strafeDir *= -1; 
                                 this.dodgeTimer = 1.0; 
                                 this.dodgeReactionTimer = 0;
                             }
-                            
                             if (this.strafeTimer <= 0) {
                                 this.strafeDir *= -1;
                                 this.strafeTimer = 1.5 + Math.random() * 2.0;
                             }
-
                             const idealRange = 1.5 + (3.0 * this.type.scale);
-
                             if (dist < 15 + (10 * this.type.scale)) {
                                 const orbitVec = new THREE.Vector3(-_vec3_1.z, 0, _vec3_1.x).multiplyScalar(this.strafeDir);
-                                
                                 if (dist > idealRange) {
                                     _vec3_1.addScaledVector(orbitVec, 0.8).normalize();
                                 } else if (dist < idealRange - 2) {
@@ -4872,7 +4272,6 @@ function executeTeleport(target, normal) {
                                         _vec3_1.multiplyScalar(0.4).addScaledVector(orbitVec, 0.8).normalize(); 
                                     }
                                 }
-                                
                                 const predictPos = this.mesh.position.clone().addScaledVector(_vec3_1, 2.0);
                                 if (!this.onGroundSafe(getGroundHeight(predictPos.x, predictPos.z))) {
                                     if (this.ledgeTimer <= 0) {
@@ -4882,10 +4281,8 @@ function executeTeleport(target, normal) {
                                 }
                             }
                         }
-
                         const distMoved = Math.hypot(this.mesh.position.x - this.lastPos.x, this.mesh.position.z - this.lastPos.y);
                         const isMovingHorizontal = _vec3_1.lengthSq() > 0.1;
-
                         if (isMovingHorizontal && distMoved < 0.01 && this.state !== 'SEARCH') {
                              if (this.onGroundSafe(groundY)) {
                                  this.velocity.y = 18;
@@ -4894,29 +4291,22 @@ function executeTeleport(target, normal) {
                              }
                         }
                         this.lastPos.set(this.mesh.position.x, this.mesh.position.z);
-                        
                         _vec3_1.normalize();
                         if (this.isSliding) speed *= 1.5;
-
-                        // v46.3 Ledge Check: Stop bots from walking off cliffs
                         if (this.onGroundSafe(groundY)) {
                              const lookAhead = this.mesh.position.clone().addScaledVector(_vec3_1, 2.0);
                              const nextGround = getGroundHeight(lookAhead.x, lookAhead.z);
                              if (nextGround < groundY - 3) {
-                                 // Ledge detected!
                                  speed = 0;
                                  if (this.state === 'ROAM') this.pickRoamTarget();
                                  else this.velocity.set(0,0,0);
                              }
                         }
-
                         this.mesh.position.addScaledVector(_vec3_1, speed * dt);
-                        
                         let lookDir = _vec3_1;
                         if (this.state === 'AGGRO' && !this.isRetreating) {
                             lookDir = _vec3_2;
                         }
-
                         if (lookDir.lengthSq() > 0.1) {
                             const targetRot = Math.atan2(lookDir.x, lookDir.z);
                             let rotDiff = targetRot - this.mesh.rotation.y;
@@ -4925,41 +4315,34 @@ function executeTeleport(target, normal) {
                             this.mesh.rotation.y += rotDiff * dt * 8; 
                         }
                     }
-                    
                     if (this.isSliding) {
                         this.mesh.rotation.x = 0.5;
                         if (currentTheme === 0 && Math.random() < 0.3) spawnSnowTrail(this.mesh.position);
                     }
                     else this.mesh.rotation.x = 0;
                 }
-
                 _box3_1.setFromObject(this.body);
                 const botBox = _box3_1;
-                
-                // v45.8 Spatial Grid Collision
-                const nearbyWalls = spatialGrid.query(botBox);
-                for(const wb of nearbyWalls) {
-                    // v46.4: Ignore Floor collision for Bots (prevents instant ejection)
-                    if (wb.mesh.userData.isFloor) continue;
-
-                    if(botBox.intersectsBox(wb.box)) {
-                         const xOverlap = Math.min(botBox.max.x - wb.box.min.x, wb.box.max.x - botBox.min.x);
-                         const zOverlap = Math.min(botBox.max.z - wb.box.min.z, wb.box.max.z - botBox.min.z);
-                         
-                         const wallX = wb.mesh.matrixWorld.elements[12];
-                         const wallZ = wb.mesh.matrixWorld.elements[14];
-                         
-                         if(xOverlap < zOverlap) {
-                             const sign = (this.mesh.position.x < wallX) ? -1 : 1;
-                             this.mesh.position.x += xOverlap * sign;
-                         } else {
-                             const sign = (this.mesh.position.z < wallZ) ? -1 : 1;
-                             this.mesh.position.z += zOverlap * sign;
-                         }
-
-                         if (this.state === 'ROAM' && Math.random() > 0.1) {
-                             this.pickRoamTarget();
-                         }
+                if(spatialGrid) {
+                    const nearbyWalls = spatialGrid.query(botBox);
+                    for(const wb of nearbyWalls) {
+                        if (wb.mesh.userData.isFloor) continue;
+                        if(botBox.intersectsBox(wb.box)) {
+                             const xOverlap = Math.min(botBox.max.x - wb.box.min.x, wb.box.max.x - botBox.min.x);
+                             const zOverlap = Math.min(botBox.max.z - wb.box.min.z, wb.box.max.z - botBox.min.z);
+                             const wallX = wb.mesh.matrixWorld.elements[12];
+                             const wallZ = wb.mesh.matrixWorld.elements[14];
+                             if(xOverlap < zOverlap) {
+                                 const sign = (this.mesh.position.x < wallX) ? -1 : 1;
+                                 this.mesh.position.x += xOverlap * sign;
+                             } else {
+                                 const sign = (this.mesh.position.z < wallZ) ? -1 : 1;
+                                 this.mesh.position.z += zOverlap * sign;
+                             }
+                             if (this.state === 'ROAM' && Math.random() > 0.1) {
+                                 this.pickRoamTarget();
+                             }
+                        }
                     }
                 }
             }
@@ -4982,12 +4365,10 @@ function executeTeleport(target, normal) {
                         }
                     }
                 }
-                
                 amt *= this.type.dmgRed;
                 this.health -= amt;
                 this.lastDamageTime = performance.now(); 
                 this.body.material.color.setHex(0xffffff); 
-                
                 setTimeout(() => { 
                     if(!this.isDeadCorpse && this.state !== 'CONFUSED') {
                         if (currentTheme === 2) { 
@@ -4999,26 +4380,20 @@ function executeTeleport(target, normal) {
                         }
                     }
                 }, 100);
-
                 if (this.state !== 'AGGRO' && this.state !== 'CONFUSED') {
                     this.state = 'AGGRO'; 
                     this.reactionTimer = CONFIG.botAggroDelay; 
                     this.hasAggroed = true;
                 }
-
                 if (this.health <= 0) {
                     addScore(1000 * this.type.scale);
-                    
                     GameStats.botKills++;
                     GameStats.checkKillMilestone();
-
                     spawnParticles(this.mesh.position, 0x8b0000, 20 * this.type.scale);
                     AudioSys.playHit();
-                    
                     let shouldSplit = false;
                     let nextType = BOT_TYPES.NORMAL;
                     let roll = Math.random();
-
                     if (this.type.name === "COLOSSUS") {
                         if (roll < 0.90) { shouldSplit = true; nextType = BOT_TYPES.TITAN; }
                     } else if (this.type.name === "TITAN") {
@@ -5026,7 +4401,6 @@ function executeTeleport(target, normal) {
                     } else if (this.type.name === "BRUTE") {
                         if (roll < 0.40) { shouldSplit = true; nextType = BOT_TYPES.NORMAL; }
                     }
-
                     if (!shouldSplit) {
                         this.isDeadCorpse = true;
                         this.corpseTimer = 3.0;
@@ -5037,7 +4411,8 @@ function executeTeleport(target, normal) {
                         const count = Math.random() > 0.5 ? 2 : 1;
                         const delays = [0.2, 0.5];
                         for(let i=0; i<count; i++) {
-                            new Enemy(this.mesh.position, nextType, 'AGGRO', delays[i]);
+                            // Ensure splits go to the same world if explicit
+                            new Enemy(this.mesh.position, nextType, 'AGGRO', delays[i], WorldManager.current);
                         }
                         showKillMessage(this.type.name + " SPLIT!");
                         this.remove();
@@ -5046,8 +4421,20 @@ function executeTeleport(target, normal) {
             }
 
             remove() {
-                scene.remove(this.mesh);
-                scene.remove(this.healthBarGroup);
+                // Must ensure we remove from the correct group. 
+                // Since this.mesh is attached to a parent (WorldGroup or Scene), 
+                // calling remove on parent is safer.
+                if (this.mesh.parent) {
+                    this.mesh.parent.remove(this.mesh);
+                }
+                // Cleanup Health Bar
+                if (this.healthBarGroup.parent) {
+                    this.healthBarGroup.parent.remove(this.healthBarGroup);
+                }
+
+                // Remove from the global array (enemies is a pointer to current world array)
+                // If the enemy belongs to an inactive world, this might fail to find it in 'enemies'
+                // But since update() is only called for active world, this logic holds.
                 const idx = enemies.indexOf(this);
                 if(idx > -1) enemies.splice(idx, 1);
             }
@@ -5056,13 +4443,11 @@ function executeTeleport(target, normal) {
         function damagePlayer(amt) {
             player.health -= amt;
             player.lastDamageTime = performance.now();
-            
             const overlay = document.getElementById('damage-overlay');
             overlay.style.background = "radial-gradient(circle, transparent 20%, rgba(255,0,0,0.6) 100%)";
             setTimeout(() => {
                 overlay.style.background = "radial-gradient(circle, transparent 50%, rgba(255,0,0,0.0) 100%)";
             }, 200);
-            
             if(player.health <= 0) {
                 if (player.extraLives > 0) {
                     player.extraLives--;
@@ -5075,7 +4460,6 @@ function executeTeleport(target, normal) {
                     player.isDead = true;
                     document.exitPointerLock();
                     showKillMessage("TERMINATED", "achievement");
-                    
                     const diff = Date.now() - sessionStartTime;
                     const mins = Math.floor(diff / 60000);
                     const secs = Math.floor((diff % 60000) / 1000);
@@ -5099,7 +4483,6 @@ function executeTeleport(target, normal) {
             const oldScore = player.score;
             player.score += amt;
             document.getElementById('score-display').innerText = "SCORE: " + player.score;
-            
             if (Math.floor(player.score / 10000) > Math.floor(oldScore / 10000)) {
                 if (player.extraLives < 3) {
                     player.extraLives++;
@@ -5111,7 +4494,7 @@ function executeTeleport(target, normal) {
 
         function resetGame() {
             player.health = CONFIG.playerMaxHP;
-            player.energy = CONFIG.energyMax; // Renamed
+            player.energy = CONFIG.energyMax; 
             player.score = 0;
             player.extraLives = 0;
             player.isDead = false;
@@ -5121,7 +4504,6 @@ function executeTeleport(target, normal) {
             player.totalHits = 0; 
             camera.position.set(0, 2, 0);
             
-            // Reset Session Stats
             bankedActiveTime = 0;
             totalBreakTime = 0;
             breakCount = 0;
@@ -5130,6 +4512,7 @@ function executeTeleport(target, normal) {
             
             updateLivesDisplay();
             
+            // Wipe Active World Enemies
             for(let i=enemies.length-1; i>=0; i--) enemies[i].remove();
             enemies.length = 0;
             
@@ -5151,9 +4534,12 @@ function executeTeleport(target, normal) {
             comboCount = 0;
             updateComboUI();
             document.getElementById('score-display').innerText = "SCORE: 0";
-            
             document.getElementById('health-fill').classList.remove('health-critical');
             document.getElementById('low-health-vignette').style.boxShadow = "inset 0 0 100px rgba(255, 0, 0, 0)";
+            
+            // Ensure we are in ARENA on reset? 
+            // The prompt says "Normal" is default, but maybe they want to restart on the current map.
+            // Let's keep current map for now.
         }
         
         function showKillMessage(text, type="", color=null) {
@@ -5177,7 +4563,6 @@ function executeTeleport(target, normal) {
 
         function animate() {
             requestAnimationFrame(animate);
-            
             const now = performance.now();
             const dt = Math.min((now - lastTime) / 1000, 0.1);
             lastTime = now;
@@ -5192,8 +4577,11 @@ function executeTeleport(target, normal) {
             }
             
             if (isLocked && !player.isDead) {
-                if (Math.random() < 0.05 && enemies.length < 60) {
-                    new Enemy();
+                // Determine spawn cap based on world
+                const cap = WorldManager.current ? WorldManager.current.config.bots : 60;
+                
+                if (Math.random() < 0.05 && enemies.length < cap) {
+                    new Enemy(null, null, 'ROAM', 0, WorldManager.current);
                 }
                 
                 player.update(dt);
@@ -5215,16 +4603,13 @@ function executeTeleport(target, normal) {
                 for (let i = particles.length - 1; i >= 0; i--) {
                     const p = particles[i];
                     p.life -= dt;
-                    
                     if (p.type === 'flash') {
-                        // Impact flash logic
                         const progress = 1.0 - (p.life / p.maxLife); 
                         p.mesh.material.opacity = 1.0 - progress;
                         const s = THREE.MathUtils.lerp(p.scaleStart, p.scaleEnd, progress);
                         p.mesh.scale.setScalar(s);
                     } 
                     else if (p.type === 'spark') {
-                        // Spark logic
                         p.vel.y -= p.gravity * dt; 
                         p.mesh.position.addScaledVector(p.vel, dt);
                         p.mesh.scale.setScalar(p.life * 1.5); 
@@ -5235,7 +4620,6 @@ function executeTeleport(target, normal) {
                     else if (p.type === 'ripple') {
                         const progress = 1.0 - (p.life / p.maxLife);
                         const ease = 1 - Math.pow(1 - progress, 3); 
-                        
                         const scale = 1 + (ease * 1);
                         p.mesh.scale.setScalar(scale);
                         p.mesh.material.opacity = (1.0 - ease) * 0.1;
@@ -5244,7 +4628,6 @@ function executeTeleport(target, normal) {
                          p.mesh.position.addScaledVector(p.vel, dt);
                          p.mesh.scale.setScalar(p.life * 2); 
                     }
-                    
                     if (p.life <= 0) {
                         scene.remove(p.mesh);
                         p.mesh.geometry.dispose();
@@ -5263,7 +4646,6 @@ function executeTeleport(target, normal) {
                 
                 const hpPct = Math.max(0, player.health / (CONFIG.playerMaxHP/100)); 
                 const enPct = Math.max(0, (player.energy / CONFIG.energyMax) * 100);
-                
                 document.getElementById('health-fill').style.width = hpPct + '%';
                 document.getElementById('energy-fill').style.width = enPct + '%';
                 
@@ -5274,7 +4656,6 @@ function executeTeleport(target, normal) {
                      btn.style.letterSpacing = "2px";
                 }
             }
-
             renderer.render(scene, camera);
         }
 
