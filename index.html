@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v47.1.0 (Performance Fix)</title>
+    <title>Neon Blade: Melee Arena v47.2.0</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -476,7 +476,7 @@
                 <button class="btn-secondary" id="fps-btn">SHOW FPS: OFF</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px;">NEON BLADE: MELEE ARENA v47.1.0</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.2.0<br>--- Refined LOD & Arena Architecture ---</div>
         </div>
     </div>
 
@@ -1129,8 +1129,9 @@
             
             init: function() {
                 // Initialize World Configurations
-                this.worlds['ARENA'] = new WorldState('ARENA', { size: 400, bots: 60, scale: 1, fog: 0.008, far: 1000 });
-                this.worlds['TITAN'] = new WorldState('TITAN', { size: 4000, bots: 400, scale: 6, fog: 0.002, far: 4000 });
+                // Reduced fog density for clearer vision and added shadow toggle
+                this.worlds['ARENA'] = new WorldState('ARENA', { size: 400, bots: 60, scale: 1, fog: 0.004, far: 1000, useShadows: true });
+                this.worlds['TITAN'] = new WorldState('TITAN', { size: 4000, bots: 400, scale: 6, fog: 0.001, far: 4000, useShadows: false });
                 scene.add(this.worlds['ARENA'].group);
                 scene.add(this.worlds['TITAN'].group);
             },
@@ -1162,6 +1163,7 @@
 
                 // 3. Swap to New
                 this.current = next;
+                dirLight.castShadow = next.config.useShadows;
                 currentWorldGroup = next.group;
                 
                 // Update Global Pointers
@@ -1184,13 +1186,31 @@
                 camera.position.copy(next.savedPlayerPos);
                 player.velocity.set(0,0,0);
                 
+                // --- FIX: UPDATE SHADOW CAMERA BOUNDS ---
+                // We expand the shadow camera to cover the new map size.
+                const halfSize = next.config.size / 2;
+                
+                // Update frustum to fit the world
+                dirLight.shadow.camera.left = -halfSize;
+                dirLight.shadow.camera.right = halfSize;
+                dirLight.shadow.camera.top = halfSize;
+                dirLight.shadow.camera.bottom = -halfSize;
+                
+                dirLight.position.set(80, 120, 80);
+                
+                // Extend shadow camera range so it touches the floor
+                // Default is 500, which is too short when light is at Y=1000
+                dirLight.shadow.camera.far = Math.max(2000, next.config.size); 
+                
+                // Commit changes
+                dirLight.shadow.camera.updateProjectionMatrix();
+
                 // Update Scene Settings
                 camera.far = next.config.far;
                 camera.updateProjectionMatrix();
-                // Fog color is updated by applyTheme(), density needs update
                 if(scene.fog) scene.fog.density = next.config.fog;
                 
-                applyTheme(); // Re-apply theme to new world objects
+                applyTheme(); 
                 
                 document.getElementById('world-btn').innerText = "WORLD: " + name;
             }
@@ -1206,11 +1226,15 @@
                 // Floor
                 this.createBox(0, -1, 0, size, 2, size, materials.floor, true, false, worldState);
                 
-                // Walls
-                this.createBox(0, 50, -hSize, size, 100, 2, materials.wall, false, true, worldState);
-                this.createBox(0, 50, hSize, size, 100, 2, materials.wall, false, true, worldState);
-                this.createBox(-hSize, 50, 0, 2, 100, size, materials.wall, false, true, worldState);
-                this.createBox(hSize, 50, 0, 2, 100, size, materials.wall, false, true, worldState);
+                // Walls shortened to leave square gaps at the corners
+                const wallThick = 10;
+                const offset = hSize + (wallThick / 2);
+
+                // All walls are exactly the length of the floor ('size')
+                this.createBox(0, 50, -offset, size, 100, wallThick, materials.wall, false, true, worldState);
+                this.createBox(0, 50, offset, size, 100, wallThick, materials.wall, false, true, worldState);
+                this.createBox(-offset, 50, 0, wallThick, 100, size, materials.wall, false, true, worldState);
+                this.createBox(offset, 50, 0, wallThick, 100, size, materials.wall, false, true, worldState);
                 
                 // Decorations
                 const scaleMod = cfg.scale;
@@ -1238,13 +1262,8 @@
                 const mesh = new THREE.Mesh(geo, mat);
                 mesh.position.set(x, y, z);
                 
-                // Shadow Optimization: Only cast shadows on small maps or for big structures
-                // For big map with 400+ objects, reduce shadow casters
-                if (ws.config.bots > 100 && !isWall) {
-                    mesh.castShadow = false; 
-                } else {
-                    mesh.castShadow = true;
-                }
+                // Only cast shadows if it's not a floor and not a boundary wall
+                mesh.castShadow = !isFloor && !isWall;
                 
                 mesh.receiveShadow = true;
                 mesh.userData.isFloor = isFloor;
@@ -1255,6 +1274,8 @@
                      mesh.add(line);
                 }
 
+                // Force environment to draw first so transparent particles don't glitch
+                mesh.renderOrder = -1;
                 ws.group.add(mesh);
                 mesh.geometry.computeBoundingBox();
                 mesh.updateMatrixWorld(true);
@@ -2661,10 +2682,23 @@
 
             // Initialize Materials
             materials.floor = new THREE.MeshPhysicalMaterial({ 
-                map: textures.gridDefault, color: 0xffffff, roughness: 0.5, metalness: 0.1 
+                map: textures.gridDefault, 
+                color: 0xffffff, 
+                roughness: 0.5, 
+                metalness: 0.1,
+                transparent: true, // Enable translucency
+                opacity: 0.90      // Subtle 10% transparency
             });
             materials.wall = new THREE.MeshPhysicalMaterial({ 
-                color: 0xeeeeee, roughness: 0.2, metalness: 0.1 
+                color: 0xeeeeee, 
+                roughness: 0.1, 
+                metalness: 0.1,
+                transparent: true, // Allows translucency
+                opacity: 0.6,      // Sets the "glass" thickness/visibility
+                transmission: 0.25, // Adds a realistic glass-like light pass-through
+                thickness: 0.5,     // Simulates depth in the glass
+                emissive: 0xffffff,       // The color of the faint glow
+                emissiveIntensity: 1   // Adjusted for a noticeable but faint glow
             });
             materials.obstacle = new THREE.MeshPhysicalMaterial({ 
                 color: 0xcccccc, roughness: 0.3, clearcoat: 0.5, clearcoatRoughness: 0.1
@@ -2839,8 +2873,15 @@
 
             const format = (ms) => {
                 const totalSec = Math.floor(ms / 1000);
-                const m = Math.floor(totalSec / 60).toString().padStart(2, '0');
                 const s = (totalSec % 60).toString().padStart(2, '0');
+                const totalMin = Math.floor(totalSec / 60);
+                const m = (totalMin % 60).toString().padStart(2, '0');
+                const totalHour = Math.floor(totalMin / 60);
+                const h = (totalHour % 24).toString().padStart(2, '0');
+                const d = Math.floor(totalHour / 24);
+
+                if (d > 0) return `${d}:${h}:${m}:${s}`;
+                if (totalHour > 0) return `${h}:${m}:${s}`;
                 return `${m}:${s}`;
             };
 
@@ -2920,7 +2961,7 @@
                 const bgCol = 0x667788; 
                 scene.background = new THREE.Color(bgCol);
                 // Respect World Fog Density
-                scene.fog = new THREE.FogExp2(bgCol, WorldManager.current ? WorldManager.current.config.fog : 0.008); 
+                scene.fog = new THREE.FogExp2(bgCol, WorldManager.current ? WorldManager.current.config.fog : 0.004); 
                 body.style.backgroundColor = "#667788";
                 ui.classList.add('light-theme');
                 
@@ -2993,7 +3034,7 @@
                 } else { // HALLOWEEN
                     const bgCol = 0x663311;
                     scene.background = new THREE.Color(bgCol); 
-                    scene.fog = new THREE.FogExp2(bgCol, WorldManager.current ? WorldManager.current.config.fog : 0.008);
+                    scene.fog = new THREE.FogExp2(bgCol, WorldManager.current ? WorldManager.current.config.fog : 0.004);
                     body.style.backgroundColor = "#663311";
                     
                     materials.floor.map = textures.solid;
@@ -3731,767 +3772,896 @@
         }
 
         class Enemy {
-            constructor(posOverride = null, typeOverride = null, initialState = 'ROAM', aggroDelay = 0, ws = null) {
-                this.mesh = new THREE.Group();
-                this.id = Math.random(); 
-                
-                let spawnY = 0;
-                
-                if (posOverride) {
-                    this.mesh.position.copy(posOverride);
-                    this.mesh.position.x += (Math.random()-0.5)*2;
-                    this.mesh.position.z += (Math.random()-0.5)*2;
-                    spawnY = this.mesh.position.y;
-                    
-                    if (typeOverride) {
-                        this.type = typeOverride;
-                    } else {
-                        this.type = BOT_TYPES.NORMAL;
-                    }
-                } else {
-                    let x, z;
-                    // World-aware spawning
-                    const usedDecorations = ws ? ws.decorations : decorations;
-                    let validSpawn = false;
-                    
-                    // Larger roam radius for spawn in big maps? No, stick to local cluster or wide scatter.
-                    const spawnRange = ws ? ws.config.size * 0.4 : 175;
+    constructor(posOverride = null, typeOverride = null, initialState = 'ROAM', aggroDelay = 0, ws = null) {
+        this.mesh = new THREE.Group();
+        this.id = Math.random();
 
-                    if (Math.random() < 0.4 && usedDecorations.length > 0) {
-                         const dec = usedDecorations[Math.floor(Math.random() * usedDecorations.length)];
-                         const range = (dec.scale - 2) * 0.6; 
-                         if(range > 2) {
-                             x = dec.visualMesh.position.x + (Math.random() - 0.5) * 2 * range;
-                             z = dec.visualMesh.position.z + (Math.random() - 0.5) * 2 * range;
-                             validSpawn = true;
-                         }
-                    }
+        // --- 1. SPAWN LOGIC ---
+        let spawnY = 0;
 
-                    if(!validSpawn) {
-                         do {
-                            x = (Math.random() - 0.5) * (spawnRange * 2);
-                            z = (Math.random() - 0.5) * (spawnRange * 2);
-                        } while (Math.abs(x) < 20 && Math.abs(z) < 20);
-                    }
-                    
-                    const groundY = getGroundHeight(x, z);
-                    spawnY = groundY;
-                    
-                    let r = Math.random();
-                    let type = 'NORMAL';
-                    if (groundY > 35) {
-                        if (r < 0.4) type = 'COLOSSUS';
-                        else if (r < 0.9) type = 'TITAN';
-                        else type = 'BRUTE';
-                    } else if (groundY > 5) {
-                        if (r < 0.05) type = 'COLOSSUS';
-                        else if (r < 0.4) type = 'TITAN';
-                        else if (r < 0.8) type = 'BRUTE';
-                        else type = 'NORMAL';
-                    } else {
-                        if (r < 0.01) type = 'COLOSSUS';
-                        else if (r < 0.05) type = 'TITAN';
-                        else if (r < 0.20) type = 'BRUTE';
-                        else type = 'NORMAL';
-                    }
-                    this.type = BOT_TYPES[type];
-                    this.mesh.position.set(x, spawnY + this.type.scale, z);
-                }
-                
-                const bodyMat = new THREE.MeshPhysicalMaterial({ 
-                    color: this.type.color, metalness: 0.1, roughness: 0.2, clearcoat: 0.5
-                });
-                this.body = new THREE.Mesh(sharedEnemyGeo, bodyMat);
-                
-                // Shadow Optimization: On Big maps with many bots, disable enemy shadows
-                if (ws && ws.config.bots > 100) {
-                    this.body.castShadow = false;
-                } else {
-                    this.body.castShadow = true;
-                }
-                
-                this.body.receiveShadow = true;
-                this.mesh.add(this.body);
+        if (posOverride) {
+            this.mesh.position.copy(posOverride);
+            this.mesh.position.x += (Math.random() - 0.5) * 2;
+            this.mesh.position.z += (Math.random() - 0.5) * 2;
+            spawnY = this.mesh.position.y;
 
-                this.outline = new THREE.LineSegments(sharedEnemyEdgeGeo, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3 }));
-                this.outline.scale.setScalar(1.02);
-                this.mesh.add(this.outline);
-                
-                const eyeGeo = new THREE.SphereGeometry(0.1, 8, 8);
-                this.eyeMat = new THREE.MeshBasicMaterial({ color: this.type.eye });
-                const leftEye = new THREE.Mesh(eyeGeo, this.eyeMat);
-                leftEye.position.set(-0.2, 0.5, 0.5); 
-                const rightEye = new THREE.Mesh(eyeGeo, this.eyeMat);
-                rightEye.position.set(0.2, 0.5, 0.5);
-                this.mesh.add(leftEye); this.mesh.add(rightEye);
-                this.mesh.scale.setScalar(this.type.scale);
+            if (typeOverride) this.type = typeOverride;
+            else this.type = BOT_TYPES.NORMAL;
+        } else {
+            let x, z;
+            const usedDecorations = ws ? ws.decorations : decorations;
+            const spawnRange = ws ? ws.config.size * 0.4 : 175;
+            let validSpawn = false;
 
-                this.healthBarGroup = new THREE.Group();
-                const barGeo = new THREE.PlaneGeometry(1.2, 0.15);
-                const barMat = new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide });
-                this.healthBar = new THREE.Mesh(barGeo, barMat);
-                this.healthBar.position.z = 0.01; 
-                this.healthBarGroup.add(this.healthBar);
-                const bgGeo = new THREE.PlaneGeometry(1.3, 0.25);
-                const bgMat = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide });
-                const bg = new THREE.Mesh(bgGeo, bgMat);
-                this.healthBarGroup.add(bg);
-                const uiScale = 1 + (this.type.scale - 1) * 0.5;
-                this.healthBarGroup.scale.setScalar(uiScale);
-                this.healthBarGroup.visible = false;
-                
-                // Add to specific world or current
-                if (ws) {
-                    ws.enemies.push(this);
-                    ws.group.add(this.mesh);
-                    // UI needs to be added to world group too, or else it lingers
-                    ws.group.add(this.healthBarGroup);
-                } else {
-                    enemies.push(this);
-                    // Use active group if global
-                    (currentWorldGroup || scene).add(this.mesh);
-                    (currentWorldGroup || scene).add(this.healthBarGroup);
-                }
-
-                this.maxHealth = this.type.hp;
-                this.health = this.maxHealth;
-                this.velocity = new THREE.Vector3();
-                this.jumps = 0;
-                this.state = initialState; 
-                this.hasAggroed = initialState === 'AGGRO'; 
-                this.reactionTimer = aggroDelay > 0 ? aggroDelay * 1000 : 0;
-                
-                this.targetPos = new THREE.Vector3();
-                this.lastKnownPos = new THREE.Vector3();
-                this.searchTimer = 0;
-                this.pickRoamTarget();
-                
-                this.lastAttack = performance.now();
-                this.actionTimer = 0; 
-                this.isSprinting = false;
-                this.isSliding = false;
-                this.isDeadCorpse = false; 
-                this.corpseTimer = 0;
-                this.confusedTimer = 0; 
-                this.streak = 0;
-                this.lastHitTime = 0;
-                this.lastDamageTime = 0;
-                this.isRegenerating = false;
-                this.isRetreating = false;
-                this.pendingRetreat = false; 
-                this.teleportTimer = 0;
-                this.teleportDelay = 0; 
-                this.personalSpeedMod = 0.8 + Math.random() * 0.4; 
-                this.portalCooldown = 0;
-                this.strafeDir = Math.random() < 0.5 ? 1 : -1;
-                this.strafeTimer = 0;
-                this.dodgeTimer = 0;
-                this.dodgeReactionTimer = 0; 
-                this.ledgeTimer = 0; 
-                this.lastPos = new THREE.Vector2(this.mesh.position.x, this.mesh.position.z);
-                this.stamina = 10;
-                this.maxStamina = 10;
-                this.staminaRegen = 3; 
-                this.visionTimer = Math.random() * 0.5; 
-                this.canSeePlayerCached = false;
-                this.groundCheckTimer = 0; 
-                this.lastGroundHeight = 0;
-                this.updateTheme(currentTheme);
-            }
-
-            setHighlight(active) {
-                if(active) {
-                    this.body.material.emissive.setHex(0xff0000); 
-                    this.body.material.emissiveIntensity = 1.0;
-                    this.outline.material.color.setHex(0xffffff);
-                    this.outline.material.opacity = 0.8;
-                } else {
-                    this.updateTheme(currentTheme); 
-                    this.outline.scale.setScalar(1.02);
+            if (Math.random() < 0.4 && usedDecorations.length > 0) {
+                const dec = usedDecorations[Math.floor(Math.random() * usedDecorations.length)];
+                const range = (dec.scale - 2) * 0.6;
+                if (range > 2) {
+                    x = dec.visualMesh.position.x + (Math.random() - 0.5) * 2 * range;
+                    z = dec.visualMesh.position.z + (Math.random() - 0.5) * 2 * range;
+                    validSpawn = true;
                 }
             }
 
-            updateTheme(t) {
-                if(t === 2) { 
-                    this.outline.material.color.setHex(0x00ffff);
-                    this.outline.material.opacity = 0.8;
-                    this.body.material.color.setHex(0x000000);
-                    this.body.material.emissive.setHex(0x000000); 
-                    this.body.material.emissiveIntensity = 0;
-                } else {
-                    this.outline.material.color.setHex(0xffffff);
-                    this.outline.material.opacity = 0.3;
-                    this.body.material.color.setHex(this.type.color);
-                    this.body.material.emissiveIntensity = 0;
-                }
+            if (!validSpawn) {
+                do {
+                    x = (Math.random() - 0.5) * (spawnRange * 2);
+                    z = (Math.random() - 0.5) * (spawnRange * 2);
+                } while (Math.abs(x) < 20 && Math.abs(z) < 20);
             }
 
-            pickRoamTarget() {
-                const myGround = getGroundHeight(this.mesh.position.x, this.mesh.position.z);
-                if (myGround > 2) {
-                    for(let i=0; i<10; i++) {
-                         const tx = this.mesh.position.x + (Math.random() - 0.5) * 60;
-                         const tz = this.mesh.position.z + (Math.random() - 0.5) * 60;
-                         if (Math.abs(tx) > 150 || Math.abs(tz) > 150) continue;
-                         const tGround = getGroundHeight(tx, tz);
-                         if (Math.abs(tGround - myGround) < 1.0) {
-                             this.targetPos.set(tx, this.mesh.position.y, tz);
-                             return;
-                         }
-                    }
-                }
-                const roamRange = WorldManager.current ? WorldManager.current.config.size * 0.3 : 150;
-                this.targetPos.set(
-                    (Math.random() - 0.5) * roamRange,
-                    this.mesh.position.y,
-                    (Math.random() - 0.5) * roamRange
-                );
-            }
+            spawnY = getGroundHeight(x, z);
 
-            canSeePlayer(playerPos) {
-                if (this.isDeadCorpse || this.state === 'CONFUSED') return false;
-                return this.canSeePlayerCached;
+            let r = Math.random();
+            let type = 'NORMAL';
+            if (spawnY > 35) {
+                if (r < 0.4) type = 'COLOSSUS'; else if (r < 0.9) type = 'TITAN'; else type = 'BRUTE';
+            } else if (spawnY > 5) {
+                if (r < 0.05) type = 'COLOSSUS'; else if (r < 0.4) type = 'TITAN'; else if (r < 0.8) type = 'BRUTE'; else type = 'NORMAL';
+            } else {
+                if (r < 0.01) type = 'COLOSSUS'; else if (r < 0.05) type = 'TITAN'; else if (r < 0.20) type = 'BRUTE'; else type = 'NORMAL';
             }
+            this.type = BOT_TYPES[type];
+            this.mesh.position.set(x, spawnY + this.type.scale, z);
+        }
 
-            checkVision(playerPos) {
-                if (this.isDeadCorpse || this.state === 'CONFUSED') return false;
-                if (this.mesh.position.distanceTo(playerPos) > 60) return false; 
-                _vec3_3.copy(this.mesh.position).add(new THREE.Vector3(0, 0.5, 0));
-                const distToPlayer = _vec3_3.distanceTo(playerPos);
-                _vec3_1.subVectors(playerPos, _vec3_3).normalize(); 
-                globalRaycaster.set(_vec3_3, _vec3_1);
-                globalRaycaster.far = 60;
-                const hits = globalRaycaster.intersectObjects(walls);
-                if (hits.length > 0 && hits[0].distance < distToPlayer) {
-                    return false; 
-                }
-                return true;
-            }
+        // --- 2. MESH SETUP ---
+        const bodyMat = new THREE.MeshPhysicalMaterial({
+            color: this.type.color, metalness: 0.1, roughness: 0.2, clearcoat: 0.5
+        });
+        this.body = new THREE.Mesh(sharedEnemyGeo, bodyMat);
 
-            update(dt, playerPos) {
-                this.visionTimer -= dt;
-                if (this.visionTimer <= 0) {
-                    this.canSeePlayerCached = this.checkVision(playerPos);
-                    this.visionTimer = 0.3 + Math.random() * 0.2; 
-                }
-                if (this.isDeadCorpse) {
-                    this.corpseTimer -= dt;
-                    this.mesh.rotation.x = Math.PI / 2; 
-                    this.mesh.position.y = this.lastGroundHeight + 0.5; 
-                    this.body.material.opacity = this.corpseTimer / 3.0;
-                    this.body.material.transparent = true;
-                    this.eyeMat.opacity = this.corpseTimer / 3.0;
-                    this.eyeMat.transparent = true;
-                    if (this.corpseTimer <= 0) {
-                        this.remove();
-                    }
+        if (ws && ws.config.bots > 100) this.body.castShadow = false;
+        else this.body.castShadow = true;
+
+        this.body.receiveShadow = true;
+        this.mesh.add(this.body);
+
+        this.outline = new THREE.LineSegments(sharedEnemyEdgeGeo, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3 }));
+        this.outline.scale.setScalar(1.02);
+        this.mesh.add(this.outline);
+
+        const eyeGeo = new THREE.SphereGeometry(0.1, 8, 8);
+        this.eyeMat = new THREE.MeshBasicMaterial({ color: this.type.eye });
+        this.eyeL = new THREE.Mesh(eyeGeo, this.eyeMat);
+        this.eyeL.position.set(-0.2, 0.5, 0.5);
+        this.eyeR = new THREE.Mesh(eyeGeo, this.eyeMat);
+        this.eyeR.position.set(0.2, 0.5, 0.5);
+        this.mesh.add(this.eyeL); this.mesh.add(this.eyeR);
+        this.mesh.scale.setScalar(this.type.scale);
+
+        this.healthBarGroup = new THREE.Group();
+        const barGeo = new THREE.PlaneGeometry(1.2, 0.15);
+        const barMat = new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide });
+        this.healthBar = new THREE.Mesh(barGeo, barMat);
+        this.healthBar.position.z = 0.01;
+        this.healthBarGroup.add(this.healthBar);
+        const bgGeo = new THREE.PlaneGeometry(1.3, 0.25);
+        const bgMat = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide });
+        const bg = new THREE.Mesh(bgGeo, bgMat);
+        this.healthBarGroup.add(bg);
+        const uiScale = 1 + (this.type.scale - 1) * 0.5;
+        this.healthBarGroup.scale.setScalar(uiScale);
+        this.healthBarGroup.visible = false;
+
+        if (ws) {
+            ws.enemies.push(this);
+            ws.group.add(this.mesh);
+            ws.group.add(this.healthBarGroup);
+        } else {
+            enemies.push(this);
+            (currentWorldGroup || scene).add(this.mesh);
+            (currentWorldGroup || scene).add(this.healthBarGroup);
+        }
+
+        // --- 3. STATS & STATE ---
+        this.maxHealth = this.type.hp;
+        this.health = this.maxHealth;
+        this.velocity = new THREE.Vector3();
+        this.jumps = 0;
+        this.state = initialState;
+        this.hasAggroed = initialState === 'AGGRO';
+        this.reactionTimer = aggroDelay > 0 ? aggroDelay * 1000 : 0;
+
+        this.targetPos = new THREE.Vector3();
+        this.lastKnownPos = new THREE.Vector3();
+        this.searchTimer = 0;
+        this.pickRoamTarget();
+
+        this.lastAttack = performance.now();
+        this.actionTimer = 0;
+        this.isSprinting = false;
+        this.isSliding = false;
+        this.isDeadCorpse = false;
+        this.corpseTimer = 0;
+        this.confusedTimer = 0;
+        this.streak = 0;
+        this.lastHitTime = 0;
+        this.lastDamageTime = 0;
+        this.isRegenerating = false;
+        this.isRetreating = false;
+        this.pendingRetreat = false;
+        this.teleportTimer = 0;
+        this.teleportDelay = 0;
+        this.personalSpeedMod = 0.8 + Math.random() * 0.4;
+        this.portalCooldown = 0;
+        this.strafeDir = Math.random() < 0.5 ? 1 : -1;
+        this.strafeTimer = 0;
+        this.dodgeTimer = 0;
+        this.dodgeReactionTimer = 0;
+        this.ledgeTimer = 0;
+        this.lastPos = new THREE.Vector2(this.mesh.position.x, this.mesh.position.z);
+        this.stamina = 10;
+        this.maxStamina = 10;
+        this.staminaRegen = 3;
+        this.visionTimer = Math.random() * 0.5;
+        this.canSeePlayerCached = false;
+
+        // Variables for LOD smoothing/logic
+        this.targetRotation = this.mesh.rotation.y;
+        this.lastGroundHeight = 0;
+        this.groundCheckTimer = 0;
+        this.currentMoveSpeed = 0;
+        this.currentMoveDir = new THREE.Vector3();
+
+        this.updateTheme(currentTheme);
+    }
+
+    setHighlight(active) {
+        if (active) {
+            this.body.material.emissive.setHex(0xff0000);
+            this.body.material.emissiveIntensity = 1.0;
+            this.outline.material.color.setHex(0xffffff);
+            this.outline.material.opacity = 0.8;
+        } else {
+            this.updateTheme(currentTheme);
+            this.outline.scale.setScalar(1.02);
+        }
+    }
+
+    updateTheme(t) {
+        if (t === 2) {
+            this.outline.material.color.setHex(0x00ffff);
+            this.outline.material.opacity = 0.8;
+            this.body.material.color.setHex(0x000000);
+            this.body.material.emissive.setHex(0x000000);
+            this.body.material.emissiveIntensity = 0;
+        } else {
+            this.outline.material.color.setHex(0xffffff);
+            this.outline.material.opacity = 0.3;
+            this.body.material.color.setHex(this.type.color);
+            this.body.material.emissiveIntensity = 0;
+        }
+    }
+
+    pickRoamTarget() {
+        const myGround = getGroundHeight(this.mesh.position.x, this.mesh.position.z);
+        if (myGround > 2) {
+            for (let i = 0; i < 10; i++) {
+                const tx = this.mesh.position.x + (Math.random() - 0.5) * 60;
+                const tz = this.mesh.position.z + (Math.random() - 0.5) * 60;
+                if (Math.abs(tx) > 150 || Math.abs(tz) > 150) continue;
+                const tGround = getGroundHeight(tx, tz);
+                if (Math.abs(tGround - myGround) < 1.0) {
+                    this.targetPos.set(tx, this.mesh.position.y, tz);
                     return;
                 }
-                const now = performance.now();
-                if (now - this.lastDamageTime > CONFIG.regenDelay && this.health < this.maxHealth) {
-                    this.health += CONFIG.regenRate * dt;
-                    if (this.health >= this.maxHealth) {
-                        this.health = this.maxHealth;
-                        this.isRetreating = false; 
-                    }
-                }
-                if(this.stamina < this.maxStamina) {
-                    this.stamina = Math.min(this.maxStamina, this.stamina + this.staminaRegen * dt);
-                }
-                if(this.teleportTimer > 0) this.teleportTimer -= dt * 1000;
-                if(this.teleportDelay > 0) this.teleportDelay -= dt; 
-                if(this.portalCooldown > 0) this.portalCooldown -= dt;
-                if(this.strafeTimer > 0) this.strafeTimer -= dt;
-                if(this.dodgeTimer > 0) this.dodgeTimer -= dt;
-                if(this.dodgeReactionTimer > 0) this.dodgeReactionTimer -= dt; 
-                if(this.ledgeTimer > 0) this.ledgeTimer -= dt;
-                if (this.state === 'CONFUSED') {
-                    this.confusedTimer -= dt;
-                    this.mesh.rotation.x = -Math.PI / 2; 
-                    this.mesh.position.y = this.lastGroundHeight + 0.5;
-                    if (this.confusedTimer <= 0) {
-                        this.state = this.hasAggroed ? 'AGGRO' : 'ROAM';
-                        this.mesh.rotation.x = 0;
-                    }
-                    this.healthBarGroup.position.copy(this.mesh.position).add(new THREE.Vector3(0, 1.0 * this.type.scale, 0));
-                    return;
-                }
-                if(this.portalCooldown <= 0) {
-                     for(let p of portals) {
-                         if(this.mesh.position.distanceTo(p.mesh.position) < 3.0) {
-                             p.teleportEntity(this.mesh.position, this.velocity);
-                             this.portalCooldown = 0.5;
-                         }
-                     }
-                }
-                
-                // Optimized Ground Check: Only raycast if moved > 1.0m or heavily in air
-                const distMoved = Math.hypot(this.mesh.position.x - this.lastPos.x, this.mesh.position.z - this.lastPos.y);
-                const isInAir = Math.abs(this.mesh.position.y - this.lastGroundHeight) > 2.0;
-                
-                if (distMoved > 1.0 || isInAir || this.groundCheckTimer <= 0) {
-                    this.lastGroundHeight = getGroundHeight(this.mesh.position.x, this.mesh.position.z);
-                    this.groundCheckTimer = 0.5; // Force check every 0.5s regardless
-                } else {
-                    this.groundCheckTimer -= dt;
-                }
-                
-                const groundY = this.lastGroundHeight;
-                const currentY = this.mesh.position.y;
-                const floorThreshold = groundY + (1 * this.type.scale);
-                const hpPct = this.health / this.maxHealth;
-                if (currentY > floorThreshold + 0.1) {
-                    this.velocity.y -= CONFIG.gravity * dt;
-                    let jumpChance = 0.05;
-                    if (this.isRetreating && hpPct < 0.3) jumpChance = 0.3; 
-                    if (this.velocity.y < -8 && this.jumps < 2 && Math.random() < jumpChance) {
-                         this.velocity.y = 18; 
-                         this.jumps++;
-                    }
-                } else {
-                    if (this.velocity.y < -22) { 
-                        let shouldFall = true;
-                        if (this.state === 'AGGRO') {
-                            if (Math.random() < 0.9) shouldFall = false; 
-                        }
-                        if (shouldFall) {
-                            this.state = 'CONFUSED';
-                            const impactSpeed = Math.abs(this.velocity.y);
-                            this.confusedTimer = 3.0 + Math.min(2.0, (impactSpeed - 22) / 5.0);
-                            this.velocity.y = 0;
-                            return;
-                        }
-                    }
-                    this.velocity.y = 0;
-                    this.mesh.position.y = floorThreshold;
-                    this.jumps = 0;
-                }
-                this.mesh.position.addScaledVector(this.velocity, dt);
-                const drag = Math.exp(-2.0 * dt);
-                this.velocity.x *= drag;
-                this.velocity.z *= drag;
-                this.healthBarGroup.position.copy(this.mesh.position).add(new THREE.Vector3(0, 1.3 * this.type.scale, 0));
-                this.healthBarGroup.lookAt(camera.position);
-                if (this.hasAggroed) {
-                    this.healthBarGroup.visible = true;
-                    this.healthBar.scale.x = Math.max(0, this.health / this.maxHealth);
-                }
-                if (this.state === 'AGGRO') this.eyeMat.color.setHex(0xff0000);
-                else if (this.state === 'SEARCH') this.eyeMat.color.setHex(0xffaa00);
-                else this.eyeMat.color.setHex(this.type.eye);
-                if (this.reactionTimer > 0) {
-                    this.reactionTimer -= dt * 1000;
-                    return; 
-                }
-                let dest = this.targetPos;
-                let speed = (this.isSprinting ? CONFIG.botSprintSpeed : CONFIG.botSpeed) * this.type.speedMod * this.personalSpeedMod;
-                if (this.state === 'ROAM') {
-                    speed = CONFIG.botRoamSpeed * this.type.speedMod * this.personalSpeedMod;
-                    if (this.onGroundSafe(groundY)) {
-                        const forward = new THREE.Vector3(0,0,1).applyAxisAngle(new THREE.Vector3(0,1,0), this.mesh.rotation.y);
-                        const lookAheadPos = this.mesh.position.clone().addScaledVector(forward, 2.0); 
-                        const aheadHeight = getGroundHeight(lookAheadPos.x, lookAheadPos.z);
-                        if (groundY - aheadHeight > 3.0) {
-                            if (Math.random() > 0.1) this.pickRoamTarget();
-                        }
-                    }
-                    if (new THREE.Vector2(this.mesh.position.x - dest.x, this.mesh.position.z - dest.z).length() < 3) {
-                        this.pickRoamTarget();
-                    }
-                    if (this.onGroundSafe(groundY) && Math.random() < 0.005) {
-                        this.velocity.y = 16; 
-                        this.jumps = 1;
-                        this.mesh.position.y += 0.2; 
-                    }
-                } else if (this.state === 'AGGRO') {
-                    if (this.canSeePlayer(playerPos)) {
-                        this.lastKnownPos.copy(playerPos);
-                        dest = playerPos;
-                        const dist = this.mesh.position.distanceTo(playerPos);
-                        if (hpPct < 0.5 && !this.isRetreating && !this.pendingRetreat) {
-                            this.pendingRetreat = true;
-                            if (this.teleportDelay <= 0) {
-                                this.teleportDelay = getBotReactionTime(this) / 1000;
-                            }
-                        }
-                        if (this.pendingRetreat && this.teleportDelay <= 0) {
-                            this.isRetreating = true;
-                            this.pendingRetreat = false;
-                        }
-                        if (this.isRetreating) {
-                            speed = CONFIG.botSprintSpeed * this.type.speedMod * this.personalSpeedMod * 1.3;
-                            this.isSprinting = true;
-                            if (hpPct < 0.25) {
-                                if(!this.isSliding && Math.random() < 0.4) this.isSliding = true; 
-                            } else {
-                                if(!this.isSliding && Math.random() < 0.05) this.isSliding = true;
-                            }
-                            const retreatDir = this.mesh.position.clone().sub(playerPos).normalize();
-                            globalRaycaster.set(this.mesh.position, retreatDir);
-                            globalRaycaster.far = 5;
-                            const wallsAhead = globalRaycaster.intersectObjects(walls);
-                            if (wallsAhead.length > 0) {
-                                let escapeFound = false;
-                                const leftDir = new THREE.Vector3(-retreatDir.z, 0, retreatDir.x);
-                                const rightDir = new THREE.Vector3(retreatDir.z, 0, -retreatDir.x);
-                                globalRaycaster.set(this.mesh.position, leftDir);
-                                if (globalRaycaster.intersectObjects(walls).length === 0) {
-                                     retreatDir.copy(leftDir);
-                                     escapeFound = true;
-                                } else {
-                                     globalRaycaster.set(this.mesh.position, rightDir);
-                                     if (globalRaycaster.intersectObjects(walls).length === 0) {
-                                         retreatDir.copy(rightDir);
-                                         escapeFound = true;
-                                     }
-                                }
-                                if (!escapeFound && dist < 10) {
-                                    if(this.onGroundSafe(groundY)) {
-                                        this.velocity.y = 25; 
-                                        this.jumps = 1;
-                                        retreatDir.subVectors(playerPos, this.mesh.position).normalize();
-                                    }
-                                } else if (!escapeFound) {
-                                     retreatDir.set((Math.random()-0.5), 0, (Math.random()-0.5)).normalize();
-                                }
-                            }
-                            dest = this.mesh.position.clone().addScaledVector(retreatDir, 40);
-                            this.targetPos.copy(dest); 
-                        }
-                        if (this.teleportTimer <= 0 && this.stamina >= 10 && this.teleportDelay <= 0) {
-                            let wantsToTp = false;
-                            if (dist < 15 && this.isRetreating) wantsToTp = true;
-                            if (dist > 25 && !this.isRetreating) wantsToTp = true; 
-                            if (dist < 15 && !this.isRetreating) wantsToTp = true; 
-                            if (wantsToTp && !this.teleportReactionPending) {
-                                this.teleportDelay = getBotReactionTime(this) / 1000;
-                                this.teleportReactionPending = true;
-                            }
-                            if (this.teleportDelay <= 0 && this.teleportReactionPending) {
-                                this.teleportReactionPending = false; 
-                                let tpChance = 0.005;
-                                if (this.isRetreating) tpChance = 0.05; 
-                                if (dist > 25) tpChance = 0.02; 
-                                if (Math.random() < tpChance) {
-                                    let newPos;
-                                    const minRange = 5;
-                                    const maxRange = 20;
-                                    const tpRange = minRange + (1.0 - hpPct) * (maxRange - minRange);
-                                    if (this.isRetreating) {
-                                        const escapeDir = this.mesh.position.clone().sub(playerPos).normalize();
-                                        escapeDir.x += (Math.random()-0.5)*0.5;
-                                        escapeDir.z += (Math.random()-0.5)*0.5;
-                                        escapeDir.normalize();
-                                        newPos = this.mesh.position.clone().addScaledVector(escapeDir, tpRange);
-                                    } 
-                                    else if (dist > 25) { 
-                                        const approachDir = playerPos.clone().sub(this.mesh.position).normalize();
-                                        const travelDist = dist - 5; 
-                                        if(travelDist > 5) {
-                                            newPos = this.mesh.position.clone().addScaledVector(approachDir, Math.min(travelDist, maxRange));
-                                        }
-                                    }
-                                    else if (dist < 15 && !this.isRetreating) {
-                                        const offset = new THREE.Vector3((Math.random()-0.5)*10, 0, (Math.random()-0.5)*10);
-                                        newPos = this.mesh.position.clone().add(offset);
-                                    }
-                                    if (newPos) {
-                                        const tpRayDir = newPos.clone().sub(this.mesh.position).normalize();
-                                        const tpDist = newPos.distanceTo(this.mesh.position);
-                                        globalRaycaster.set(this.mesh.position, tpRayDir);
-                                        globalRaycaster.far = tpDist;
-                                        const tpHits = globalRaycaster.intersectObjects(walls);
-                                        if (tpHits.length > 0) {
-                                            newPos.copy(tpHits[0].point).addScaledVector(tpRayDir, -1.0);
-                                        }
-                                        if(getGroundHeight(newPos.x, newPos.z) > -10) {
-                                            spawnParticles(this.mesh.position, 0xff00ff, 15);
-                                            this.mesh.position.copy(newPos);
-                                            spawnParticles(this.mesh.position, 0xff00ff, 15);
-                                            AudioSys.playTeleport();
-                                            this.stamina -= 10;
-                                            this.teleportTimer = 500; 
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        if (dist < 5 * this.type.scale) {
-                            const now = performance.now();
-                            if (now - this.lastAttack > CONFIG.botAttackCooldown) {
-                                this.lastAttack = now;
-                                spawnSlash(this.mesh); 
-                                AudioSys.playSlash();
-                                const lungeDir = playerPos.clone().sub(this.mesh.position).normalize();
-                                lungeDir.y = 0; lungeDir.normalize();
-                                const lungeForce = 25 + (this.type.scale * 5); 
-                                this.velocity.addScaledVector(lungeDir, lungeForce);
-                                const hitChance = 1.05 - (this.type.scale * 0.1); 
-                                if (Math.random() < hitChance) {
-                                    if (now - this.lastHitTime > 2000) {
-                                        this.streak = 0;
-                                    }
-                                    let dmg = CONFIG.botDamage * this.type.scale; 
-                                    dmg += this.streak * 2; 
-                                    dmg = Math.min(dmg, 40); 
-                                    this.streak++;
-                                    this.lastHitTime = now;
-                                    damagePlayer(dmg); 
-                                }
-                                else {
-                                    AudioSys.playMiss();
-                                    this.streak = 0; 
-                                }
-                            }
-                        }
-                    } else {
-                        dest = this.lastKnownPos;
-                        if (this.mesh.position.distanceTo(dest) < 3) {
-                            this.state = 'SEARCH';
-                            this.searchTimer = 3000; 
-                            this.body.material.color.setHex(0xffaa00); 
-                        }
-                    }
-                } else if (this.state === 'SEARCH') {
-                    speed = 0; 
-                    this.searchTimer -= dt * 1000;
-                    const lookTime = performance.now() * 0.002;
-                    this.mesh.rotation.y = Math.sin(lookTime) * Math.PI;
-                    if (this.canSeePlayer(playerPos)) {
-                        this.state = 'AGGRO';
-                        this.body.material.color.setHex(0x8b0000);
-                        this.reactionTimer = CONFIG.botAggroDelay; 
-                    } else if (this.searchTimer <= 0) {
-                        this.state = 'ROAM';
-                        this.body.material.color.setHex(this.type.color);
-                        this.pickRoamTarget();
-                    }
-                }
-                this.actionTimer -= dt;
-                if (this.actionTimer <= 0) {
-                    this.actionTimer = 0.5 + Math.random() * 1.5; 
-                    this.isSprinting = Math.random() < (this.type.skill >= 2 ? 0.7 : 0.3);
-                    this.isSliding = this.isSprinting && Math.random() < (this.type.skill >= 2 ? 0.4 : 0.1);
-                }
-                if(this.type.speedMod === 0) {
-                     this.velocity.y = 0; 
-                } else {
-                    if (this.state !== 'SEARCH') {
-                        _vec3_1.subVectors(dest, this.mesh.position);
-                        _vec3_1.y = 0; 
-                        _vec3_1.normalize();
-                        _vec3_2.copy(_vec3_1); 
-                        if (this.state === 'AGGRO' && !this.isRetreating) {
-                            _vec3_2.subVectors(playerPos, this.mesh.position);
-                            _vec3_2.y = 0; 
-                            _vec3_2.normalize();
-                        }
-                        if (this.state === 'AGGRO' && !this.isRetreating && this.canSeePlayer(playerPos)) {
-                            const dist = this.mesh.position.distanceTo(playerPos);
-                            if (this.dodgeTimer <= 0) {
-                                const playerAim = new THREE.Vector3();
-                                camera.getWorldDirection(playerAim);
-                                playerAim.y = 0; playerAim.normalize();
-                                const toBot = this.mesh.position.clone().sub(playerPos).normalize();
-                                if (playerAim.dot(toBot) > 0.9 && player.velocity.length() > 10) {
-                                    if (this.dodgeReactionTimer <= 0) {
-                                         this.dodgeReactionTimer = getBotReactionTime(this) / 1000;
-                                    }
-                                }
-                            }
-                            if (this.dodgeReactionTimer > 0 && this.dodgeReactionTimer <= dt && this.dodgeTimer <= 0) {
-                                this.strafeDir *= -1; 
-                                this.dodgeTimer = 1.0; 
-                                this.dodgeReactionTimer = 0;
-                            }
-                            if (this.strafeTimer <= 0) {
-                                this.strafeDir *= -1;
-                                this.strafeTimer = 1.5 + Math.random() * 2.0;
-                            }
-                            const idealRange = 1.5 + (3.0 * this.type.scale);
-                            if (dist < 15 + (10 * this.type.scale)) {
-                                const orbitVec = new THREE.Vector3(-_vec3_1.z, 0, _vec3_1.x).multiplyScalar(this.strafeDir);
-                                if (dist > idealRange) {
-                                    _vec3_1.addScaledVector(orbitVec, 0.8).normalize();
-                                } else if (dist < idealRange - 2) {
-                                    _vec3_1.multiplyScalar(-0.5).addScaledVector(orbitVec, 1.0).normalize();
-                                } else {
-                                    const attackReady = (performance.now() - this.lastAttack > CONFIG.botAttackCooldown);
-                                    if (attackReady) {
-                                        _vec3_1.addScaledVector(orbitVec, 0.2).normalize(); 
-                                    } else {
-                                        _vec3_1.multiplyScalar(0.4).addScaledVector(orbitVec, 0.8).normalize(); 
-                                    }
-                                }
-                                const predictPos = this.mesh.position.clone().addScaledVector(_vec3_1, 2.0);
-                                if (!this.onGroundSafe(getGroundHeight(predictPos.x, predictPos.z))) {
-                                    if (this.ledgeTimer <= 0) {
-                                        this.strafeDir *= -1;
-                                        this.ledgeTimer = 0.5; 
-                                    }
-                                }
-                            }
-                        }
-                        
-                        // Optimized movement check using squared distance
-                        const distMovedSq = (this.mesh.position.x - this.lastPos.x)**2 + (this.mesh.position.z - this.lastPos.y)**2;
-                        const isMovingHorizontal = _vec3_1.lengthSq() > 0.1;
-                        if (isMovingHorizontal && distMovedSq < 0.0001 && this.state !== 'SEARCH') {
-                             if (this.onGroundSafe(groundY)) {
-                                 this.velocity.y = 18;
-                                 this.jumps = 1;
-                                 this.mesh.position.y += 0.5;
-                             }
-                        }
-                        this.lastPos.set(this.mesh.position.x, this.mesh.position.z);
-                        _vec3_1.normalize();
-                        if (this.isSliding) speed *= 1.5;
-                        if (this.onGroundSafe(groundY)) {
-                             const lookAhead = this.mesh.position.clone().addScaledVector(_vec3_1, 2.0);
-                             const nextGround = getGroundHeight(lookAhead.x, lookAhead.z);
-                             if (nextGround < groundY - 3) {
-                                 speed = 0;
-                                 if (this.state === 'ROAM') this.pickRoamTarget();
-                                 else this.velocity.set(0,0,0);
-                             }
-                        }
-                        this.mesh.position.addScaledVector(_vec3_1, speed * dt);
-                        let lookDir = _vec3_1;
-                        if (this.state === 'AGGRO' && !this.isRetreating) {
-                            lookDir = _vec3_2;
-                        }
-                        if (lookDir.lengthSq() > 0.1) {
-                            const targetRot = Math.atan2(lookDir.x, lookDir.z);
-                            let rotDiff = targetRot - this.mesh.rotation.y;
-                            while (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
-                            while (rotDiff < -Math.PI) rotDiff += Math.PI * 2;
-                            this.mesh.rotation.y += rotDiff * dt * 8; 
-                        }
-                    }
-                    if (this.isSliding) {
-                        this.mesh.rotation.x = 0.5;
-                        if (currentTheme === 0 && Math.random() < 0.3) spawnSnowTrail(this.mesh.position);
-                    }
-                    else this.mesh.rotation.x = 0;
-                }
-                _box3_1.setFromObject(this.body);
-                const botBox = _box3_1;
-                if(spatialGrid) {
-                    const nearbyWalls = spatialGrid.query(botBox);
-                    for(const wb of nearbyWalls) {
-                        if (wb.mesh.userData.isFloor) continue;
-                        if(botBox.intersectsBox(wb.box)) {
-                             const xOverlap = Math.min(botBox.max.x - wb.box.min.x, wb.box.max.x - botBox.min.x);
-                             const zOverlap = Math.min(botBox.max.z - wb.box.min.z, wb.box.max.z - botBox.min.z);
-                             const wallX = wb.mesh.matrixWorld.elements[12];
-                             const wallZ = wb.mesh.matrixWorld.elements[14];
-                             if(xOverlap < zOverlap) {
-                                 const sign = (this.mesh.position.x < wallX) ? -1 : 1;
-                                 this.mesh.position.x += xOverlap * sign;
-                             } else {
-                                 const sign = (this.mesh.position.z < wallZ) ? -1 : 1;
-                                 this.mesh.position.z += zOverlap * sign;
-                             }
-                             if (this.state === 'ROAM' && Math.random() > 0.1) {
-                                 this.pickRoamTarget();
-                             }
-                        }
-                    }
-                }
-            }
-
-            onGroundSafe(groundY) {
-                 return Math.abs(this.mesh.position.y - (groundY + this.type.scale)) < 0.5;
-            }
-
-            takeHit(amt) {
-                if(this.isDeadCorpse || this.state === 'CONFUSED') {
-                    if(this.state === 'CONFUSED') {
-                        amt *= 2;
-                        if (this.health < this.maxHealth * 0.3) {
-                            this.state = 'AGGRO';
-                            this.confusedTimer = 0;
-                            this.mesh.rotation.x = 0;
-                            this.isRetreating = true;
-                            this.velocity.y = 15;
-                            this.jumps = 1;
-                        }
-                    }
-                }
-                amt *= this.type.dmgRed;
-                this.health -= amt;
-                this.lastDamageTime = performance.now(); 
-                this.body.material.color.setHex(0xffffff); 
-                setTimeout(() => { 
-                    if(!this.isDeadCorpse && this.state !== 'CONFUSED') {
-                        if (currentTheme === 2) { 
-                            this.body.material.color.setHex(0x000000);
-                        } else {
-                            if(this.state === 'SEARCH') this.body.material.color.setHex(0xffaa00);
-                            else if(this.state === 'AGGRO') this.body.material.color.setHex(0x8b0000);
-                            else this.body.material.color.setHex(this.type.color);
-                        }
-                    }
-                }, 100);
-                if (this.state !== 'AGGRO' && this.state !== 'CONFUSED') {
-                    this.state = 'AGGRO'; 
-                    this.reactionTimer = CONFIG.botAggroDelay; 
-                    this.hasAggroed = true;
-                }
-                if (this.health <= 0) {
-                    addScore(1000 * this.type.scale);
-                    GameStats.botKills++;
-                    GameStats.checkKillMilestone();
-                    spawnParticles(this.mesh.position, 0x8b0000, 20 * this.type.scale);
-                    AudioSys.playHit();
-                    let shouldSplit = false;
-                    let nextType = BOT_TYPES.NORMAL;
-                    let roll = Math.random();
-                    if (this.type.name === "COLOSSUS") {
-                        if (roll < 0.90) { shouldSplit = true; nextType = BOT_TYPES.TITAN; }
-                    } else if (this.type.name === "TITAN") {
-                        if (roll < 0.70) { shouldSplit = true; nextType = BOT_TYPES.BRUTE; }
-                    } else if (this.type.name === "BRUTE") {
-                        if (roll < 0.40) { shouldSplit = true; nextType = BOT_TYPES.NORMAL; }
-                    }
-                    if (!shouldSplit) {
-                        this.isDeadCorpse = true;
-                        this.corpseTimer = 3.0;
-                        this.healthBarGroup.visible = false;
-                        this.outline.visible = false;
-                        showKillMessage("THREAT NEUTRALIZED");
-                    } else {
-                        const count = Math.random() > 0.5 ? 2 : 1;
-                        const delays = [0.2, 0.5];
-                        for(let i=0; i<count; i++) {
-                            // Ensure splits go to the same world if explicit
-                            new Enemy(this.mesh.position, nextType, 'AGGRO', delays[i], WorldManager.current);
-                        }
-                        showKillMessage(this.type.name + " SPLIT!");
-                        this.remove();
-                    }
-                }
-            }
-
-            remove() {
-                // Must ensure we remove from the correct group. 
-                // Since this.mesh is attached to a parent (WorldGroup or Scene), 
-                // calling remove on parent is safer.
-                if (this.mesh.parent) {
-                    this.mesh.parent.remove(this.mesh);
-                }
-                // Cleanup Health Bar
-                if (this.healthBarGroup.parent) {
-                    this.healthBarGroup.parent.remove(this.healthBarGroup);
-                }
-
-                // Remove from the global array (enemies is a pointer to current world array)
-                // If the enemy belongs to an inactive world, this might fail to find it in 'enemies'
-                // But since update() is only called for active world, this logic holds.
-                const idx = enemies.indexOf(this);
-                if(idx > -1) enemies.splice(idx, 1);
             }
         }
+        const roamRange = WorldManager.current ? WorldManager.current.config.size * 0.3 : 150;
+        this.targetPos.set(
+            (Math.random() - 0.5) * roamRange,
+            this.mesh.position.y,
+            (Math.random() - 0.5) * roamRange
+        );
+    }
+
+    canSeePlayer(playerPos) {
+        if (this.isDeadCorpse || this.state === 'CONFUSED') return false;
+        return this.canSeePlayerCached;
+    }
+
+    checkVision(playerPos) {
+        if (this.isDeadCorpse || this.state === 'CONFUSED') return false;
+        if (this.mesh.position.distanceTo(playerPos) > 60) return false;
+        _vec3_3.copy(this.mesh.position).add(new THREE.Vector3(0, 0.5, 0));
+        const distToPlayer = _vec3_3.distanceTo(playerPos);
+        _vec3_1.subVectors(playerPos, _vec3_3).normalize();
+        globalRaycaster.set(_vec3_3, _vec3_1);
+        globalRaycaster.far = 60;
+        const hits = globalRaycaster.intersectObjects(walls);
+        if (hits.length > 0 && hits[0].distance < distToPlayer) {
+            return false;
+        }
+        return true;
+    }
+
+    // --- 4. LOD CONTROLLER ---
+    update(dt, playerPos) {
+        const distSq = this.mesh.position.distanceToSquared(camera.position);
+        let logicInterval = 1;
+
+        if (distSq > 22500) logicInterval = 10;
+        else if (distSq > 2500) logicInterval = 3;
+
+        if (distSq > 22500) {
+            this.outline.visible = false;
+            this.healthBarGroup.visible = false;
+            this.eyeL.visible = false;
+            this.eyeR.visible = false;
+        } else {
+            this.outline.visible = true;
+            this.eyeL.visible = true;
+            this.eyeR.visible = true;
+            if (this.hasAggroed && !this.isDeadCorpse) this.healthBarGroup.visible = true;
+        }
+
+        // Logic runs on interval
+        const shouldRunLogic = (frameCounter + Math.floor(this.id * 100)) % logicInterval === 0;
+
+        if (shouldRunLogic) {
+            this.updateLogic(dt * logicInterval, playerPos, logicInterval);
+        }
+
+        // Physics runs every frame for smoothness
+        this.updatePhysics(dt);
+    }
+
+    // --- 5. LOGIC BRAIN ---
+    updateLogic(dt, playerPos, intervalMultiplier) {
+        if (this.isDeadCorpse) return;
+
+        // Ground Check
+        const distMoved = Math.hypot(this.mesh.position.x - this.lastPos.x, this.mesh.position.z - this.lastPos.y);
+        const isInAir = Math.abs(this.mesh.position.y - this.lastGroundHeight) > 2.0;
+
+        if (distMoved > 1.0 || isInAir || this.groundCheckTimer <= 0) {
+            this.lastGroundHeight = getGroundHeight(this.mesh.position.x, this.mesh.position.z);
+            this.groundCheckTimer = 0.5; 
+        } else {
+            this.groundCheckTimer -= dt;
+        }
+
+        // Timers
+        this.visionTimer -= dt;
+        if (this.visionTimer <= 0) {
+            this.canSeePlayerCached = this.checkVision(playerPos);
+            this.visionTimer = 0.3 + Math.random() * 0.2;
+        }
+
+        if (this.reactionTimer > 0) {
+            this.reactionTimer -= dt * 1000;
+            this.currentMoveSpeed = 0;
+            return;
+        }
+        
+        // Regen
+        const now = performance.now();
+        if (now - this.lastDamageTime > CONFIG.regenDelay && this.health < this.maxHealth) {
+            this.health += CONFIG.regenRate * dt;
+            if (this.health >= this.maxHealth) {
+                this.health = this.maxHealth;
+                this.isRetreating = false; 
+            }
+        }
+        
+        if (this.stamina < this.maxStamina) {
+            this.stamina = Math.min(this.maxStamina, this.stamina + this.staminaRegen * dt);
+        }
+
+        if (this.teleportTimer > 0) this.teleportTimer -= dt * 1000;
+        if (this.teleportDelay > 0) this.teleportDelay -= dt;
+        if (this.portalCooldown > 0) this.portalCooldown -= dt;
+        if (this.strafeTimer > 0) this.strafeTimer -= dt;
+        if (this.dodgeTimer > 0) this.dodgeTimer -= dt;
+        if (this.dodgeReactionTimer > 0) this.dodgeReactionTimer -= dt;
+        if (this.ledgeTimer > 0) this.ledgeTimer -= dt;
+
+        // Portals
+        if(this.portalCooldown <= 0) {
+             for(let p of portals) {
+                 if(this.mesh.position.distanceTo(p.mesh.position) < 3.0) {
+                     p.teleportEntity(this.mesh.position, this.velocity);
+                     this.portalCooldown = 0.5;
+                 }
+             }
+        }
+
+        let dest = this.targetPos;
+        let speed = (this.isSprinting ? CONFIG.botSprintSpeed : CONFIG.botSpeed) * this.type.speedMod * this.personalSpeedMod;
+        const hpPct = this.health / this.maxHealth;
+        const groundY = this.lastGroundHeight;
+
+        // --- State Machine ---
+        if (this.state === 'ROAM') {
+            speed = CONFIG.botRoamSpeed * this.type.speedMod * this.personalSpeedMod;
+            if (this.onGroundSafe(groundY)) {
+                const forward = new THREE.Vector3(0,0,1).applyAxisAngle(new THREE.Vector3(0,1,0), this.mesh.rotation.y);
+                const lookAheadPos = this.mesh.position.clone().addScaledVector(forward, 2.0); 
+                const aheadHeight = getGroundHeight(lookAheadPos.x, lookAheadPos.z);
+                if (groundY - aheadHeight > 3.0) {
+                    if (Math.random() < 0.1 * intervalMultiplier) this.pickRoamTarget();
+                }
+            }
+            if (new THREE.Vector2(this.mesh.position.x - dest.x, this.mesh.position.z - dest.z).length() < 3) {
+                this.pickRoamTarget();
+            }
+            if (this.onGroundSafe(groundY) && Math.random() < 0.005 * intervalMultiplier) {
+                this.velocity.y = 16; 
+                this.jumps = 1;
+                this.mesh.position.y += 0.2; 
+            }
+        } 
+        else if (this.state === 'AGGRO') {
+            if (this.canSeePlayer(playerPos)) {
+                this.lastKnownPos.copy(playerPos);
+                dest = playerPos;
+                const dist = this.mesh.position.distanceTo(playerPos);
+
+                // Retreat Logic
+                if (hpPct < 0.5 && !this.isRetreating && !this.pendingRetreat) {
+                    this.pendingRetreat = true;
+                    if (this.teleportDelay <= 0) {
+                        this.teleportDelay = getBotReactionTime(this) / 1000;
+                    }
+                }
+                if (this.pendingRetreat && this.teleportDelay <= 0) {
+                    this.isRetreating = true;
+                    this.pendingRetreat = false;
+                }
+                if (this.isRetreating) {
+                    speed = CONFIG.botSprintSpeed * this.type.speedMod * this.personalSpeedMod * 1.3;
+                    this.isSprinting = true;
+                    
+                    const slideBase = (hpPct < 0.25) ? 0.4 : 0.05;
+                    if(!this.isSliding && Math.random() < slideBase * intervalMultiplier) this.isSliding = true;
+
+                    const retreatDir = this.mesh.position.clone().sub(playerPos).normalize();
+                    globalRaycaster.set(this.mesh.position, retreatDir);
+                    globalRaycaster.far = 5;
+                    const wallsAhead = globalRaycaster.intersectObjects(walls);
+                    if (wallsAhead.length > 0) {
+                        let escapeFound = false;
+                        const leftDir = new THREE.Vector3(-retreatDir.z, 0, retreatDir.x);
+                        const rightDir = new THREE.Vector3(retreatDir.z, 0, -retreatDir.x);
+                        globalRaycaster.set(this.mesh.position, leftDir);
+                        if (globalRaycaster.intersectObjects(walls).length === 0) {
+                             retreatDir.copy(leftDir);
+                             escapeFound = true;
+                        } else {
+                             globalRaycaster.set(this.mesh.position, rightDir);
+                             if (globalRaycaster.intersectObjects(walls).length === 0) {
+                                 retreatDir.copy(rightDir);
+                                 escapeFound = true;
+                             }
+                        }
+                        if (!escapeFound && dist < 10) {
+                            if(this.onGroundSafe(groundY)) {
+                                this.velocity.y = 25; 
+                                this.jumps = 1;
+                                retreatDir.subVectors(playerPos, this.mesh.position).normalize();
+                            }
+                        } else if (!escapeFound) {
+                             retreatDir.set((Math.random()-0.5), 0, (Math.random()-0.5)).normalize();
+                        }
+                    }
+                    dest = this.mesh.position.clone().addScaledVector(retreatDir, 40);
+                    this.targetPos.copy(dest); 
+                }
+
+                // Teleport Logic
+                if (this.teleportTimer <= 0 && this.stamina >= 10 && this.teleportDelay <= 0) {
+                    let wantsToTp = false;
+                    if (dist < 15 && this.isRetreating) wantsToTp = true;
+                    if (dist > 25 && !this.isRetreating) wantsToTp = true; 
+                    if (dist < 15 && !this.isRetreating) wantsToTp = true; 
+                    if (wantsToTp && !this.teleportReactionPending) {
+                        this.teleportDelay = getBotReactionTime(this) / 1000;
+                        this.teleportReactionPending = true;
+                    }
+                    if (this.teleportDelay <= 0 && this.teleportReactionPending) {
+                        this.teleportReactionPending = false; 
+                        let tpChance = 0.005;
+                        if (this.isRetreating) tpChance = 0.05; 
+                        if (dist > 25) tpChance = 0.02; 
+                        
+                        if (Math.random() < tpChance * intervalMultiplier) {
+                            let newPos;
+                            const minRange = 5;
+                            const maxRange = 20;
+                            const tpRange = minRange + (1.0 - hpPct) * (maxRange - minRange);
+                            if (this.isRetreating) {
+                                const escapeDir = this.mesh.position.clone().sub(playerPos).normalize();
+                                escapeDir.x += (Math.random()-0.5)*0.5;
+                                escapeDir.z += (Math.random()-0.5)*0.5;
+                                escapeDir.normalize();
+                                newPos = this.mesh.position.clone().addScaledVector(escapeDir, tpRange);
+                            } 
+                            else if (dist > 25) { 
+                                const approachDir = playerPos.clone().sub(this.mesh.position).normalize();
+                                const travelDist = dist - 5; 
+                                if(travelDist > 5) {
+                                    newPos = this.mesh.position.clone().addScaledVector(approachDir, Math.min(travelDist, maxRange));
+                                }
+                            }
+                            else if (dist < 15 && !this.isRetreating) {
+                                const offset = new THREE.Vector3((Math.random()-0.5)*10, 0, (Math.random()-0.5)*10);
+                                newPos = this.mesh.position.clone().add(offset);
+                            }
+                            if (newPos) {
+                                const tpRayDir = newPos.clone().sub(this.mesh.position).normalize();
+                                const tpDist = newPos.distanceTo(this.mesh.position);
+                                globalRaycaster.set(this.mesh.position, tpRayDir);
+                                globalRaycaster.far = tpDist;
+                                const tpHits = globalRaycaster.intersectObjects(walls);
+                                if (tpHits.length > 0) {
+                                    newPos.copy(tpHits[0].point).addScaledVector(tpRayDir, -1.0);
+                                }
+                                if(getGroundHeight(newPos.x, newPos.z) > -10) {
+                                    spawnParticles(this.mesh.position, 0xff00ff, 15);
+                                    this.mesh.position.copy(newPos);
+                                    spawnParticles(this.mesh.position, 0xff00ff, 15);
+                                    AudioSys.playTeleport();
+                                    this.stamina -= 10;
+                                    this.teleportTimer = 500; 
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Attack Logic
+                if (dist < 5 * this.type.scale) {
+                    const now = performance.now();
+                    if (now - this.lastAttack > CONFIG.botAttackCooldown) {
+                        this.lastAttack = now;
+                        spawnSlash(this.mesh); 
+                        AudioSys.playSlash();
+                        const lungeDir = playerPos.clone().sub(this.mesh.position).normalize();
+                        lungeDir.y = 0; lungeDir.normalize();
+                        const lungeForce = 25 + (this.type.scale * 5); 
+                        this.velocity.addScaledVector(lungeDir, lungeForce);
+                        const hitChance = 1.05 - (this.type.scale * 0.1); 
+                        if (Math.random() < hitChance) {
+                            if (now - this.lastHitTime > 2000) {
+                                this.streak = 0;
+                            }
+                            let dmg = CONFIG.botDamage * this.type.scale; 
+                            dmg += this.streak * 2; 
+                            dmg = Math.min(dmg, 40); 
+                            this.streak++;
+                            this.lastHitTime = now;
+                            damagePlayer(dmg); 
+                        }
+                        else {
+                            AudioSys.playMiss();
+                            this.streak = 0; 
+                        }
+                    }
+                }
+            } else {
+                dest = this.lastKnownPos;
+                if (this.mesh.position.distanceTo(dest) < 3) {
+                    this.state = 'SEARCH';
+                    this.searchTimer = 3000; 
+                    this.body.material.color.setHex(0xffaa00); 
+                }
+            }
+        } 
+        else if (this.state === 'SEARCH') {
+            speed = 0; 
+            this.searchTimer -= dt * 1000;
+            if (this.canSeePlayer(playerPos)) {
+                this.state = 'AGGRO';
+                this.body.material.color.setHex(0x8b0000);
+                this.reactionTimer = CONFIG.botAggroDelay; 
+            } else if (this.searchTimer <= 0) {
+                this.state = 'ROAM';
+                this.body.material.color.setHex(this.type.color);
+                this.pickRoamTarget();
+            }
+        }
+
+        this.actionTimer -= dt;
+        if (this.actionTimer <= 0) {
+            this.actionTimer = 0.5 + Math.random() * 1.5; 
+            let sprintChance = (this.type.skill >= 2 ? 0.7 : 0.3);
+            let slideChance = (this.type.skill >= 2 ? 0.4 : 0.1);
+            if (Math.random() < sprintChance) this.isSprinting = true;
+            else this.isSprinting = false; 
+            
+            if (this.isSprinting && Math.random() < slideChance) this.isSliding = true;
+            else this.isSliding = false;
+        }
+
+        // --- Calculate Movement Vector (Intent) ---
+        this.currentMoveSpeed = 0;
+        
+        if (this.type.speedMod !== 0 && this.state !== 'SEARCH' && this.state !== 'CONFUSED') {
+            _vec3_1.subVectors(dest, this.mesh.position);
+            _vec3_1.y = 0; 
+            _vec3_1.normalize();
+            _vec3_2.copy(_vec3_1);
+
+            if (this.state === 'AGGRO' && !this.isRetreating) {
+                _vec3_2.subVectors(playerPos, this.mesh.position);
+                _vec3_2.y = 0; 
+                _vec3_2.normalize();
+            }
+
+            if (this.state === 'AGGRO' && !this.isRetreating && this.canSeePlayer(playerPos)) {
+                const dist = this.mesh.position.distanceTo(playerPos);
+                if (this.dodgeTimer <= 0) {
+                    const playerAim = new THREE.Vector3();
+                    camera.getWorldDirection(playerAim);
+                    playerAim.y = 0; playerAim.normalize();
+                    const toBot = this.mesh.position.clone().sub(playerPos).normalize();
+                    if (playerAim.dot(toBot) > 0.9 && player.velocity.length() > 10) {
+                        if (this.dodgeReactionTimer <= 0) {
+                             this.dodgeReactionTimer = getBotReactionTime(this) / 1000;
+                        }
+                    }
+                }
+                if (this.dodgeReactionTimer > 0 && this.dodgeReactionTimer <= dt && this.dodgeTimer <= 0) {
+                    this.strafeDir *= -1; 
+                    this.dodgeTimer = 1.0; 
+                    this.dodgeReactionTimer = 0;
+                }
+                if (this.strafeTimer <= 0) {
+                    this.strafeDir *= -1;
+                    this.strafeTimer = 1.5 + Math.random() * 2.0;
+                }
+                const idealRange = 1.5 + (3.0 * this.type.scale);
+                if (dist < 15 + (10 * this.type.scale)) {
+                    const orbitVec = new THREE.Vector3(-_vec3_1.z, 0, _vec3_1.x).multiplyScalar(this.strafeDir);
+                    if (dist > idealRange) {
+                        _vec3_1.addScaledVector(orbitVec, 0.8).normalize();
+                    } else if (dist < idealRange - 2) {
+                        _vec3_1.multiplyScalar(-0.5).addScaledVector(orbitVec, 1.0).normalize();
+                    } else {
+                        const attackReady = (performance.now() - this.lastAttack > CONFIG.botAttackCooldown);
+                        if (attackReady) {
+                            _vec3_1.addScaledVector(orbitVec, 0.2).normalize(); 
+                        } else {
+                            _vec3_1.multiplyScalar(0.4).addScaledVector(orbitVec, 0.8).normalize(); 
+                        }
+                    }
+                    const predictPos = this.mesh.position.clone().addScaledVector(_vec3_1, 2.0);
+                    if (!this.onGroundSafe(getGroundHeight(predictPos.x, predictPos.z))) {
+                        if (this.ledgeTimer <= 0) {
+                            this.strafeDir *= -1;
+                            this.ledgeTimer = 0.5; 
+                        }
+                    }
+                }
+            }
+            
+            _vec3_1.normalize();
+            if (this.isSliding) speed *= 1.5;
+            
+            // Ledge Stop
+            if (this.onGroundSafe(groundY)) {
+                 const lookAhead = this.mesh.position.clone().addScaledVector(_vec3_1, 2.0);
+                 const nextGround = getGroundHeight(lookAhead.x, lookAhead.z);
+                 if (nextGround < groundY - 3) {
+                     speed = 0;
+                     if (this.state === 'ROAM') this.pickRoamTarget();
+                     else this.velocity.set(0,0,0);
+                 }
+            }
+
+            this.currentMoveDir.copy(_vec3_1);
+            this.currentMoveSpeed = speed;
+
+            let lookDir = _vec3_1;
+            if (this.state === 'AGGRO' && !this.isRetreating) {
+                lookDir = _vec3_2;
+            }
+            if (lookDir.lengthSq() > 0.1) {
+                this.targetRotation = Math.atan2(lookDir.x, lookDir.z);
+            }
+        }
+        
+        if (this.isSliding) {
+            if (currentTheme === 0 && Math.random() < 0.3 * intervalMultiplier) spawnSnowTrail(this.mesh.position);
+        }
+    }
+
+    // --- 6. PHYSICS & ANIMATION ---
+    updatePhysics(dt) {
+        // Eye Color
+        if (this.state === 'AGGRO') this.eyeMat.color.setHex(0xff0000);
+        else if (this.state === 'SEARCH') this.eyeMat.color.setHex(0xffaa00);
+        else this.eyeMat.color.setHex(this.type.eye);
+
+        // Dead State
+        if (this.isDeadCorpse) {
+            this.corpseTimer -= dt;
+            this.mesh.rotation.x = Math.PI / 2;
+            this.mesh.position.y = this.lastGroundHeight + 0.5; 
+            this.body.material.opacity = this.corpseTimer / 3.0;
+            this.body.material.transparent = true;
+            this.eyeMat.opacity = this.corpseTimer / 3.0;
+            this.eyeMat.transparent = true;
+            if (this.corpseTimer <= 0) {
+                this.remove();
+            }
+            return;
+        }
+
+        // Confused State
+        if (this.state === 'CONFUSED') {
+            this.confusedTimer -= dt;
+            this.mesh.rotation.x = -Math.PI / 2; 
+            this.mesh.position.y = this.lastGroundHeight + 0.5;
+            if (this.confusedTimer <= 0) {
+                this.state = this.hasAggroed ? 'AGGRO' : 'ROAM';
+                this.mesh.rotation.x = 0;
+            }
+            this.healthBarGroup.position.copy(this.mesh.position).add(new THREE.Vector3(0, 1.0 * this.type.scale, 0));
+            return;
+        }
+
+        // Gravity & Ground Physics
+        const groundY = this.lastGroundHeight;
+        const floorThreshold = groundY + (1 * this.type.scale);
+        
+        if (this.mesh.position.y > floorThreshold + 0.1) {
+            this.velocity.y -= CONFIG.gravity * dt;
+            
+            // Fall Recovery Jump (Double Jump logic)
+            let jumpChance = 0.05; 
+            if (this.isRetreating && (this.health/this.maxHealth) < 0.3) jumpChance = 0.3; 
+            if (this.velocity.y < -8 && this.jumps < 2 && Math.random() < jumpChance * dt * 60) {
+                 this.velocity.y = 18; 
+                 this.jumps++;
+            }
+        } else {
+            // Fall Damage / Confused Check
+            if (this.velocity.y < -22) { 
+                let shouldFall = true;
+                if (this.state === 'AGGRO') {
+                    if (Math.random() < 0.9) shouldFall = false; 
+                }
+                if (shouldFall) {
+                    this.state = 'CONFUSED';
+                    const impactSpeed = Math.abs(this.velocity.y);
+                    this.confusedTimer = 3.0 + Math.min(2.0, (impactSpeed - 22) / 5.0);
+                    this.velocity.y = 0;
+                    return;
+                }
+            }
+            this.velocity.y = 0;
+            this.mesh.position.y = floorThreshold;
+            this.jumps = 0;
+        }
+
+        // Horizontal Movement
+        if (this.currentMoveSpeed > 0) {
+            this.mesh.position.addScaledVector(this.currentMoveDir, this.currentMoveSpeed * dt);
+        }
+
+        // Velocity Application
+        this.mesh.position.addScaledVector(this.velocity, dt);
+        const drag = Math.exp(-2.0 * dt);
+        this.velocity.x *= drag;
+        this.velocity.z *= drag;
+
+        // --- OPTIMIZED STUCK LOGIC ---
+        // Check "Movement Efficiency" using squared distance (Avoids expensive Sqrt)
+        if (this.currentMoveSpeed > 0.5 && this.state !== 'SEARCH') {
+             // 1. Calculate actual distance squared
+             const dx = this.mesh.position.x - this.lastPos.x;
+             const dz = this.mesh.position.z - this.lastPos.y; // Vector2.y holds the Z coord
+             const distMovedSq = dx*dx + dz*dz;
+             
+             // 2. Calculate minimum expected distance squared
+             // (We expect to move at least 30% of intended speed)
+             const minDist = this.currentMoveSpeed * dt * 0.3;
+             const minExpectedSq = minDist * minDist;
+
+             // 3. Compare Squares (Much faster)
+             if (distMovedSq < minExpectedSq) {
+                 
+                 if (this.state === 'ROAM') {
+                     // Get current heading
+                     const fwdX = this.currentMoveDir.x;
+                     const fwdZ = this.currentMoveDir.z;
+                     
+                     const roll = Math.random();
+                     let newDirX, newDirZ;
+
+                     if (roll < 0.4) { 
+                         // Turn Right (Swap and invert X)
+                         newDirX = -fwdZ; newDirZ = fwdX; 
+                     } else if (roll < 0.8) { 
+                         // Turn Left (Swap and invert Z)
+                         newDirX = fwdZ; newDirZ = -fwdX; 
+                     } else { 
+                         // Turn Around (Invert both)
+                         newDirX = -fwdX; newDirZ = -fwdZ; 
+                     }
+                     
+                     // Project new target 15m away
+                     this.targetPos.x = this.mesh.position.x + (newDirX * 15);
+                     this.targetPos.z = this.mesh.position.z + (newDirZ * 15);
+                     
+                 } else if (this.state === 'AGGRO') {
+                     // Flip strafe direction
+                     this.strafeDir *= -1;
+                     this.strafeTimer = 0.5;
+                 }
+             }
+        }
+        
+        // Update Last Pos
+        this.lastPos.set(this.mesh.position.x, this.mesh.position.z);
+
+        // Rotation Smoothing
+        if (this.state === 'SEARCH') {
+            const lookTime = performance.now() * 0.002;
+            this.mesh.rotation.y = Math.sin(lookTime) * Math.PI;
+        } else {
+            let rotDiff = this.targetRotation - this.mesh.rotation.y;
+            while (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
+            while (rotDiff < -Math.PI) rotDiff += Math.PI * 2;
+            this.mesh.rotation.y += rotDiff * dt * 8;
+        }
+
+        if (this.isSliding) this.mesh.rotation.x = 0.5;
+        else if (this.state !== 'CONFUSED') this.mesh.rotation.x = 0;
+
+        // UI Updates
+        this.healthBarGroup.position.copy(this.mesh.position).add(new THREE.Vector3(0, 1.3 * this.type.scale, 0));
+        this.healthBarGroup.lookAt(camera.position);
+        if (this.hasAggroed) {
+            this.healthBarGroup.visible = true;
+            this.healthBar.scale.x = Math.max(0, this.health / this.maxHealth);
+        }
+
+        // --- HARD WALL COLLISIONS (PATCHED) ---
+        _box3_1.setFromObject(this.body);
+        const botBox = _box3_1;
+        
+        if(spatialGrid) {
+            const nearbyWalls = spatialGrid.query(botBox);
+            
+            for(const wb of nearbyWalls) {
+                if (wb.mesh.userData.isFloor) continue;
+                
+                // --- FIX: Vertical Clearance Check ---
+                // If the bot's center is higher than the box's top (minus a small step margin),
+                // we are standing ON it, not walking INTO it. Ignore collision.
+                // 0.5 is a safe margin for "step height".
+                if (this.mesh.position.y >= wb.box.max.y - 0.5) continue;
+
+                if(botBox.intersectsBox(wb.box)) {
+                     const xOverlap = Math.min(botBox.max.x - wb.box.min.x, wb.box.max.x - botBox.min.x);
+                     const zOverlap = Math.min(botBox.max.z - wb.box.min.z, wb.box.max.z - botBox.min.z);
+                     
+                     const wallX = wb.mesh.matrixWorld.elements[12];
+                     const wallZ = wb.mesh.matrixWorld.elements[14];
+                     
+                     if(xOverlap < zOverlap) {
+                         const sign = (this.mesh.position.x < wallX) ? -1 : 1;
+                         this.mesh.position.x += xOverlap * sign;
+                     } else {
+                         const sign = (this.mesh.position.z < wallZ) ? -1 : 1;
+                         this.mesh.position.z += zOverlap * sign;
+                     }
+                     
+                     // If we hit a wall while roaming, pick a new target immediately
+                     if (this.state === 'ROAM' && Math.random() > 0.1) {
+                         this.pickRoamTarget();
+                     }
+                }
+            }
+        }
+    }
+
+    onGroundSafe(groundY) {
+         return Math.abs(this.mesh.position.y - (groundY + this.type.scale)) < 0.5;
+    }
+
+    takeHit(amt) {
+        if(this.isDeadCorpse || this.state === 'CONFUSED') {
+            if(this.state === 'CONFUSED') {
+                amt *= 2;
+                if (this.health < this.maxHealth * 0.3) {
+                    this.state = 'AGGRO';
+                    this.confusedTimer = 0;
+                    this.mesh.rotation.x = 0;
+                    this.isRetreating = true;
+                    this.velocity.y = 15;
+                    this.jumps = 1;
+                }
+            }
+        }
+        amt *= this.type.dmgRed;
+        this.health -= amt;
+        this.lastDamageTime = performance.now(); 
+        this.body.material.color.setHex(0xffffff); 
+        setTimeout(() => { 
+            if(!this.isDeadCorpse && this.state !== 'CONFUSED') {
+                if (currentTheme === 2) { 
+                    this.body.material.color.setHex(0x000000);
+                } else {
+                    if(this.state === 'SEARCH') this.body.material.color.setHex(0xffaa00);
+                    else if(this.state === 'AGGRO') this.body.material.color.setHex(0x8b0000);
+                    else this.body.material.color.setHex(this.type.color);
+                }
+            }
+        }, 100);
+        if (this.state !== 'AGGRO' && this.state !== 'CONFUSED') {
+            this.state = 'AGGRO'; 
+            this.reactionTimer = CONFIG.botAggroDelay; 
+            this.hasAggroed = true;
+        }
+        if (this.health <= 0) {
+            addScore(1000 * this.type.scale);
+            GameStats.botKills++;
+            GameStats.checkKillMilestone();
+            spawnParticles(this.mesh.position, 0x8b0000, 20 * this.type.scale);
+            AudioSys.playHit();
+            let shouldSplit = false;
+            let nextType = BOT_TYPES.NORMAL;
+            let roll = Math.random();
+            if (this.type.name === "COLOSSUS") {
+                if (roll < 0.90) { shouldSplit = true; nextType = BOT_TYPES.TITAN; }
+            } else if (this.type.name === "TITAN") {
+                if (roll < 0.70) { shouldSplit = true; nextType = BOT_TYPES.BRUTE; }
+            } else if (this.type.name === "BRUTE") {
+                if (roll < 0.40) { shouldSplit = true; nextType = BOT_TYPES.NORMAL; }
+            }
+            if (!shouldSplit) {
+                this.isDeadCorpse = true;
+                this.corpseTimer = 3.0;
+                this.healthBarGroup.visible = false;
+                this.outline.visible = false;
+                showKillMessage("THREAT NEUTRALIZED");
+            } else {
+                const count = Math.random() > 0.5 ? 2 : 1;
+                const delays = [0.2, 0.5];
+                for(let i=0; i<count; i++) {
+                    new Enemy(this.mesh.position, nextType, 'AGGRO', delays[i], WorldManager.current);
+                }
+                showKillMessage(this.type.name + " SPLIT!");
+                this.remove();
+            }
+        }
+    }
+
+    remove() {
+        if (this.mesh.parent) {
+            this.mesh.parent.remove(this.mesh);
+        }
+        if (this.healthBarGroup.parent) {
+            this.healthBarGroup.parent.remove(this.healthBarGroup);
+        }
+        const idx = enemies.indexOf(this);
+        if(idx > -1) enemies.splice(idx, 1);
+    }
+}
         
         function damagePlayer(amt) {
             player.health -= amt;
@@ -4653,19 +4823,9 @@
                 // Optimized Enemy Updates with Logic LOD (Level of Detail)
                 const playerPos = camera.position;
                 for (let i = enemies.length - 1; i >= 0; i--) {
-                    const e = enemies[i];
-                    const distSq = e.mesh.position.distanceToSquared(playerPos);
-                    
-                    // Logic Throttling based on distance
-                    let skip = 1;
-                    if (distSq > 22500) skip = 10; // > 150m
-                    else if (distSq > 3600) skip = 3; // > 60m
-                    
-                    // Use modulo of frameCounter with ID variance to distribute load
-                    // Multiply ID by 100 to get a varied integer offset
-                    if ((frameCounter + Math.floor(e.id * 100)) % skip === 0) {
-                        e.update(dt * skip, playerPos);
-                    }
+                    // Just call update. The class now handles skipping logic vs physics internally.
+                    // We pass the raw dt, not the multiplied version.
+                    enemies[i].update(dt, playerPos);
                 }
 
                 for (let i = particles.length - 1; i >= 0; i--) {
