@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v47.2.0</title>
+    <title>Neon Blade: Melee Arena v47.2.1</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -476,7 +476,7 @@
                 <button class="btn-secondary" id="fps-btn">SHOW FPS: OFF</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.2.0<br>--- Refined LOD & Arena Architecture ---</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.2.1<br>--- Refined LOD 1.1 ---</div>
         </div>
     </div>
 
@@ -1037,6 +1037,12 @@
         const _vec3_2 = new THREE.Vector3();
         const _vec3_3 = new THREE.Vector3(); 
         const _box3_1 = new THREE.Box3(); 
+        
+        // Dedicated variables for ground checks to prevent recursion bugs
+        const _groundBox = new THREE.Box3();
+        const _groundVec1 = new THREE.Vector3();
+        const _groundVec2 = new THREE.Vector3();
+        const _groundSet = new Set();
 
         const materials = {};
         const textures = {};
@@ -1061,7 +1067,9 @@
             constructor(bounds, dimensions) {
                 const [x, z] = dimensions;
                 this.cells = new Map();
-                this.cellSize = 50; 
+                this.cellSize = 50;
+                // MEMORY FIX: Create ONE re-usable set for the entire game session
+                this.querySet = new Set();
             }
 
             _getKey(x, z) {
@@ -1083,22 +1091,28 @@
                 }
             }
 
-            query(box) {
-                const results = new Set();
+            query(box, targetSet) {
+                // Use the passed set, or default to the class-wide set
+                const set = targetSet || this.querySet;
+                set.clear();
+                
                 const minX = Math.floor(box.min.x / this.cellSize);
                 const maxX = Math.floor(box.max.x / this.cellSize);
                 const minZ = Math.floor(box.min.z / this.cellSize);
                 const maxZ = Math.floor(box.max.z / this.cellSize);
+                
                 for (let x = minX; x <= maxX; x++) {
                     for (let z = minZ; z <= maxZ; z++) {
                         const key = `${x}:${z}`;
                         const cell = this.cells.get(key);
                         if (cell) {
-                            for (const item of cell) results.add(item);
+                            for (let i = 0; i < cell.length; i++) {
+                                set.add(cell[i]);
+                            }
                         }
                     }
                 }
-                return results;
+                return set;
             }
         }
         
@@ -1131,7 +1145,7 @@
                 // Initialize World Configurations
                 // Reduced fog density for clearer vision and added shadow toggle
                 this.worlds['ARENA'] = new WorldState('ARENA', { size: 400, bots: 60, scale: 1, fog: 0.004, far: 1000, useShadows: true });
-                this.worlds['TITAN'] = new WorldState('TITAN', { size: 4000, bots: 400, scale: 6, fog: 0.001, far: 4000, useShadows: false });
+                this.worlds['TITAN'] = new WorldState('TITAN', { size: 2000, bots: 300, scale: 3, fog: 0.001, far: 4000, useShadows: false });
                 scene.add(this.worlds['ARENA'].group);
                 scene.add(this.worlds['TITAN'].group);
             },
@@ -3515,14 +3529,38 @@
         }
 
         function getGroundHeight(x, z) {
-            const rayOrigin = new THREE.Vector3(x, 200, z);
-            globalRaycaster.set(rayOrigin, new THREE.Vector3(0, -1, 0));
-            globalRaycaster.far = 250;
-            const intersects = globalRaycaster.intersectObjects(groundObjects);
-            if (intersects.length > 0) {
-                return intersects[0].point.y;
+            // OPTIMIZATION: Main Floor Fast Check
+            let highestY = 0; 
+            
+            if (spatialGrid) {
+                // FIX: Use dedicated _groundBox to avoid overwriting _box3_1 during recursion
+                const queryBox = _groundBox; 
+                queryBox.min.set(x - 0.5, -10, z - 0.5);
+                queryBox.max.set(x + 0.5, 500, z + 0.5);
+                
+                // FIX: Pass _groundSet to avoid clearing the main physics querySet
+                const candidates = spatialGrid.query(queryBox, _groundSet);
+                
+                if (candidates.size > 0) {
+                    // FIX: Use dedicated vectors
+                    const rayOrigin = _groundVec1.set(x, 200, z);
+                    globalRaycaster.set(rayOrigin, _groundVec2.set(0, -1, 0));
+                    globalRaycaster.far = 250;
+                    
+                    const candidateMeshes = [];
+                    candidates.forEach(c => {
+                        if (!c.mesh.userData.isFloor) candidateMeshes.push(c.mesh);
+                    });
+
+                    if (candidateMeshes.length > 0) {
+                        const intersects = globalRaycaster.intersectObjects(candidateMeshes);
+                        if (intersects.length > 0) {
+                            highestY = intersects[0].point.y;
+                        }
+                    }
+                }
             }
-            return 0;
+            return highestY;
         }
         
         function snapToFloor(pos) {
@@ -3996,11 +4034,13 @@
         return true;
     }
 
-    // --- 4. LOD CONTROLLER ---
+   // --- 4. LOD CONTROLLER ---
     update(dt, playerPos) {
+        // Calculate distance ONCE for both Visuals and Physics
         const distSq = this.mesh.position.distanceToSquared(camera.position);
+        
+        // --- VISUAL LOD (Existing Logic) ---
         let logicInterval = 1;
-
         if (distSq > 22500) logicInterval = 10;
         else if (distSq > 2500) logicInterval = 3;
 
@@ -4016,15 +4056,15 @@
             if (this.hasAggroed && !this.isDeadCorpse) this.healthBarGroup.visible = true;
         }
 
-        // Logic runs on interval
+        // --- LOGIC LOD ---
         const shouldRunLogic = (frameCounter + Math.floor(this.id * 100)) % logicInterval === 0;
-
         if (shouldRunLogic) {
             this.updateLogic(dt * logicInterval, playerPos, logicInterval);
         }
 
-        // Physics runs every frame for smoothness
-        this.updatePhysics(dt);
+        // --- PHYSICS LOD (New Hybrid Logic) ---
+        // Pass the distSq to updatePhysics so we know which precision mode to use
+        this.updatePhysics(dt, distSq);
     }
 
     // --- 5. LOGIC BRAIN ---
@@ -4388,7 +4428,7 @@
     }
 
     // --- 6. PHYSICS & ANIMATION ---
-    updatePhysics(dt) {
+    updatePhysics(dt, distSq) {
         // Eye Color
         if (this.state === 'AGGRO') this.eyeMat.color.setHex(0xff0000);
         else if (this.state === 'SEARCH') this.eyeMat.color.setHex(0xffaa00);
@@ -4539,8 +4579,24 @@
             this.healthBar.scale.x = Math.max(0, this.health / this.maxHealth);
         }
 
-        // --- HARD WALL COLLISIONS (PATCHED) ---
-        _box3_1.setFromObject(this.body);
+        // --- OPTIMIZED COLLISION BOUNDS ---
+        // Use the passed distSq to determine precision
+        const isNear = distSq < 2500; // 50 meters (Same as Visual LOD threshold)
+
+        if (isNear) {
+            // ACCURATE MODE: Full matrix calculation (Preserves Game Feel for combat)
+            _box3_1.setFromObject(this.body);
+        } else {
+            // FAST MODE: Simple math approximation (Saves CPU for the swarm)
+            // We assume the bot is standing upright (which they mostly are)
+            const p = this.mesh.position;
+            const s = this.type.scale; // Respect the bot type scale (Titan/Brute/etc)
+            
+            // Hardcoded offset based on bot geometry (1x2x1 box roughly)
+            _box3_1.min.set(p.x - 0.5 * s, p.y, p.z - 0.5 * s);
+            _box3_1.max.set(p.x + 0.5 * s, p.y + 2 * s, p.z + 0.5 * s);
+        }
+        
         const botBox = _box3_1;
         
         if(spatialGrid) {
