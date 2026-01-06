@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v47.2.1</title>
+    <title>Neon Blade: Melee Arena v47.2.2</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -476,7 +476,7 @@
                 <button class="btn-secondary" id="fps-btn">SHOW FPS: OFF</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.2.1<br>--- Refined LOD 1.1 ---</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.2.2<br>--- Spawn Fix: Bots & Portals ---</div>
         </div>
     </div>
 
@@ -1331,7 +1331,10 @@
             createPortals: function(ws, range) {
                 const colors = [0x00ffff, 0xffaa00, 0xaa00ff, 0x00ff00];
                 const portalLocs = [];
-                const pairCount = Math.max(4, Math.floor(range / 100)); // More portals in bigger world
+                
+                // TWEAK: Increase density. Was /100, now /50.
+                // Titan (2000m) now gets ~40 pairs (80 portals) instead of 20 pairs.
+                const pairCount = Math.max(4, Math.floor(range / 50)); 
                 
                 for(let i=0; i<pairCount*2; i++) {
                     let x, z;
@@ -1339,7 +1342,9 @@
                         x = (Math.random()-0.5)*range;
                         z = (Math.random()-0.5)*range;
                     } while(Math.abs(x) < 30 && Math.abs(z) < 30);
-                    const y = getGroundHeight(x, z); // Uses global raycaster which uses 'groundObjects' (now swapped)
+                    
+                    // This now uses the fixed getGroundHeight, so it will hit box tops
+                    const y = getGroundHeight(x, z); 
                     portalLocs.push({x, y, z});
                 }
                 
@@ -3542,10 +3547,11 @@
                 const candidates = spatialGrid.query(queryBox, _groundSet);
                 
                 if (candidates.size > 0) {
-                    // FIX: Use dedicated vectors
-                    const rayOrigin = _groundVec1.set(x, 200, z);
+                    // FIX: Raise scan height to 1000 to clear Titan's massive skyscrapers
+                    // FIX: Increase .far to 1200 so it actually reaches the floor
+                    const rayOrigin = _groundVec1.set(x, 1000, z);
                     globalRaycaster.set(rayOrigin, _groundVec2.set(0, -1, 0));
-                    globalRaycaster.far = 250;
+                    globalRaycaster.far = 1200; 
                     
                     const candidateMeshes = [];
                     candidates.forEach(c => {
