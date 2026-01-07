@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v47.3.0</title>
+    <title>Neon Blade: Melee Arena v47.4.0</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -476,7 +476,7 @@
                 <button class="btn-secondary" id="fps-btn">SHOW FPS: OFF</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.3.0<br>--- Audio & Visual Updates ---</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.4.0<br>--- Maze & Labyrinth ---</div>
         </div>
     </div>
 
@@ -1468,12 +1468,29 @@
             current: null,
             
             init: function() {
-                // Initialize World Configurations
-                // Reduced fog density for clearer vision and added shadow toggle
-                this.worlds['ARENA'] = new WorldState('ARENA', { size: 400, bots: 60, scale: 1, fog: 0.004, far: 1000, useShadows: true });
-                this.worlds['TITAN'] = new WorldState('TITAN', { size: 2000, bots: 300, scale: 3, fog: 0.001, far: 4000, useShadows: false });
-                scene.add(this.worlds['ARENA'].group);
-                scene.add(this.worlds['TITAN'].group);
+                // --- 1. Standard Arenas ---
+                this.worlds['ARENA'] = new WorldState('ARENA', { 
+                    type: 'OPEN', size: 400, bots: 60, scale: 1, fog: 0.004, far: 1000, useShadows: true 
+                });
+                this.worlds['TITAN'] = new WorldState('TITAN', { 
+                    type: 'OPEN', size: 2000, bots: 300, scale: 3, fog: 0.001, far: 4000, useShadows: false 
+                });
+
+                // --- 2. New Maze Worlds ---
+                // MAZE: Tight, claustrophobic, smaller map
+                this.worlds['MAZE'] = new WorldState('MAZE', { 
+                    type: 'MAZE', size: 400, bots: 50, scale: 1, fog: 0.0125, far: 800, useShadows: true,
+                    mazeCellSize: 30, mazeWallHeight: 18 
+                });
+                
+                // LABYRINTH: Massive scale, slightly wider corridors
+                this.worlds['LABYRINTH'] = new WorldState('LABYRINTH', { 
+                    type: 'MAZE', size: 1200, bots: 150, scale: 2, fog: 0.005, far: 2000, useShadows: false,
+                    mazeCellSize: 60, mazeWallHeight: 40
+                });
+
+                // Add all groups to scene
+                for (let key in this.worlds) scene.add(this.worlds[key].group);
             },
             
             switch: function(name) {
@@ -1523,26 +1540,23 @@
                 
                 // 5. Reveal & Restore
                 next.group.visible = true;
-                camera.position.copy(next.savedPlayerPos);
+                
+                // Reset player slightly above center to ensure they don't spawn inside a maze wall
+                if (next.config.type === 'MAZE') {
+                    camera.position.set(0, 5, 0); 
+                } else {
+                    camera.position.copy(next.savedPlayerPos);
+                }
                 player.velocity.set(0,0,0);
                 
-                // --- FIX: UPDATE SHADOW CAMERA BOUNDS ---
-                // We expand the shadow camera to cover the new map size.
+                // Update Shadows
                 const halfSize = next.config.size / 2;
-                
-                // Update frustum to fit the world
                 dirLight.shadow.camera.left = -halfSize;
                 dirLight.shadow.camera.right = halfSize;
                 dirLight.shadow.camera.top = halfSize;
                 dirLight.shadow.camera.bottom = -halfSize;
-                
                 dirLight.position.set(80, 120, 80);
-                
-                // Extend shadow camera range so it touches the floor
-                // Default is 500, which is too short when light is at Y=1000
                 dirLight.shadow.camera.far = Math.max(2000, next.config.size); 
-                
-                // Commit changes
                 dirLight.shadow.camera.updateProjectionMatrix();
 
                 // Update Scene Settings
@@ -1559,52 +1573,187 @@
         const LevelBuilder = {
             build: function(worldState) {
                 const cfg = worldState.config;
-                const group = worldState.group;
-                const size = cfg.size;
-                const hSize = size / 2;
+                
+                this.buildBase(worldState);
 
-                // Floor
-                this.createBox(0, -1, 0, size, 2, size, materials.floor, true, false, worldState);
-                
-                // Walls shortened to leave square gaps at the corners
-                const wallThick = 10;
-                const offset = hSize + (wallThick / 2);
+                if (cfg.type === 'MAZE') {
+                    this.buildMaze(worldState);
+                } else {
+                    this.buildOpenArena(worldState);
+                }
 
-                // All walls are exactly the length of the floor ('size')
-                this.createBox(0, 50, -offset, size, 100, wallThick, materials.wall, false, true, worldState);
-                this.createBox(0, 50, offset, size, 100, wallThick, materials.wall, false, true, worldState);
-                this.createBox(-offset, 50, 0, wallThick, 100, size, materials.wall, false, true, worldState);
-                this.createBox(offset, 50, 0, wallThick, 100, size, materials.wall, false, true, worldState);
+                this.createPortals(worldState, cfg.size * 0.75);
                 
-                // Decorations
-                const scaleMod = cfg.scale;
-                
-                // Small
-                this.spawnDecorations(Math.floor(25 * scaleMod), 2*scaleMod, 7*scaleMod, size*0.75, size*0.75, worldState);
-                // Medium
-                this.spawnDecorations(Math.floor(8 * scaleMod), 10*scaleMod, 20*scaleMod, size*0.85, size*0.85, worldState);
-                // Large
-                this.spawnDecorations(Math.floor(4 * scaleMod), 25*scaleMod, 45*scaleMod, size*0.9, size*0.9, worldState);
-                // Massive
-                this.spawnDecorations(Math.max(1, Math.floor(1 * scaleMod)), 60*scaleMod, 80*scaleMod, size*0.75, size*0.75, worldState);
-                
-                // Portals
-                this.createPortals(worldState, size * 0.75);
-                
-                // Bots
                 for(let i=0; i<cfg.bots; i++) {
                      new Enemy(null, null, 'ROAM', 0, worldState);
                 }
             },
+
+            buildBase: function(ws) {
+                const size = ws.config.size;
+                const hSize = size / 2;
+                const wallThick = 10;
+                const offset = hSize + (wallThick / 2);
+
+                this.createBox(0, -1, 0, size, 2, size, materials.floor, true, false, ws, true, -1);
+
+                // Outer Boundary Walls
+                this.createBox(0, 50, -offset, size, 100, wallThick, materials.wall, false, true, ws, true, -1);
+                this.createBox(0, 50, offset, size, 100, wallThick, materials.wall, false, true, ws, true, -1);
+                this.createBox(-offset, 50, 0, wallThick, 100, size, materials.wall, false, true, ws, true, -1);
+                this.createBox(offset, 50, 0, wallThick, 100, size, materials.wall, false, true, ws, true, -1);
+            },
+
+            buildOpenArena: function(ws) {
+                const cfg = ws.config;
+                const size = cfg.size;
+                const scaleMod = cfg.scale;
+
+                this.spawnDecorations(Math.floor(25 * scaleMod), 2*scaleMod, 7*scaleMod, size*0.75, size*0.75, ws);
+                this.spawnDecorations(Math.floor(8 * scaleMod), 10*scaleMod, 20*scaleMod, size*0.85, size*0.85, ws);
+                this.spawnDecorations(Math.floor(4 * scaleMod), 25*scaleMod, 45*scaleMod, size*0.9, size*0.9, ws);
+                this.spawnDecorations(Math.max(1, Math.floor(1 * scaleMod)), 60*scaleMod, 80*scaleMod, size*0.75, size*0.75, ws);
+            },
+
+            buildMaze: function(ws) {
+                const cfg = ws.config;
+                const cellSize = cfg.mazeCellSize || 30;
+                const wallH = cfg.mazeWallHeight || 18;
+                
+                const mazePixelSize = cfg.size * 0.7; 
+                const cols = Math.floor(mazePixelSize / cellSize);
+                const rows = Math.floor(mazePixelSize / cellSize);
+                
+                const mazeData = this.generateMazeData(cols, rows);
+                
+                const realWidth = cols * cellSize;
+                const realDepth = rows * cellSize;
+                const startX = -realWidth / 2;
+                const startZ = -realDepth / 2;
+                const wallThickness = 1.0;
+
+                // 1. Spawn Pillars at Intersections
+                for (let x = 0; x <= cols; x++) {
+                    for (let y = 0; y <= rows; y++) {
+                        // Skip outer perimeter nodes
+                        if (x === 0 || x === cols || y === 0 || y === rows) continue;
+
+                        let hasConnection = false;
+                        if (y < rows && mazeData.vertical[x][y]) hasConnection = true;
+                        if (y > 0 && mazeData.vertical[x][y-1]) hasConnection = true;
+                        if (x < cols && mazeData.horizontal[y][x]) hasConnection = true;
+                        if (x > 0 && mazeData.horizontal[y][x-1]) hasConnection = true;
+
+                        if (hasConnection) {
+                            const px = startX + (x * cellSize);
+                            const pz = startZ + (y * cellSize);
+                            this.createBox(px, wallH/2, pz, wallThickness, wallH, wallThickness, materials.wall, false, true, ws);
+                        }
+                    }
+                }
+
+                // 2. Spawn Wall Panels Between Pillars
+                // Vertical Walls
+                for (let x = 0; x <= cols; x++) {
+                    for (let y = 0; y < rows; y++) {
+                        if (x === 0 || x === cols) continue;
+
+                        if (mazeData.vertical[x][y]) {
+                            const wx = startX + (x * cellSize);
+                            const wz = startZ + (y * cellSize) + (cellSize / 2);
+                            this.createBox(wx, wallH/2, wz, wallThickness, wallH, cellSize - wallThickness, materials.wall, false, true, ws);
+                        }
+                    }
+                }
+
+                // Horizontal Walls
+                for (let y = 0; y <= rows; y++) {
+                    for (let x = 0; x < cols; x++) {
+                        if (y === 0 || y === rows) continue;
+
+                        if (mazeData.horizontal[y][x]) {
+                            const wx = startX + (x * cellSize) + (cellSize / 2);
+                            const wz = startZ + (y * cellSize);
+                            this.createBox(wx, wallH/2, wz, cellSize - wallThickness, wallH, wallThickness, materials.wall, false, true, ws);
+                        }
+                    }
+                }
+
+                // 3. Spawn Decorations
+                for (let x = 0; x < cols; x++) {
+                    for (let y = 0; y < rows; y++) {
+                        if (Math.random() < 0.4) {
+                            const cx = startX + (x * cellSize) + (cellSize / 2);
+                            const cz = startZ + (y * cellSize) + (cellSize / 2);
+                            
+                            const jitterRange = cellSize * 0.2;
+                            const jx = (Math.random() - 0.5) * 2 * jitterRange;
+                            const jz = (Math.random() - 0.5) * 2 * jitterRange;
+                            
+                            const minScale = 2;
+                            const maxScale = cellSize * 0.45; 
+                            const scale = minScale + Math.random() * (maxScale - minScale);
+                            
+                            new Decoration(cx + jx, cz + jz, scale, ws);
+                        }
+                    }
+                }
+            },
+
+            generateMazeData: function(cols, rows) {
+                const vertical = Array(cols + 1).fill(null).map(() => Array(rows).fill(true));
+                const horizontal = Array(rows + 1).fill(null).map(() => Array(cols).fill(true));
+                const visited = Array(cols).fill(null).map(() => Array(rows).fill(false));
+                
+                const stack = [];
+                const startX = Math.floor(Math.random() * cols);
+                const startZ = Math.floor(Math.random() * rows);
+                
+                visited[startX][startZ] = true;
+                stack.push({x: startX, z: startZ});
+                
+                while(stack.length > 0) {
+                    const current = stack[stack.length - 1];
+                    const neighbors = [];
+                    
+                    if (current.z > 0 && !visited[current.x][current.z - 1]) 
+                        neighbors.push({x: current.x, z: current.z - 1, dir: 'N'});
+                    if (current.z < rows - 1 && !visited[current.x][current.z + 1]) 
+                        neighbors.push({x: current.x, z: current.z + 1, dir: 'S'});
+                    if (current.x < cols - 1 && !visited[current.x + 1][current.z]) 
+                        neighbors.push({x: current.x + 1, z: current.z, dir: 'E'});
+                    if (current.x > 0 && !visited[current.x - 1][current.z]) 
+                        neighbors.push({x: current.x - 1, z: current.z, dir: 'W'});
+                        
+                    if (neighbors.length > 0) {
+                        const next = neighbors[Math.floor(Math.random() * neighbors.length)];
+                        
+                        if (next.dir === 'N') horizontal[current.z][current.x] = false;
+                        if (next.dir === 'S') horizontal[current.z + 1][current.x] = false;
+                        if (next.dir === 'E') vertical[current.x + 1][current.z] = false;
+                        if (next.dir === 'W') vertical[current.x][current.z] = false;
+                        
+                        visited[next.x][next.z] = true;
+                        stack.push(next);
+                    } else {
+                        stack.pop();
+                    }
+                }
+                
+                return { vertical, horizontal };
+            },
             
-            createBox: function(x, y, z, w, h, d, mat, isFloor, isWall, ws) {
+            createBox: function(x, y, z, w, h, d, mat, isFloor, isWall, ws, disableCull = false, customOrder = null) {
                 const geo = new THREE.BoxGeometry(w, h, d);
                 const mesh = new THREE.Mesh(geo, mat);
                 mesh.position.set(x, y, z);
                 
-                // Only cast shadows if it's not a floor and not a boundary wall
-                mesh.castShadow = !isFloor && !isWall;
+                // Unified Render Order Logic
+                mesh.renderOrder = (customOrder !== null) ? customOrder : 0;
                 
+                if (disableCull) mesh.frustumCulled = false;
+
+                mesh.castShadow = !isFloor && !isWall;
                 mesh.receiveShadow = true;
                 mesh.userData.isFloor = isFloor;
                 
@@ -1614,8 +1763,6 @@
                      mesh.add(line);
                 }
 
-                // Force environment to draw first so transparent particles don't glitch
-                mesh.renderOrder = -1;
                 ws.group.add(mesh);
                 mesh.geometry.computeBoundingBox();
                 mesh.updateMatrixWorld(true);
@@ -1657,19 +1804,18 @@
             createPortals: function(ws, range) {
                 const colors = [0x00ffff, 0xffaa00, 0xaa00ff, 0x00ff00];
                 const portalLocs = [];
-                
-                // TWEAK: Increase density. Was /100, now /50.
-                // Titan (2000m) now gets ~40 pairs (80 portals) instead of 20 pairs.
                 const pairCount = Math.max(4, Math.floor(range / 50)); 
                 
                 for(let i=0; i<pairCount*2; i++) {
                     let x, z;
+                    let attempts = 0;
                     do {
                         x = (Math.random()-0.5)*range;
                         z = (Math.random()-0.5)*range;
-                    } while(Math.abs(x) < 30 && Math.abs(z) < 30);
+                        attempts++;
+                        if (attempts > 5) break; 
+                    } while(Math.abs(x) < 15 && Math.abs(z) < 15);
                     
-                    // This now uses the fixed getGroundHeight, so it will hit box tops
                     const y = getGroundHeight(x, z); 
                     portalLocs.push({x, y, z});
                 }
@@ -1744,10 +1890,11 @@
                 const mat = new THREE.MeshBasicMaterial({ 
                     color: 0xffffff, opacity: 0.4, transparent: true, side: THREE.DoubleSide, depthWrite: false 
                 });
-                this.aimLine = new THREE.Mesh(geo, mat); 
-                this.aimLine.frustumCulled = false;
-                this.aimLine.visible = false;
-                camera.add(this.aimLine);
+                this.aimLine = new THREE.Mesh(geo, mat);
+                    this.aimLine.renderOrder = 2;
+                    this.aimLine.frustumCulled = false;
+                    this.aimLine.visible = false;
+                    camera.add(this.aimLine);
             }
             
             updatePlayerBox() {
@@ -2374,6 +2521,7 @@
                 });
                 
                 this.mesh = new THREE.Mesh(geo, mat);
+                this.mesh.renderOrder = 2;
                 
                 const wireGeo = new THREE.DodecahedronGeometry(0.22);
                 const wireMat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.5 });
@@ -3018,7 +3166,11 @@
                 disp.style.display = showFPS ? "block" : "none";
             });
             document.getElementById('world-btn').addEventListener('click', () => {
-                const next = WorldManager.current.name === 'ARENA' ? 'TITAN' : 'ARENA';
+                const order = ['ARENA', 'TITAN', 'MAZE', 'LABYRINTH'];
+                const currentName = WorldManager.current ? WorldManager.current.name : 'ARENA';
+                let idx = order.indexOf(currentName);
+                if (idx === -1) idx = 0;
+                const next = order[(idx + 1) % order.length];
                 WorldManager.switch(next);
             });
 
@@ -3047,24 +3199,28 @@
             sharedLeafGeo = new THREE.PlaneGeometry(0.3, 0.3); 
 
             // Initialize Materials
+            // Initialize Materials
             materials.floor = new THREE.MeshPhysicalMaterial({ 
                 map: textures.gridDefault, 
                 color: 0xffffff, 
                 roughness: 0.5, 
                 metalness: 0.1,
-                transparent: true, // Enable translucency
-                opacity: 0.90      // Subtle 10% transparency
+                transparent: true, 
+                opacity: 0.90,
+                depthWrite: false // Prevents floor from occluding things (like player in void)
             });
+            
             materials.wall = new THREE.MeshPhysicalMaterial({ 
                 color: 0xeeeeee, 
                 roughness: 0.1, 
                 metalness: 0.1,
-                transparent: true, // Allows translucency
-                opacity: 0.6,      // Sets the "glass" thickness/visibility
-                transmission: 0.25, // Adds a realistic glass-like light pass-through
-                thickness: 0.5,     // Simulates depth in the glass
-                emissive: 0xffffff,       // The color of the faint glow
-                emissiveIntensity: 1   // Adjusted for a noticeable but faint glow
+                transparent: true, 
+                opacity: 0.5,      
+                transmission: 0.25, 
+                thickness: 0.5,     
+                emissive: 0xffffff,       
+                emissiveIntensity: 1,
+                depthWrite: false // Allows floor/objects to be seen "through" and "behind" the wall
             });
             materials.obstacle = new THREE.MeshPhysicalMaterial({ 
                 color: 0xcccccc, roughness: 0.3, clearcoat: 0.5, clearcoatRoughness: 0.1
@@ -3772,6 +3928,7 @@
         function spawnImpact(pos, color=0xffffff, scale=1.0) {
             const matCore = new THREE.SpriteMaterial({ map: textures.glow, color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending });
             const core = new THREE.Sprite(matCore);
+            core.renderOrder = 2;
             core.position.copy(pos);
             core.scale.setScalar(scale);
             scene.add(core);
@@ -3779,6 +3936,7 @@
 
             const matGlow = new THREE.SpriteMaterial({ map: textures.glow, color: color, transparent: true, blending: THREE.AdditiveBlending, opacity: 0.8 });
             const glow = new THREE.Sprite(matGlow);
+            glow.renderOrder = 2;
             glow.position.copy(pos);
             glow.scale.setScalar(scale * 2);
             scene.add(glow);
@@ -3794,6 +3952,7 @@
                     blending: THREE.AdditiveBlending 
                 });
                 const m = new THREE.Sprite(mat);
+                m.renderOrder = 2;
                 const s = 0.2 + Math.random() * 0.3;
                 m.scale.set(s, s, s);
                 m.position.copy(pos);
@@ -3830,6 +3989,7 @@
                 });
                 
                 const mesh = new THREE.Mesh(geo, mat);
+                mesh.renderOrder = 2;
                 mesh.position.copy(pos).addScaledVector(normal, 0.05 + (i * 0.2)); 
                 mesh.lookAt(pos.clone().add(normal)); 
                 
@@ -4374,7 +4534,7 @@
 
     checkVision(playerPos) {
         if (this.isDeadCorpse || this.state === 'CONFUSED') return false;
-        if (this.mesh.position.distanceTo(playerPos) > 60) return false;
+        // if (this.mesh.position.distanceTo(playerPos) > 300) return false;
         _vec3_3.copy(this.mesh.position).add(new THREE.Vector3(0, 0.5, 0));
         const distToPlayer = _vec3_3.distanceTo(playerPos);
         _vec3_1.subVectors(playerPos, _vec3_3).normalize();
