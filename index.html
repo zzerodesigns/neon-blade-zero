@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v47.2.2</title>
+    <title>Neon Blade: Melee Arena v47.3.0</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -136,7 +136,7 @@
         /* MENUS */ 
         #start-screen {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(5, 10, 20, 0.95);
+            background: rgba(5, 10, 20, 0.875);
             display: flex; flex-direction: column; overflow-y: auto; padding: 0; 
             z-index: 10; pointer-events: auto; backdrop-filter: blur(5px);
             background-image: 
@@ -476,7 +476,7 @@
                 <button class="btn-secondary" id="fps-btn">SHOW FPS: OFF</button>
             </div>
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.2.2<br>--- Spawn Fix: Bots & Portals ---</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.3.0<br>--- Audio & Visual Updates ---</div>
         </div>
     </div>
 
@@ -802,59 +802,306 @@
             },
 
             playSlash: function() {
-                if(!this.ctx) return;
+                if (!this.ctx) return;
                 const t = this.ctx.currentTime;
-                const osc1 = this.ctx.createOscillator();
-                osc1.type = 'triangle';
-                osc1.frequency.setValueAtTime(1200, t); 
-                osc1.frequency.exponentialRampToValueAtTime(200, t + 0.15);
-                const g1 = this.ctx.createGain();
-                g1.gain.setValueAtTime(0.25, t);
-                g1.gain.exponentialRampToValueAtTime(0.01, t + 0.15);
-                osc1.connect(g1); g1.connect(this.ctx.destination);
-                osc1.start(); osc1.stop(t + 0.2);
+                
+                // --- Master Volume for this effect ---
+                const masterGain = this.ctx.createGain();
+                masterGain.gain.value = 0.8; // Slightly reduced for subtlety
+                masterGain.connect(this.ctx.destination);
+                
+                // 1. GENERATE WHITE NOISE BUFFER
+                const bufferSize = this.ctx.sampleRate * 2;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+                
+                // 2. THE SCRAPE (Cleaner, more focused)
+                const noiseSrc = this.ctx.createBufferSource();
+                noiseSrc.buffer = buffer;
+                
+                // Main bandpass sweep
+                const scrapeFilter = this.ctx.createBiquadFilter();
+                scrapeFilter.type = 'bandpass';
+                scrapeFilter.Q.value = 8; // Reduced Q for smoother sound
+                scrapeFilter.frequency.setValueAtTime(900, t);
+                scrapeFilter.frequency.exponentialRampToValueAtTime(7000, t + 0.2); // Tighter sweep
+                
+                const scrapeGain = this.ctx.createGain();
+                scrapeGain.gain.setValueAtTime(0, t);
+                scrapeGain.gain.linearRampToValueAtTime(0.9, t + 0.12); // Reduced peak
+                scrapeGain.gain.exponentialRampToValueAtTime(0.001, t + 0.25); // Quick cutoff
+                
+                noiseSrc.connect(scrapeFilter);
+                scrapeFilter.connect(scrapeGain);
+                scrapeGain.connect(masterGain);
+                noiseSrc.start(t);
+                noiseSrc.stop(t + 0.35);
+                
+                // Low-frequency whoosh for body (more subtle)
+                const whooshSrc = this.ctx.createBufferSource();
+                whooshSrc.buffer = buffer;
+                
+                const whooshFilter = this.ctx.createBiquadFilter();
+                whooshFilter.type = 'lowpass';
+                whooshFilter.frequency.setValueAtTime(350, t);
+                whooshFilter.frequency.exponentialRampToValueAtTime(120, t + 0.22);
+                
+                const whooshGain = this.ctx.createGain();
+                whooshGain.gain.setValueAtTime(0, t);
+                whooshGain.gain.linearRampToValueAtTime(0.5, t + 0.1);
+                whooshGain.gain.exponentialRampToValueAtTime(0.001, t + 0.24);
+                
+                whooshSrc.connect(whooshFilter);
+                whooshFilter.connect(whooshGain);
+                whooshGain.connect(masterGain);
+                whooshSrc.start(t);
+                whooshSrc.stop(t + 0.3);
+                
+                // 3. THE RING (Minimal, clean resonance)
+                const partials = [3200, 4500]; // Reduced from 4 partials to 2
+                partials.forEach((freq, index) => {
+                    const osc = this.ctx.createOscillator();
+                    osc.type = 'sine'; // Pure sine for cleaner sound
+                    osc.frequency.setValueAtTime(freq, t);
+                    osc.frequency.linearRampToValueAtTime(freq - 20, t + 0.4);
+                    
+                    const oscGain = this.ctx.createGain();
+                    const peakTime = t + 0.18;
+                    oscGain.gain.setValueAtTime(0, t);
+                    oscGain.gain.setValueAtTime(0, peakTime - 0.03);
+                    oscGain.gain.linearRampToValueAtTime(0.08 / (index + 1), peakTime); // Much quieter
+                    // Very short tail - 0.35s
+                    oscGain.gain.exponentialRampToValueAtTime(0.0001, peakTime + 0.35);
+                    
+                    osc.connect(oscGain);
+                    oscGain.connect(masterGain);
+                    osc.start(t);
+                    osc.stop(t + 0.7); // Stop much earlier
+                });
             },
             
             playMiss: function() {
-                if(!this.ctx) return;
+                if (!this.ctx) return;
                 const t = this.ctx.currentTime;
-                const bSize = this.ctx.sampleRate * 0.1;
+
+                // 1. GENERATE A SLIGHTLY LONGER NOISE BUFFER
+                const bSize = this.ctx.sampleRate * 0.4; // Increased to 0.4s for a fuller swing
                 const b = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
                 const d = b.getChannelData(0);
-                for(let i=0;i<bSize;i++) d[i] = Math.random()*2-1;
+                for (let i = 0; i < bSize; i++) d[i] = Math.random() * 2 - 1;
+
+                // 2. THE WHOOSH (Air displacement)
                 const n = this.ctx.createBufferSource();
                 n.buffer = b;
-                const ng = this.ctx.createGain();
-                ng.gain.setValueAtTime(0.1, t);
-                ng.gain.exponentialRampToValueAtTime(0.001, t+0.1);
+
                 const nf = this.ctx.createBiquadFilter();
-                nf.type = 'lowpass';
-                nf.frequency.value = 800;
-                n.connect(nf); nf.connect(ng); ng.connect(this.ctx.destination);
-                n.start();
+                nf.type = 'bandpass'; // Bandpass creates that "whistling" air sound
+                nf.Q.value = 5;
+                // Sweep the frequency down to simulate the object moving away
+                nf.frequency.setValueAtTime(2000, t);
+                nf.frequency.exponentialRampToValueAtTime(400, t + 0.3);
+
+                const ng = this.ctx.createGain();
+                ng.gain.setValueAtTime(0, t);
+                ng.gain.linearRampToValueAtTime(0.4, t + 0.1); // Quick fade in
+                ng.gain.exponentialRampToValueAtTime(0.001, t + 0.4); // Longer fade out
+
+                n.connect(nf);
+                nf.connect(ng);
+                ng.connect(this.ctx.destination);
+
+                // 3. THE "DISSAPOINTMENT" LAYER (Low-end ghost)
+                // This adds a subtle "oomph" to the miss so it feels physical, but hollow.
+                const ghost = this.ctx.createOscillator();
+                ghost.type = 'sine';
+                ghost.frequency.setValueAtTime(200, t);
+                ghost.frequency.exponentialRampToValueAtTime(50, t + 0.3); // Pitch drops away
+
+                const ghostGain = this.ctx.createGain();
+                ghostGain.gain.setValueAtTime(0, t);
+                ghostGain.gain.linearRampToValueAtTime(0.2, t + 0.1);
+                ghostGain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+
+                ghost.connect(ghostGain);
+                ghostGain.connect(this.ctx.destination);
+
+                n.start(t);
+                ghost.start(t);
+                n.stop(t + 0.4);
+                ghost.stop(t + 0.4);
             },
 
-            playHit: function() { 
-                if(!this.ctx) return;
+            playHit: function() {
+                if (!this.ctx) return;
                 const t = this.ctx.currentTime;
-                const oscA = this.ctx.createOscillator();
-                oscA.type = 'square';
-                oscA.frequency.setValueAtTime(450, t);
-                oscA.frequency.exponentialRampToValueAtTime(300, t+0.15);
-                const oscB = this.ctx.createOscillator();
-                oscB.type = 'square';
-                oscB.frequency.setValueAtTime(680, t);
-                oscB.frequency.exponentialRampToValueAtTime(500, t+0.15);
-                const gainA = this.ctx.createGain();
-                gainA.gain.setValueAtTime(0.1, t);
-                gainA.gain.exponentialRampToValueAtTime(0.001, t+0.15);
-                const gainB = this.ctx.createGain();
-                gainB.gain.setValueAtTime(0.1, t);
-                gainB.gain.exponentialRampToValueAtTime(0.001, t+0.15);
-                oscA.connect(gainA); oscA.start(); oscA.stop(t+0.15);
-                oscB.connect(gainB); oscB.start(); oscB.stop(t+0.15);
-                gainA.connect(this.ctx.destination);
-                gainB.connect(this.ctx.destination);
+
+                // --- 1. SIGNAL CHAIN ---
+                const masterGain = this.ctx.createGain();
+                masterGain.gain.value = 0.85; 
+                
+                const compressor = this.ctx.createDynamicsCompressor();
+                compressor.threshold.setValueAtTime(-18, t); // Slightly higher threshold for more "punch"
+                compressor.knee.setValueAtTime(20, t);
+                compressor.ratio.setValueAtTime(12, t);
+                compressor.attack.setValueAtTime(0.002, t); // Faster attack to clamp the hit
+                compressor.release.setValueAtTime(0.2, t);
+
+                compressor.connect(masterGain);
+                masterGain.connect(this.ctx.destination);
+
+                // --- 2. SHARED NOISE BUFFER ---
+                const bufferSize = this.ctx.sampleRate * 2;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) { data[i] = Math.random() * 2 - 1; }
+
+                // --- 3. THE IMPACT (Revised for more weight) ---
+                
+                // The "Crack" (Transient)
+                const impactSrc = this.ctx.createBufferSource();
+                impactSrc.buffer = buffer;
+                const impactFilter = this.ctx.createBiquadFilter();
+                impactFilter.type = 'highpass';
+                impactFilter.frequency.setValueAtTime(2500, t);
+                const impactGain = this.ctx.createGain();
+                impactGain.gain.setValueAtTime(1.4, t);
+                impactGain.gain.exponentialRampToValueAtTime(0.01, t + 0.04);
+                impactSrc.connect(impactFilter);
+                impactFilter.connect(impactGain);
+                impactGain.connect(compressor);
+                impactSrc.start(t);
+                impactSrc.stop(t + 0.05);
+
+                // NEW: THE "HEAVY BODY" THUD (Added weight)
+                const heavyThud = this.ctx.createOscillator();
+                heavyThud.type = 'triangle'; // Triangle provides more "chest-hit" harmonics
+                const thudFilter = this.ctx.createBiquadFilter();
+                thudFilter.type = 'lowpass';
+                thudFilter.frequency.setValueAtTime(100, t); // Filter out the "buzz," keep the weight
+                
+                heavyThud.frequency.setValueAtTime(100, t); 
+                heavyThud.frequency.exponentialRampToValueAtTime(30, t + 0.15);
+                
+                const thudGain = this.ctx.createGain();
+                thudGain.gain.setValueAtTime(1.0, t);
+                thudGain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+                
+                heavyThud.connect(thudFilter);
+                thudFilter.connect(thudGain);
+                thudGain.connect(compressor);
+                heavyThud.start(t);
+                heavyThud.stop(t + 0.3);
+
+                // Original Thump (Sine) - kept for the low-end "foundation"
+                const thumpOsc = this.ctx.createOscillator();
+                thumpOsc.type = 'sine';
+                thumpOsc.frequency.setValueAtTime(150, t); 
+                thumpOsc.frequency.exponentialRampToValueAtTime(40, t + 0.1);
+                const thumpGain = this.ctx.createGain();
+                thumpGain.gain.setValueAtTime(0.6, t); // Lowered slightly to make room for heavyThud
+                thumpGain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+                thumpOsc.connect(thumpGain);
+                thumpGain.connect(compressor);
+                thumpOsc.start(t);
+                thumpOsc.stop(t + 0.2);
+
+                // --- 4. THE BODY (Scrape, Whoosh, & Ring) ---
+                // [Scrape Logic]
+                const noiseSrc = this.ctx.createBufferSource();
+                noiseSrc.buffer = buffer;
+                const scrapeFilter = this.ctx.createBiquadFilter();
+                scrapeFilter.type = 'bandpass';
+                scrapeFilter.Q.value = 10; 
+                scrapeFilter.frequency.setValueAtTime(800, t); 
+                scrapeFilter.frequency.exponentialRampToValueAtTime(9000, t + 0.22); 
+                const scrapeGain = this.ctx.createGain();
+                scrapeGain.gain.setValueAtTime(0, t);
+                scrapeGain.gain.linearRampToValueAtTime(1.1, t + 0.15); 
+                scrapeGain.gain.exponentialRampToValueAtTime(0.001, t + 0.3); 
+                noiseSrc.connect(scrapeFilter);
+                scrapeFilter.connect(scrapeGain);
+                scrapeGain.connect(compressor);
+                noiseSrc.start(t);
+                noiseSrc.stop(t + 0.4);
+
+                // [Whoosh Logic]
+                const whooshSrc = this.ctx.createBufferSource();
+                whooshSrc.buffer = buffer;
+                const whooshFilter = this.ctx.createBiquadFilter();
+                whooshFilter.type = 'lowpass';
+                whooshFilter.frequency.setValueAtTime(400, t);
+                whooshFilter.frequency.exponentialRampToValueAtTime(150, t + 0.25);
+                const whooshGain = this.ctx.createGain();
+                whooshGain.gain.setValueAtTime(0, t);
+                whooshGain.gain.linearRampToValueAtTime(0.6, t + 0.12);
+                whooshGain.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+                whooshSrc.connect(whooshFilter);
+                whooshFilter.connect(whooshGain);
+                whooshGain.connect(compressor);
+                whooshSrc.start(t);
+                whooshSrc.stop(t + 0.35);
+
+                // [Metallic Ring Logic]
+                const partials = [2800, 3500, 5200, 8000];
+                partials.forEach((freq, index) => {
+                    const osc = this.ctx.createOscillator();
+                    osc.type = index === 0 ? 'sine' : 'triangle';
+                    osc.frequency.setValueAtTime(freq, t);
+                    osc.frequency.linearRampToValueAtTime(freq - 30, t + 0.6); 
+                    const oscGain = this.ctx.createGain();
+                    const peakTime = t + 0.2; 
+                    oscGain.gain.setValueAtTime(0, t);
+                    oscGain.gain.setValueAtTime(0, peakTime - 0.04);
+                    oscGain.gain.linearRampToValueAtTime(0.1 / (index + 1), peakTime); 
+                    oscGain.gain.exponentialRampToValueAtTime(0.0001, peakTime + 0.4 + (index * 0.05)); 
+                    osc.connect(oscGain);
+                    oscGain.connect(compressor);
+                    osc.start(t);
+                    osc.stop(t + 0.9); 
+                });
+
+                // --- 5. THE RESONANCE (Vibration) ---
+                const vibOsc = this.ctx.createOscillator();
+                vibOsc.type = 'sine';
+                vibOsc.frequency.setValueAtTime(50, t); 
+                vibOsc.frequency.exponentialRampToValueAtTime(25, t + 0.8);
+                const tremoloOsc = this.ctx.createOscillator();
+                tremoloOsc.type = 'sine';
+                tremoloOsc.frequency.setValueAtTime(8, t);
+                const tremoloGain = this.ctx.createGain();
+                tremoloGain.gain.setValueAtTime(0.3, t); // Slightly less tremolo for cleaner impact
+                tremoloOsc.connect(tremoloGain);
+                const vibGain = this.ctx.createGain();
+                vibGain.gain.setValueAtTime(0, t);
+                vibGain.gain.linearRampToValueAtTime(0.8, t + 0.05);
+                vibGain.gain.exponentialRampToValueAtTime(0.15, t + 0.3);
+                vibGain.gain.exponentialRampToValueAtTime(0.001, t + 0.7);
+                tremoloGain.connect(vibGain.gain);
+                vibOsc.connect(vibGain);
+                vibGain.connect(compressor);
+                vibOsc.start(t);
+                vibOsc.stop(t + 0.75);
+                tremoloOsc.start(t);
+                tremoloOsc.stop(t + 0.75);
+
+                // --- 6. THE TAIL (Subtle & Shorter) ---
+                const tailSrc = this.ctx.createBufferSource();
+                tailSrc.buffer = buffer;
+                const tailFilter = this.ctx.createBiquadFilter();
+                tailFilter.type = 'lowpass';
+                tailFilter.frequency.setValueAtTime(800, t); // Darker reverb
+                const tailGain = this.ctx.createGain();
+                tailGain.gain.setValueAtTime(0, t);
+                tailGain.gain.linearRampToValueAtTime(0.08, t + 0.08); // Lower peak volume (0.08 vs 0.15)
+                tailGain.gain.exponentialRampToValueAtTime(0.001, t + 0.7); // Faster fade (0.7s vs 1.2s)
+                tailSrc.connect(tailFilter);
+                tailFilter.connect(tailGain);
+                tailGain.connect(compressor);
+                tailSrc.start(t);
+                tailSrc.stop(t + 0.7);
             },
 
             playTeleport: function() {
@@ -876,82 +1123,136 @@
             playExplosion: function(type) {
                 if (!this.ctx) return;
                 const t = this.ctx.currentTime;
+
+                // SIGNAL MANAGEMENT: Prevents digital clipping while preserving transient peaks
+                const masterLimit = this.ctx.createDynamicsCompressor();
+                masterLimit.threshold.setValueAtTime(-1, t);
+                masterLimit.knee.setValueAtTime(0, t);
+                masterLimit.ratio.setValueAtTime(20, t);
+                masterLimit.connect(this.ctx.destination);
+
+                // NOISE SOURCE: Re-generating buffer for consistent texture
                 const bSize = this.ctx.sampleRate * 0.8;
                 const b = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
                 const d = b.getChannelData(0);
-                for(let i=0;i<bSize;i++) d[i] = Math.random()*2-1;
+                for(let i=0; i<bSize; i++) d[i] = Math.random()*2-1;
+                
                 const n = this.ctx.createBufferSource();
                 n.buffer = b;
                 const ng = this.ctx.createGain();
+                const nf = this.ctx.createBiquadFilter();
+
+                // PRIMARY OSCILLATORS
                 const osc = this.ctx.createOscillator();
                 const og = this.ctx.createGain();
-                
+
+                // SUB-BASS LAYER: Pure sine for felt weight without harmonic clutter
+                const sub = this.ctx.createOscillator();
+                const subGain = this.ctx.createGain();
+                sub.type = 'sine';
+                sub.connect(subGain);
+                subGain.connect(masterLimit);
+
                 if (type === 'STICKY') {
+                    // Charge Phase
                     osc.type = 'sine';
                     osc.frequency.setValueAtTime(40, t); 
                     osc.frequency.exponentialRampToValueAtTime(600, t + 0.3); 
                     og.gain.setValueAtTime(0, t);
                     og.gain.linearRampToValueAtTime(0.25, t + 0.25); 
-                    og.gain.setValueAtTime(0, t + 0.3); 
+                    og.gain.linearRampToValueAtTime(0, t + 0.3); 
+
+                    // The Snap (Mechanical Impact)
                     const snapOsc = this.ctx.createOscillator();
                     const snapGain = this.ctx.createGain();
                     snapOsc.type = 'triangle';
                     snapOsc.frequency.setValueAtTime(100, t + 0.31); 
                     snapOsc.frequency.exponentialRampToValueAtTime(40, t + 0.45);
-                    snapGain.gain.setValueAtTime(0, t);
-                    snapGain.gain.setValueAtTime(0.5, t + 0.31); 
-                    snapGain.gain.exponentialRampToValueAtTime(0.01, t + 0.6);
+                    snapGain.gain.setValueAtTime(0, t + 0.31);
+                    snapGain.gain.linearRampToValueAtTime(0.5, t + 0.32); 
+                    snapGain.gain.exponentialRampToValueAtTime(0.001, t + 0.7); 
+                    
+                    // Sticky Sub (Synchronized with Snap)
+                    sub.frequency.setValueAtTime(50, t + 0.31);
+                    sub.frequency.exponentialRampToValueAtTime(20, t + 0.6);
+                    subGain.gain.setValueAtTime(0, t + 0.31);
+                    subGain.gain.linearRampToValueAtTime(0.4, t + 0.32);
+                    subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.7); 
+
                     snapOsc.connect(snapGain);
-                    snapGain.connect(this.ctx.destination);
-                    snapOsc.start(t + 0.31); snapOsc.stop(t + 0.7);
-                    const nf = this.ctx.createBiquadFilter();
+                    snapGain.connect(masterLimit);
+                    snapOsc.start(t + 0.31); 
+                    snapOsc.stop(t + 0.85); 
+                    sub.start(t + 0.31); 
+                    sub.stop(t + 0.85); 
+
                     nf.type = 'bandpass';
                     nf.frequency.setValueAtTime(100, t);
                     nf.frequency.exponentialRampToValueAtTime(1500, t + 0.3); 
                     nf.Q.value = 2.0; 
                     ng.gain.setValueAtTime(0, t);
                     ng.gain.linearRampToValueAtTime(0.3, t + 0.25); 
-                    ng.gain.setValueAtTime(0, t + 0.3); 
-                    n.connect(nf); nf.connect(ng);
+                    ng.gain.linearRampToValueAtTime(0, t + 0.3); 
+                    
                 } else if (type === 'IMPULSE') {
+                    // Pneumatic Air Texture
                     osc.type = 'triangle';
                     osc.frequency.setValueAtTime(40, t); 
                     osc.frequency.exponentialRampToValueAtTime(550, t + 0.08); 
                     osc.frequency.exponentialRampToValueAtTime(30, t + 0.6); 
                     og.gain.setValueAtTime(0, t);
                     og.gain.linearRampToValueAtTime(0.5, t + 0.015); 
-                    og.gain.exponentialRampToValueAtTime(0.01, t + 0.5); 
-                    const nf = this.ctx.createBiquadFilter();
+                    og.gain.exponentialRampToValueAtTime(0.001, t + 0.6); 
+
+                    // Impulse Sub (Provides the 'Push' sensation)
+                    sub.frequency.setValueAtTime(70, t);
+                    sub.frequency.exponentialRampToValueAtTime(30, t + 0.2);
+                    subGain.gain.setValueAtTime(0, t);
+                    subGain.gain.linearRampToValueAtTime(0.8, t + 0.01); 
+                    subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
+                    sub.start(t); sub.stop(t + 0.5);
+
                     nf.type = 'lowpass';
                     nf.frequency.setValueAtTime(600, t); 
                     nf.frequency.exponentialRampToValueAtTime(40, t + 0.6);
-                    nf.Q.setValueAtTime(8, t); 
-                    nf.Q.exponentialRampToValueAtTime(1, t + 0.15);
+                    nf.Q.setValueAtTime(1.5, t); // Softer resonance to reduce fatiguing chirps
                     ng.gain.setValueAtTime(0.35, t); 
-                    ng.gain.exponentialRampToValueAtTime(0.01, t + 0.6); 
-                    n.connect(nf); nf.connect(ng);
+                    ng.gain.exponentialRampToValueAtTime(0.001, t + 0.7); 
+
                 } else { 
+                    // STANDARD/FRAG
                     osc.type = 'triangle'; 
                     osc.frequency.setValueAtTime(65, t); 
                     osc.frequency.exponentialRampToValueAtTime(30, t + 0.3); 
-                    og.gain.setValueAtTime(0.6, t);
-                    og.gain.exponentialRampToValueAtTime(0.01, t + 0.9);
-                    const distortionGain = this.ctx.createGain();
-                    distortionGain.gain.setValueAtTime(1.0, t);
-                    distortionGain.gain.linearRampToValueAtTime(0, t + 0.05); 
-                    const nf = this.ctx.createBiquadFilter();
+                    og.gain.setValueAtTime(0.7, t); 
+                    og.gain.exponentialRampToValueAtTime(0.001, t + 1.0);
+
+                    // Frag Sub (Adds density to the explosion)
+                    sub.frequency.setValueAtTime(55, t);
+                    sub.frequency.exponentialRampToValueAtTime(25, t + 0.4);
+                    subGain.gain.setValueAtTime(0.8, t);
+                    subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+                    sub.start(t); sub.stop(t + 0.75);
+
                     nf.type = 'lowpass';
                     nf.frequency.setValueAtTime(450, t); 
                     nf.frequency.linearRampToValueAtTime(60, t + 0.6);
                     nf.Q.value = 1.0; 
-                    ng.gain.setValueAtTime(0.7, t);
+                    ng.gain.setValueAtTime(0.8, t); 
                     ng.gain.linearRampToValueAtTime(0, t + 1.5); 
-                    n.connect(nf); nf.connect(ng);
                 }
-                osc.connect(og); og.connect(this.ctx.destination);
-                osc.start(); osc.stop(t+1.0);
-                ng.connect(this.ctx.destination);
-                n.start();
+
+                // FINAL SIGNAL COUPLING
+                n.connect(nf); 
+                nf.connect(ng); 
+                ng.connect(masterLimit);
+                
+                osc.connect(og); 
+                og.connect(masterLimit);
+
+                osc.start(t); 
+                osc.stop(t + 1.6); // Buffer to ensure all ramps finalize
+                n.start(t);
             },
 
             playThrow: function() {
@@ -970,25 +1271,50 @@
                 osc.start(); osc.stop(t + 0.15);
             },
 
-            playHeartbeat: function(speed) {
+            playHeartbeat: function(dangerFactor = 0) {
                 if(!this.ctx) return;
                 const t = this.ctx.currentTime;
+
                 const playThump = (time, freq, vol, duration) => {
-                    const osc = this.ctx.createOscillator();
+                    const osc1 = this.ctx.createOscillator();
+                    const osc2 = this.ctx.createOscillator();
                     const g = this.ctx.createGain();
                     const filter = this.ctx.createBiquadFilter();
-                    osc.type = 'sine';
-                    osc.frequency.setValueAtTime(freq, time);
-                    osc.frequency.exponentialRampToValueAtTime(1, time + duration);
+
+                    const pitchMelt = dangerFactor * 15;
+                    const adjustedDuration = duration - (dangerFactor * 0.05);
+
+                    osc1.type = 'sine';
+                    osc2.type = 'triangle';
+                    
+                    osc1.frequency.setValueAtTime(freq + pitchMelt, time);
+                    osc1.frequency.exponentialRampToValueAtTime(1, time + adjustedDuration);
+                    
+                    osc2.frequency.setValueAtTime(freq + pitchMelt, time);
+                    osc2.frequency.exponentialRampToValueAtTime(1, time + adjustedDuration);
+
                     filter.type = 'lowpass';
-                    filter.frequency.setValueAtTime(120, time);
-                    g.gain.setValueAtTime(vol, time);
-                    g.gain.exponentialRampToValueAtTime(0.001, time + duration);
-                    osc.connect(filter); filter.connect(g); g.connect(this.ctx.destination);
-                    osc.start(time); osc.stop(time + duration + 0.05);
+                    filter.frequency.setValueAtTime(150 + (dangerFactor * 50), time);
+
+                    // Scale volume based on dangerFactor
+                    const finalVol = (vol + (dangerFactor * 0.5)) * 1.5;
+                    g.gain.setValueAtTime(finalVol, time); 
+                    g.gain.exponentialRampToValueAtTime(0.001, time + adjustedDuration);
+
+                    osc1.connect(filter);
+                    osc2.connect(filter);
+                    filter.connect(g);
+                    g.connect(this.ctx.destination);
+
+                    osc1.start(time);
+                    osc2.start(time);
+                    osc1.stop(time + adjustedDuration + 0.05);
+                    osc2.stop(time + adjustedDuration + 0.05);
                 };
-                playThump(t, 60, 0.6, 0.12);
-                playThump(t + 0.14, 45, 0.4, 0.15);
+
+                // Lub-Dub sequence
+                playThump(t, 65, 0.6, 0.15);
+                playThump(t + 0.16, 48, 0.4, 0.2);
             },
             
             playUI: function(active) { this.playTone(active ? 800 : 400, 'sine', 0.05, 0.05); },
@@ -1770,22 +2096,43 @@
                 const vignette = document.getElementById('low-health-vignette');
                 const healthFill = document.getElementById('health-fill');
                 const maxHP = CONFIG.playerMaxHP;
-                if (this.health < maxHP * 0.4) {
+                
+                // Threshold: 0.5 (50% health)
+                if (this.health < maxHP * 0.5) {
                     if (!healthFill.classList.contains('health-critical')) healthFill.classList.add('health-critical');
-                    if (this.health < maxHP * 0.25) vignette.style.boxShadow = "inset 0 0 150px rgba(255, 0, 0, 0.6)";
-                    else vignette.style.boxShadow = "inset 0 0 100px rgba(255, 0, 0, 0.3)";
+
+                    // dangerFactor (0.0 to 1.0). 
+                    // We use Math.pow to make the increase feel more "urgent" as health gets lower.
+                    const rawFactor = 1 - (this.health / (maxHP * 0.5));
+                    const dangerFactor = Math.pow(rawFactor, 1.2); 
                     
-                    let hbInterval = 1.0;
-                    if(this.health < maxHP * 0.2) hbInterval = 0.4;
-                    else if(this.health < maxHP * 0.4) hbInterval = 0.8;
+                    // Scale alpha from 0.3 to 1.25 as requested
+                    const shadowAlpha = 0.3 + (dangerFactor * 0.95);
+
+                    // Dynamic blur and spread to ensure it covers more screen than the hit flash
+                    const blurRadius = 100 + (dangerFactor * 250);
+                    const spreadRadius = 20 + (dangerFactor * 150);
+
+                    vignette.style.boxShadow = `inset 0 0 ${blurRadius}px ${spreadRadius}px rgba(255, 0, 0, ${shadowAlpha})`;
+                    vignette.style.transition = "box-shadow 0.3s ease-out";
+
+                    // Dynamic Interval logic
+                    const hbInterval = 1.2 - (dangerFactor * 0.85);
                     const nowSec = performance.now() / 1000;
-                    if(nowSec - lastHeartbeatTime > hbInterval) {
-                        AudioSys.playHeartbeat();
+                    
+                    if (nowSec - lastHeartbeatTime > hbInterval) {
+                        AudioSys.playHeartbeat(dangerFactor); 
                         lastHeartbeatTime = nowSec;
+                        
+                        // Brief visual "pulse" synced with the audio thump
+                        vignette.style.boxShadow = `inset 0 0 ${blurRadius + 40}px ${spreadRadius + 20}px rgba(255, 0, 0, ${Math.min(shadowAlpha + 0.2, 1.25)})`;
+                        setTimeout(() => {
+                            vignette.style.boxShadow = `inset 0 0 ${blurRadius}px ${spreadRadius}px rgba(255, 0, 0, ${shadowAlpha})`;
+                        }, 150);
                     }
                 } else {
-                     if (healthFill.classList.contains('health-critical')) healthFill.classList.remove('health-critical');
-                     vignette.style.boxShadow = "inset 0 0 100px rgba(255, 0, 0, 0)";
+                    if (healthFill.classList.contains('health-critical')) healthFill.classList.remove('health-critical');
+                    vignette.style.boxShadow = "inset 0 0 100px rgba(255, 0, 0, 0)";
                 }
             }
 
