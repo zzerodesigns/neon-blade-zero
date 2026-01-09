@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v47.5.2</title>
+    <title>Neon Blade: Melee Arena v47.5.3</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -425,6 +425,17 @@
             padding-top: 40px;
             justify-items: center; /* Horizontally center grid items */
         }
+
+        /* Tilt Slider */
+        #tilt-slider-row {
+            display: none; /* Hidden by default */
+            flex-direction: column;
+            gap: 15px;
+            border-top: 1px solid #334455; /* Separator line */
+            padding-top: 40px;
+            margin-top: 40px; 
+            align-items: center;
+        }
         
         /* Centered Switch Wrapper */
         .switch-wrapper { 
@@ -635,11 +646,16 @@
                     </div>
                 </div>
 
+                <div id="tilt-slider-row">
+                    <span class="setting-label">Tilt Intensity</span>
+                    <input type="range" min="0.1" max="0.8" step="0.05" value="0.45" class="cyber-range" id="set-tilt-amt">
+                </div>
+
                 <div class="close-btn" id="settings-close">CLOSE</div>
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.5.2<br>--- Wall Slide Tilt Fix ---</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.5.3<br>--- Wall Tilt Settings & Polish ---</div>
         </div>
     </div>
 
@@ -1540,6 +1556,7 @@
         let fpsFrames = 0;
         let lastFpsTime = 0;
         let enableWallTilt = false;
+        let wallTiltAmount = 0.45;
         let sharedSnowGeo = null;
         let sharedLeafGeo = null;
         let frameCounter = 0;
@@ -2267,7 +2284,7 @@
                 
                 const tiltEnabled = (typeof enableWallTilt !== 'undefined') ? enableWallTilt : false;
                 const tiltTarget = (this.isWallSliding && tiltEnabled) ? this.wallSlideTilt : 0;
-                camera.rotation.z = THREE.MathUtils.lerp(camera.rotation.z, tiltTarget, dt * 10);
+                camera.rotation.z = THREE.MathUtils.lerp(camera.rotation.z, tiltTarget, dt * 2.5);
                 
                 // Recalculate speed BEFORE slide logic (base speed)
                 let speed = new THREE.Vector2(this.velocity.x, this.velocity.z).length();
@@ -2439,7 +2456,7 @@
                                     const normalX = (camera.position.x < wallCenterX) ? -1 : 1; 
                                     const dot = camRight.x * normalX;
                                     // If dot > 0: Wall is on Left (Tilt Right/-). Else Wall is on Right (Tilt Left/+)
-                                    this.wallSlideTilt = (dot > 0) ? -0.15 : 0.15;
+                                    this.wallSlideTilt = (dot > 0) ? -wallTiltAmount : wallTiltAmount;
                                 }
                             }
                         }
@@ -2469,7 +2486,7 @@
                                     // FIX: Tilt based on Camera View vs Wall Normal
                                     const normalZ = (camera.position.z < wallCenterZ) ? -1 : 1;
                                     const dot = camRight.z * normalZ;
-                                    this.wallSlideTilt = (dot > 0) ? -0.15 : 0.15;
+                                    this.wallSlideTilt = (dot > 0) ? -wallTiltAmount : wallTiltAmount;
                                 }
                             }
                         }
@@ -3463,10 +3480,16 @@
                 AudioSys.playUI(true);
             });
 
-            // Wall Tilt Toggle
+            // Wall Tilt Toggle & Slider
+            const tiltRow = document.getElementById('tilt-slider-row');
             document.getElementById('set-tilt').addEventListener('change', (e) => {
                 enableWallTilt = e.target.checked;
+                tiltRow.style.display = enableWallTilt ? 'flex' : 'none';
                 AudioSys.playUI(true);
+            });
+
+            document.getElementById('set-tilt-amt').addEventListener('input', (e) => {
+                wallTiltAmount = parseFloat(e.target.value);
             });
 
             // Brightness
