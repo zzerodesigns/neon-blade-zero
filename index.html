@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v47.5.0</title>
+    <title>Neon Blade: Melee Arena v47.5.1</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -419,7 +419,7 @@
         /* Switch Grid (Bottom Row) */
         .switch-container {
             display: grid; 
-            grid-template-columns: 1fr 1fr 1fr; 
+            grid-template-columns: 1fr 1fr 1fr 1fr; 
             gap: 20px;
             border-top: 1px solid #334455; 
             padding-top: 40px;
@@ -611,6 +611,14 @@
                     </div>
 
                     <div class="switch-wrapper">
+                        <span class="setting-label">Wall Tilt</span>
+                        <label class="cyber-switch">
+                            <input type="checkbox" id="set-tilt">
+                            <span class="slider-track"></span>
+                        </label>
+                    </div>
+
+                    <div class="switch-wrapper">
                         <span class="setting-label" style="color:#556677;">God Mode</span>
                         <label class="cyber-switch" id="trap-god">
                             <input type="checkbox">
@@ -631,7 +639,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.5.0<br>--- Settings Terminal & UI Polish ---</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.5.1<br>--- Wall Sliding & Collision Fixes ---</div>
         </div>
     </div>
 
@@ -1531,6 +1539,7 @@
         let showFPS = false;
         let fpsFrames = 0;
         let lastFpsTime = 0;
+        let enableWallTilt = false;
         let sharedSnowGeo = null;
         let sharedLeafGeo = null;
         let frameCounter = 0;
@@ -2016,6 +2025,8 @@
                 this.onGround = false;
                 this.jumpsRemaining = 3; 
                 this.isSliding = false;
+                this.isWallSliding = false;
+                this.wallSlideTilt = 0;
                 this.isCrouching = false;
                 this.isSprinting = false;
                 this.health = CONFIG.playerMaxHP;
@@ -2184,7 +2195,18 @@
                 this.handleHealthRegen(dt);
                 this.handleEnergy(dt);
                 this.handleTeleport(dt);
+
+                // --- WALL SLIDE: RESET & GRAVITY ---
+                const wasWallSliding = this.isWallSliding;
+                this.isWallSliding = false; 
+
+                // Apply Gravity (Reduced by 80% if sliding down a wall)
+                const appliedGravity = (wasWallSliding && this.velocity.y < 0) ? CONFIG.gravity * 0.2 : CONFIG.gravity;
+                this.velocity.y -= appliedGravity * dt;
                 
+                camera.position.y += this.velocity.y * dt;
+                // -----------------------------------
+
                 if (this.aimingGadget) {
                     this.aimLine.visible = true;
                     const posAttr = this.aimLine.geometry.attributes.position;
@@ -2211,6 +2233,11 @@
                     posAttr.needsUpdate = true;
                 }
 
+                // --- PHYSICS LOOP ---
+                // Capture ground state before physics runs
+                const wasOnGroundFrame = this.onGround;
+                this.onGround = false; // Reset once per frame
+
                 const timeSteps = Math.min(5, Math.ceil(dt / 0.01)); 
                 const subDt = dt / timeSteps;
                 
@@ -2218,10 +2245,34 @@
                     this.physicsStep(subDt);
                 }
 
+                // --- LANDING LOGIC (Post-Physics) ---
+                if (this.onGround && !wasOnGroundFrame) {
+                    this.jumpsRemaining = 3; 
+                    moveStreaks.longAerial.count = 0; 
+                    moveStreaks.aerial.count = 0;
+                    this.lastTeleportWasAerial = false;
+                    spawnRipple(camera.position.clone().add(new THREE.Vector3(0,-1.5,0)), new THREE.Vector3(0,1,0), 0x00ffff);
+                } else if (!this.onGround && wasOnGroundFrame) {
+                    this.airTimeStart = performance.now();
+                }
+                // ------------------------------------
+
                 const keys = InputManager.keys;
-                const speed = new THREE.Vector2(this.velocity.x, this.velocity.z).length();
+
+                // --- WALL SLIDE: POST-PHYSICS ---
+                if (this.isWallSliding) {
+                    this.jumpsRemaining = 3; 
+                    if (this.velocity.y < -5) this.velocity.y = -5;
+                }
                 
-                if (keys.c && this.onGround) {
+                const tiltEnabled = (typeof enableWallTilt !== 'undefined') ? enableWallTilt : false;
+                const tiltTarget = (this.isWallSliding && tiltEnabled) ? this.wallSlideTilt : 0;
+                camera.rotation.z = THREE.MathUtils.lerp(camera.rotation.z, tiltTarget, dt * 10);
+                
+                // Recalculate speed BEFORE slide logic (base speed)
+                let speed = new THREE.Vector2(this.velocity.x, this.velocity.z).length();
+
+                if (keys.c && (this.onGround || this.isWallSliding)) {
                      if ((this.isSprinting || this.isSliding || speed > CONFIG.baseSpeed) && !this.isCrouching) {
                          if (!this.isSliding) {
                             this.isSliding = true;
@@ -2229,7 +2280,7 @@
                             const forward = new THREE.Vector3();
                             camera.getWorldDirection(forward);
                             forward.y = 0; forward.normalize();
-                            this.velocity.addScaledVector(forward, CONFIG.slideBoost);
+                            if(this.onGround) this.velocity.addScaledVector(forward, CONFIG.slideBoost);
                          }
                      } else if (!this.isSliding) {
                          this.isCrouching = true;
@@ -2239,10 +2290,14 @@
                      this.isCrouching = false;
                 }
                 
+                // Recalculate speed AFTER potential slide boost for Audio
+                speed = new THREE.Vector2(this.velocity.x, this.velocity.z).length();
+
                 if (this.isSliding && currentTheme === 0) {
                     if (Math.random() < 0.3) spawnSnowTrail(camera.position);
                     if (Math.random() < 0.5) spawnSnowKickup(camera.position);
                 }
+                
                 AudioSys.toggleSlideSound(this.isSliding && speed > 5);
 
                 const targetHeight = (this.isSliding || this.isCrouching) ? -0.8 : 0;
@@ -2297,10 +2352,10 @@
                 if (!this.onGround) { friction = CONFIG.frictionAir; drive = CONFIG.airControl; }
 
                 if (this.isSliding) { 
-                    if (this.onGround) {
+                    if (this.onGround || this.isWallSliding) {
                         friction = CONFIG.frictionSlide; 
                         drive = 1; 
-                        targetSpeed = CONFIG.sprintSpeed; 
+                        if (this.onGround) targetSpeed = CONFIG.sprintSpeed; 
                     } else {
                         friction = CONFIG.frictionAir; 
                         drive = CONFIG.airControl * 0.5; 
@@ -2315,11 +2370,8 @@
                 this.velocity.x *= damping;
                 this.velocity.z *= damping;
 
-                this.velocity.y -= CONFIG.gravity * dt;
-                camera.position.y += this.velocity.y * dt;
                 this.updatePlayerBox();
-                const wasOnGround = this.onGround;
-                this.onGround = false;
+                // Note: onGround reset is now in update()
                 
                 if (spatialGrid) {
                     let collisions = spatialGrid.query(this.playerBox);
@@ -2334,13 +2386,7 @@
                                     if (this.playerBox.min.y < wall.box.max.y && this.playerBox.min.y > wall.box.min.y) {
                                         camera.position.y += overlapY;
                                         this.velocity.y = 0;
-                                        this.onGround = true;
-                                        if(!wasOnGround) {
-                                            this.jumpsRemaining = 3; 
-                                            moveStreaks.longAerial.count = 0; 
-                                            moveStreaks.aerial.count = 0;
-                                            this.lastTeleportWasAerial = false; 
-                                        }
+                                        this.onGround = true; // Sets flag, but logic handled in update
                                     }
                                 } else if (this.velocity.y > 0) {
                                     if (this.playerBox.max.y > wall.box.min.y && this.playerBox.max.y < wall.box.max.y) {
@@ -2351,10 +2397,6 @@
                             }
                         }
                     }
-                }
-                
-                if (wasOnGround && !this.onGround) {
-                     this.airTimeStart = performance.now();
                 }
 
                 if (this.wantsToJump) {
@@ -2377,10 +2419,17 @@
                             const overlapY = Math.min(this.playerBox.max.y - wall.box.min.y, wall.box.max.y - this.playerBox.min.y);
                             const overlapZ = Math.min(this.playerBox.max.z - wall.box.min.z, wall.box.max.z - this.playerBox.min.z);
                             if (overlapY > 0.1 && overlapZ > 0) {
-                                if (this.velocity.x > 0) camera.position.x -= overlapX;
+                                const wallCenterX = (wall.box.min.x + wall.box.max.x) / 2;
+                                if (camera.position.x < wallCenterX) camera.position.x -= overlapX;
                                 else camera.position.x += overlapX;
+
                                 this.wallImpactVelocity = Math.abs(this.velocity.x);
                                 this.velocity.x = 0;
+
+                                if (!this.onGround && InputManager.keys.c) {
+                                    this.isWallSliding = true;
+                                    this.wallSlideTilt = (camera.position.x < wallCenterX) ? 0.15 : -0.15;
+                                }
                             }
                         }
                     }
@@ -2396,10 +2445,17 @@
                             const overlapY = Math.min(this.playerBox.max.y - wall.box.min.y, wall.box.max.y - this.playerBox.min.y);
                             const overlapZ = Math.min(this.playerBox.max.z - wall.box.min.z, wall.box.max.z - this.playerBox.min.z);
                             if (overlapY > 0.1 && overlapX > 0) {
-                                if (this.velocity.z > 0) camera.position.z -= overlapZ;
+                                const wallCenterZ = (wall.box.min.z + wall.box.max.z) / 2;
+                                if (camera.position.z < wallCenterZ) camera.position.z -= overlapZ;
                                 else camera.position.z += overlapZ;
+
                                 this.wallImpactVelocity = Math.abs(this.velocity.z);
                                 this.velocity.z = 0;
+
+                                if (!this.onGround && InputManager.keys.c) {
+                                    this.isWallSliding = true;
+                                    this.wallSlideTilt = (camera.position.z < wallCenterZ) ? 0.15 : -0.15;
+                                }
                             }
                         }
                     }
@@ -3389,6 +3445,12 @@
             document.getElementById('set-fps').addEventListener('change', (e) => {
                 showFPS = e.target.checked;
                 document.getElementById('fps-display').style.display = showFPS ? "block" : "none";
+                AudioSys.playUI(true);
+            });
+
+            // Wall Tilt Toggle
+            document.getElementById('set-tilt').addEventListener('change', (e) => {
+                enableWallTilt = e.target.checked;
                 AudioSys.playUI(true);
             });
 
