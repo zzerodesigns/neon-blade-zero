@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v47.5.1</title>
+    <title>Neon Blade: Melee Arena v47.5.2</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -639,7 +639,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.5.1<br>--- Wall Sliding & Collision Fixes ---</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.5.1<br>--- Wall Slide Tilt Fix ---</div>
         </div>
     </div>
 
@@ -2330,10 +2330,16 @@
                 const isMoving = (keys.w || keys.a || keys.s || keys.d);
                 this.isSprinting = keys.shift && this.energy > 0 && isMoving && !this.isCrouching;
 
+                // --- 1. Calculate View Vectors for Tilt Logic ---
                 const forward = new THREE.Vector3();
-                const right = new THREE.Vector3();
                 camera.getWorldDirection(forward);
                 forward.y = 0; forward.normalize();
+                
+                // Calculate Player's "Right" vector for wall side detection
+                const camRight = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0));
+                // -----------------------------------------------
+
+                const right = new THREE.Vector3();
                 right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
 
                 const inputDir = new THREE.Vector3();
@@ -2371,7 +2377,6 @@
                 this.velocity.z *= damping;
 
                 this.updatePlayerBox();
-                // Note: onGround reset is now in update()
                 
                 if (spatialGrid) {
                     let collisions = spatialGrid.query(this.playerBox);
@@ -2386,7 +2391,7 @@
                                     if (this.playerBox.min.y < wall.box.max.y && this.playerBox.min.y > wall.box.min.y) {
                                         camera.position.y += overlapY;
                                         this.velocity.y = 0;
-                                        this.onGround = true; // Sets flag, but logic handled in update
+                                        this.onGround = true; 
                                     }
                                 } else if (this.velocity.y > 0) {
                                     if (this.playerBox.max.y > wall.box.min.y && this.playerBox.max.y < wall.box.max.y) {
@@ -2400,7 +2405,7 @@
                 }
 
                 if (this.wantsToJump) {
-                    if (this.onGround) {
+                    if (this.onGround) { 
                         performJump();
                         moveStreaks.longAerial.count = 0;
                         moveStreaks.aerial.count = 0;
@@ -2409,6 +2414,7 @@
                     }
                 }
 
+                // --- X-AXIS COLLISION ---
                 camera.position.x += this.velocity.x * dt;
                 if (!this.isPhasing && spatialGrid) {
                     this.updatePlayerBox();
@@ -2428,13 +2434,19 @@
 
                                 if (!this.onGround && InputManager.keys.c) {
                                     this.isWallSliding = true;
-                                    this.wallSlideTilt = (camera.position.x < wallCenterX) ? 0.15 : -0.15;
+                                    // FIX: Tilt based on Camera View vs Wall Normal
+                                    // Normal points TO player. (-1 if player on left, 1 if player on right)
+                                    const normalX = (camera.position.x < wallCenterX) ? -1 : 1; 
+                                    const dot = camRight.x * normalX;
+                                    // If dot > 0: Wall is on Left (Tilt Right/-). Else Wall is on Right (Tilt Left/+)
+                                    this.wallSlideTilt = (dot > 0) ? -0.15 : 0.15;
                                 }
                             }
                         }
                     }
                 }
 
+                // --- Z-AXIS COLLISION ---
                 camera.position.z += this.velocity.z * dt;
                 if (!this.isPhasing && spatialGrid) {
                     this.updatePlayerBox();
@@ -2454,7 +2466,10 @@
 
                                 if (!this.onGround && InputManager.keys.c) {
                                     this.isWallSliding = true;
-                                    this.wallSlideTilt = (camera.position.z < wallCenterZ) ? 0.15 : -0.15;
+                                    // FIX: Tilt based on Camera View vs Wall Normal
+                                    const normalZ = (camera.position.z < wallCenterZ) ? -1 : 1;
+                                    const dot = camRight.z * normalZ;
+                                    this.wallSlideTilt = (dot > 0) ? -0.15 : 0.15;
                                 }
                             }
                         }
