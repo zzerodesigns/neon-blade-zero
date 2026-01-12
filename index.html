@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v47.5.3</title>
+    <title>Neon Blade: Melee Arena v47.6.0</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -546,7 +546,7 @@
                 <div class="ability-icon" id="icon-r">
                     <div class="ability-icon-inner">
                         <div class="ability-key">R</div>
-                        <div class="ability-name">STICKY</div>
+                        <div class="ability-name">VOID</div>
                     </div>
                 </div>
                  <div class="ability-icon" id="icon-e">
@@ -655,7 +655,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.5.3<br>--- Wall Tilt Settings & Polish ---</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.6.0<br>--- Grenade Visuals ---</div>
         </div>
     </div>
 
@@ -681,7 +681,7 @@
             energyDrain: 25, 
             energyRegen: 50, 
             teleportCost: 10,
-            gadgetCost: { frag: 35, sticky: 30, impulse: 25 },
+            gadgetCost: { frag: 35, void: 30, impulse: 25 },
             gadgetCooldown: 200, 
             attackRange: 8,
             attackCooldown: 250,
@@ -806,7 +806,7 @@
                     case 'r':
                         if (!this.keys.r) { 
                             this.keys.r = true; 
-                            if(isLocked && !player.isDead) player.beginAim('STICKY'); 
+                            if(isLocked && !player.isDead) player.beginAim('VOID'); 
                         }
                         break;
                     case 'e':
@@ -1355,7 +1355,7 @@
                 sub.connect(subGain);
                 subGain.connect(masterLimit);
 
-                if (type === 'STICKY') {
+                if (type === 'VOID') {
                     // Charge Phase
                     osc.type = 'sine';
                     osc.frequency.setValueAtTime(40, t); 
@@ -1374,7 +1374,7 @@
                     snapGain.gain.linearRampToValueAtTime(0.5, t + 0.32); 
                     snapGain.gain.exponentialRampToValueAtTime(0.001, t + 0.7); 
                     
-                    // Sticky Sub (Synchronized with Snap)
+                    // Void Sub (Synchronized with Snap)
                     sub.frequency.setValueAtTime(50, t + 0.31);
                     sub.frequency.exponentialRampToValueAtTime(20, t + 0.6);
                     subGain.gain.setValueAtTime(0, t + 0.31);
@@ -2095,14 +2095,21 @@
                 const arrowBase = segmentCount * 2;
                 indices.push(arrowBase, arrowBase+1, arrowBase+2);
                 geo.setIndex(indices);
+                
+                // Aim Line
                 const mat = new THREE.MeshBasicMaterial({ 
-                    color: 0xffffff, opacity: 0.4, transparent: true, side: THREE.DoubleSide, depthWrite: false 
+                    color: 0xffffff, 
+                    opacity: 0.2,
+                    transparent: true, 
+                    side: THREE.DoubleSide, 
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
                 });
                 this.aimLine = new THREE.Mesh(geo, mat);
-                    this.aimLine.renderOrder = 2;
-                    this.aimLine.frustumCulled = false;
-                    this.aimLine.visible = false;
-                    camera.add(this.aimLine);
+                this.aimLine.renderOrder = 2;
+                this.aimLine.frustumCulled = false;
+                this.aimLine.visible = false;
+                camera.add(this.aimLine);
             }
             
             updatePlayerBox() {
@@ -2153,7 +2160,7 @@
             beginAim(type) {
                 this.aimingGadget = type;
                 document.getElementById('icon-f').classList.toggle('active', type==='FRAG');
-                document.getElementById('icon-r').classList.toggle('active', type==='STICKY');
+                document.getElementById('icon-r').classList.toggle('active', type==='VOID');
                 document.getElementById('icon-e').classList.toggle('active', type==='IMPULSE');
             }
             
@@ -2174,7 +2181,7 @@
                 
                 let cost = 0;
                 if (type === 'FRAG') cost = CONFIG.gadgetCost.frag;
-                if (type === 'STICKY') cost = CONFIG.gadgetCost.sticky;
+                if (type === 'VOID') cost = CONFIG.gadgetCost.void;
                 if (type === 'IMPULSE') cost = CONFIG.gadgetCost.impulse;
 
                 if (this.energy < cost) {
@@ -2748,7 +2755,7 @@
                 this.velocity = vel.clone();
                 this.radius = 0.2;
                 this.stuckTo = null;
-                this.life = type === 'STICKY' ? 1.5 : (type === 'IMPULSE' ? 10.0 : 3.5);
+                this.life = type === 'VOID' ? 1.5 : (type === 'IMPULSE' ? 10.0 : 3.5);
 
                 const eyePos = camera.position.clone();
                 const distToSpawn = eyePos.distanceTo(pos);
@@ -2767,32 +2774,57 @@
                     this.meshPos = pos.clone();
                 }
 
+                // --- VISUAL SETUP ---
+                // Unified Shape: Icosahedron (Sphere-like)
+                const geoRadius = (type === 'FRAG') ? 0.45 : 0.25; 
+                const geo = new THREE.IcosahedronGeometry(geoRadius, 1);
+                // Wireframe slightly larger for the "Tech Shell" look
+                const wireGeo = new THREE.IcosahedronGeometry(geoRadius * 1.1, 1);
+
                 let color = 0xff0000; 
                 let roughness = 0.4;  
+                let metalness = 0.5;
                 let emissiveInt = 0.8;
+                let opacity = 1.0;
 
-                if (type === 'STICKY') {
-                    color = 0x8A2BE2; 
-                    roughness = 1.0;  
-                    emissiveInt = 2.0; 
+                if (type === 'VOID') {
+                    color = 0x220044; // Very dark purple base
+                    roughness = 1.0;  // Fully Matte (No shine)
+                    metalness = 0.0;  // No reflection
+                    emissiveInt = 0;  // No self-glow on the core
                 }
-                if (type === 'IMPULSE') {
-                    color = 0x00ffff; 
+                else if (type === 'FRAG') {
+                    color = 0xff3300; 
+                    roughness = 0.7;
+                    emissiveInt = 0.5;
+                }
+                else if (type === 'IMPULSE') {
+                    color = 0x00ffff;
+                    roughness = 0.2;
+                    emissiveInt = 1.0;
                 }
 
-                const geo = new THREE.DodecahedronGeometry(0.2);
                 const mat = new THREE.MeshStandardMaterial({ 
                     color: color, 
                     emissive: color, 
                     emissiveIntensity: emissiveInt, 
-                    roughness: roughness 
+                    roughness: roughness,
+                    metalness: metalness
                 });
                 
                 this.mesh = new THREE.Mesh(geo, mat);
                 this.mesh.renderOrder = 2;
                 
-                const wireGeo = new THREE.DodecahedronGeometry(0.22);
-                const wireMat = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.5 });
+                // Wireframe Shell
+                let wireCol = 0xffffff;
+                if (type === 'VOID') wireCol = 0x8A2BE2; // Purple wire over dark matte core
+                
+                const wireMat = new THREE.MeshBasicMaterial({ 
+                    color: wireCol, 
+                    wireframe: true, 
+                    transparent: true, 
+                    opacity: (type === 'VOID' ? 0.2 : 0.5) 
+                });
                 this.wire = new THREE.Mesh(wireGeo, wireMat);
                 this.mesh.add(this.wire);
                 
@@ -2862,7 +2894,7 @@
                          if (this.type === 'IMPULSE') {
                              this.active = false; this.explode(); return;
                          }
-                         if (this.type === 'STICKY') {
+                         if (this.type === 'VOID') {
                              this.stuckTo = enemyHit;
                              this.stuckOffset = new THREE.Vector3(0, 1, 0); 
                              return;
@@ -2876,7 +2908,7 @@
                          if (this.type === 'IMPULSE') {
                              this.active = false; this.explode(); return;
                          }
-                         if (this.type === 'STICKY') {
+                         if (this.type === 'VOID') {
                              this.active = false; 
                              this.mesh.position.copy(hits[0].point);
                              this.velocity.set(0,0,0);
@@ -2904,6 +2936,85 @@
 
                 this.mesh.rotation.x += dt * 10;
                 this.mesh.rotation.z += dt * 10;
+
+                // VOID: Dark Soft Trail
+                if (this.type === 'VOID') {
+                    if (Math.random() < 0.4) { // High frequency
+                        const mat = new THREE.SpriteMaterial({ 
+                            map: textures.glow, 
+                            color: 0x110022, // Very dark purple/black
+                            transparent: true, 
+                            opacity: 0.6,
+                            blending: THREE.NormalBlending, // Normal blending allows darkness to show against light backgrounds
+                            depthWrite: false
+                        });
+                        const s = 0.5 + Math.random() * 0.3;
+                        const m = new THREE.Sprite(mat);
+                        m.scale.set(s, s, s);
+                        m.position.copy(this.mesh.position);
+                        scene.add(m);
+                        
+                        particles.push({
+                            mesh: m, 
+                            vel: new THREE.Vector3(0, 0.5, 0), // Float up gently
+                            life: 0.5, 
+                            maxLife: 0.5, 
+                            type: 'static' // Use existing static type to fade out opacity
+                        });
+                    }
+                }
+
+                // FRAG: Smoke Trail
+                if (this.type === 'FRAG' && Math.random() < 0.3) {
+                    const mat = new THREE.SpriteMaterial({ 
+                        map: textures.glow, 
+                        color: 0x664422, 
+                        transparent: true, 
+                        opacity: 0.4,
+                        blending: THREE.NormalBlending,
+                        depthWrite: false
+                    });
+                    const s = 0.3 + Math.random() * 0.2;
+                    const m = new THREE.Sprite(mat);
+                    m.renderOrder = 0;
+                    m.scale.set(s, s, s);
+                    m.position.copy(this.mesh.position);
+                    scene.add(m);
+                    
+                    particles.push({
+                        mesh: m, 
+                        vel: new THREE.Vector3(0, 0.5, 0), 
+                        life: 0.4, 
+                        maxLife: 0.4, 
+                        type: 'static' 
+                    });
+                }
+
+                // IMPULSE: Clean Energy Trail
+                if (this.type === 'IMPULSE' && Math.random() < 0.2) {
+                    const mat = new THREE.SpriteMaterial({ 
+                        map: textures.glow, 
+                        color: 0x00ffff, 
+                        transparent: true, 
+                        opacity: 0.3,
+                        blending: THREE.AdditiveBlending,
+                        depthWrite: false
+                    });
+                    const s = 0.2 + Math.random() * 0.2;
+                    const m = new THREE.Sprite(mat);
+                    m.renderOrder = 0;
+                    m.scale.set(s, s, s);
+                    m.position.copy(this.mesh.position);
+                    scene.add(m);
+                    
+                    particles.push({
+                        mesh: m, 
+                        vel: new THREE.Vector3(0, 0, 0), 
+                        life: 0.3, 
+                        maxLife: 0.3, 
+                        type: 'static' 
+                    });
+                }
             }
             
             explode() {
@@ -2919,20 +3030,19 @@
                 let color = 0x00ff00;
 
                 if (this.type === 'FRAG') { 
-                    range = 30; damage = 200; force = 50; color = 0xffaa00; 
-                    this.spawnFirework(pos, range);
+                    range = 30; damage = 200; force = 50; color = 0xff3300; 
+                    this.spawnExplosion(pos, range);
                 } 
-                else if (this.type === 'STICKY') { 
+                else if (this.type === 'VOID') { 
                     range = 25; damage = 150; force = -70; color = 0x8A2BE2; 
                     this.spawnImplosion(pos, range, color);
                 } 
                 else if (this.type === 'IMPULSE') { 
                     range = 20; damage = 10; force = 60; color = 0x00ffff; 
-                    spawnImpact(pos, color, range/2); 
-                    this.spawnShockwaveRing(pos, range, color);
+                    this.spawnShockwave(pos, range, color);
                 }
                 
-                if(this.type !== 'STICKY' && this.type !== 'IMPULSE') {
+                if(this.type !== 'VOID' && this.type !== 'IMPULSE') {
                     spawnImpact(pos, color, range/2); 
                 }
                 
@@ -2948,7 +3058,7 @@
                         if (damage > 0) e.takeHit(damage * falloff);
                         const dir = e.mesh.position.clone().sub(pos).normalize();
                         
-                        if(this.type === 'STICKY') {
+                        if(this.type === 'VOID') {
                             const pullStrength = (dist / range); 
                             e.velocity.addScaledVector(dir, force * pullStrength); 
                         } else {
@@ -2965,7 +3075,7 @@
                      
                      if(damage > 0) damagePlayer(damage * 0.1 * falloff);
                      
-                     if(this.type === 'STICKY') {
+                     if(this.type === 'VOID') {
                          const pullStrength = (pDist / range);
                          player.velocity.addScaledVector(dir, force * pullStrength * 0.5);
                      } else {
@@ -2975,79 +3085,176 @@
                 }
             }
 
-            spawnFirework(pos, range) {
-                const pCount = 24;
-                const geo = new THREE.BufferGeometry();
-                const positions = [];
-                const velocities = [];
+            spawnExplosion(pos, range) {
+                // 1. Initial Flash (Redder, Bigger)
+                spawnImpact(pos, 0xff4400, 5.0); 
 
-                for(let i=0; i<pCount; i++) {
-                    positions.push(pos.x, pos.y, pos.z);
-                    const theta = Math.random() * Math.PI * 2;
-                    const phi = Math.acos(Math.random() * 2 - 1);
-                    const speed = (Math.random() * 0.5 + 0.5) * (range * 0.8); 
-                    velocities.push(
-                        speed * Math.sin(phi) * Math.cos(theta),
-                        speed * Math.sin(phi) * Math.sin(theta),
-                        speed * Math.cos(phi)
-                    );
+                // 2. Fire Clouds (Volumetric & Red)
+                // Increased count (12 -> 16), Opacity (0.4 -> 0.6), and Size
+                const cloudCount = 16;
+                for(let i=0; i<cloudCount; i++) {
+                    const mat = new THREE.SpriteMaterial({ 
+                        map: textures.glow, 
+                        // Shift colors to Deep Red / Bright Red-Orange
+                        color: Math.random() > 0.5 ? 0xff2200 : 0x880000, 
+                        transparent: true, 
+                        opacity: 0.6, 
+                        blending: THREE.AdditiveBlending,
+                        depthWrite: false 
+                    });
+                    
+                    const sprite = new THREE.Sprite(mat);
+                    sprite.renderOrder = 0;
+                    
+                    // Massive scale up for volume
+                    const s = range * (1.0 + Math.random() * 1.0);
+                    sprite.scale.set(s, s, s);
+                    
+                    const offset = new THREE.Vector3(
+                        (Math.random()-0.5), (Math.random()-0.5), (Math.random()-0.5)
+                    ).normalize().multiplyScalar(Math.random() * range * 0.6);
+                    sprite.position.copy(pos).add(offset);
+                    
+                    scene.add(sprite);
+                    
+                    particles.push({
+                        mesh: sprite,
+                        vel: offset.normalize().multiplyScalar(0.8).add(new THREE.Vector3(0, 3.0, 0)), 
+                        life: 0.6 + Math.random() * 0.4, 
+                        maxLife: 1.0,
+                        type: 'static'
+                    });
                 }
-                geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-                const mat = new THREE.PointsMaterial({
-                    color: 0xffd700, size: 0.8, transparent: true, opacity: 1
-                });
-                const sparks = new THREE.Points(geo, mat);
-                scene.add(sparks);
-                
-                let time = 0;
-                const animateSparks = () => {
-                    time += 0.05; 
-                    if(time > 1.0) { scene.remove(sparks); geo.dispose(); mat.dispose(); return; }
-                    const posAttr = sparks.geometry.attributes.position;
-                    for(let i=0; i<pCount; i++) {
-                        posAttr.array[i*3] += velocities[i*3] * 0.05; 
-                        posAttr.array[i*3+1] += (velocities[i*3+1] - 9.8 * time) * 0.05; 
-                        posAttr.array[i*3+2] += velocities[i*3+2] * 0.05; 
-                    }
-                    posAttr.needsUpdate = true;
-                    sparks.material.opacity = 1 - time; 
-                    requestAnimationFrame(animateSparks);
-                };
-                animateSparks();
+
+                // 3. Shrapnel (Heavier & Redder)
+                // Fast Orange-Red Sparks (Count 40, Size 4.0)
+                spawnParticles(pos, 0xff6600, 40, 4.0, 4.0); 
+                // Heavy Dark Red Chunks (Count 30, Size 6.0)
+                spawnParticles(pos, 0xaa0000, 30, 2.0, 6.0); 
+
+                // 4. Ground Char
+                spawnRipple(pos, new THREE.Vector3(0,1,0), 0x000000); 
+                spawnRipple(pos, new THREE.Vector3(0,1,0), 0xff2200); 
             }
 
             spawnImplosion(pos, range, color) {
-                const geo = new THREE.SphereGeometry(range, 16, 16);
-                const mat = new THREE.MeshBasicMaterial({ color: color, wireframe: true, transparent: true, opacity: 0.5 });
-                const sphere = new THREE.Mesh(geo, mat);
-                sphere.position.copy(pos);
-                scene.add(sphere);
+                const group = new THREE.Group();
+                group.position.copy(pos);
+                scene.add(group);
+
+                // 1. The "Inversion" Core
+                // We use CustomBlending with Difference logic to mathematically invert 
+                // the colors of whatever is rendered behind this sphere.
+                const coreGeo = new THREE.SphereGeometry(range, 32, 32);
+                const coreMat = new THREE.MeshBasicMaterial({ 
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: 1.0,
+                    blending: THREE.CustomBlending,
+                    blendEquation: THREE.AddEquation,
+                    blendSrc: THREE.OneMinusDstColorFactor,
+                    blendDst: THREE.OneMinusSrcColorFactor
+                }); 
+                const core = new THREE.Mesh(coreGeo, coreMat);
+                group.add(core);
+
+                // 2. The Raven Wireframe (Solid, single layer, glowing)
+                const wireMat = materials.marker.clone();
+                wireMat.color.setHex(color);
+                wireMat.emissive.setHex(color);
+                wireMat.emissiveIntensity = 2.0;
+                wireMat.wireframe = true;
+                wireMat.transparent = true;
+                wireMat.opacity = 1.0;
+
+                const wireGeo = new THREE.IcosahedronGeometry(range * 1.02, 2);
+                const wire = new THREE.Mesh(wireGeo, wireMat);
+                group.add(wire);
+
+                // 3. Animation (Restored Original Speed: 0.05)
                 let s = 1.0;
                 const anim = () => {
-                    s -= 0.05; 
-                    if (s <= 0) { scene.remove(sphere); geo.dispose(); mat.dispose(); return; }
-                    sphere.scale.set(s, s, s);
+                    s -= 0.05; // Fast snap (approx 0.3-0.4s visible life)
+                    if (s <= 0) { 
+                        scene.remove(group); 
+                        coreGeo.dispose(); coreMat.dispose(); 
+                        wireGeo.dispose(); wireMat.dispose();
+                        return; 
+                    }
+                    
+                    group.scale.set(s, s, s);
+                    
+                    // Spin
+                    wire.rotation.y += 0.08;
+                    wire.rotation.z -= 0.03;
+                    
                     requestAnimationFrame(anim);
                 };
                 anim();
             }
 
-            spawnShockwaveRing(pos, range, color) {
-                const geo = new THREE.TorusGeometry(1, 0.2, 8, 32); 
-                const mat = new THREE.MeshBasicMaterial({ color: color, transparent: true, opacity: 0.8 });
-                const ring = new THREE.Mesh(geo, mat);
-                ring.rotation.x = Math.PI / 2; 
-                ring.position.copy(pos);
-                scene.add(ring);
-                let s = 1.0;
-                const anim = () => {
-                    s += (range * 2) * 0.02; 
-                    if (s > range * 1.5) { scene.remove(ring); geo.dispose(); mat.dispose(); return; }
-                    ring.scale.set(s, s, s);
-                    ring.material.opacity -= 0.05;
-                    requestAnimationFrame(anim);
+            spawnShockwave(pos, range, color) {
+                // 1. Impact Flash
+                spawnImpact(pos, color, range/2);
+
+                // 2. High Velocity Burst
+                spawnParticles(pos, color, 30, 4.0); 
+
+                // 3. Volumetric Air Cushion (Tuned)
+                const spawnRing = (delay, opacity, expansionSpeed, fadeRate, yOffset) => {
+                    setTimeout(() => {
+                        const geo = new THREE.TorusGeometry(1, 0.2, 8, 32); 
+                        const mat = new THREE.MeshBasicMaterial({ 
+                            color: color, 
+                            transparent: true, 
+                            opacity: opacity, 
+                            depthWrite: false, 
+                            blending: THREE.AdditiveBlending 
+                        });
+                        const ring = new THREE.Mesh(geo, mat);
+                        ring.renderOrder = 0;
+                        ring.rotation.x = Math.PI / 2; 
+                        
+                        const ringPos = pos.clone();
+                        ringPos.y += yOffset;
+                        ring.position.copy(ringPos);
+                        
+                        scene.add(ring);
+                        
+                        let s = 1.0;
+                        const anim = () => {
+                            if (!ring.parent) return; 
+                            
+                            s += expansionSpeed;
+                            
+                            if (s > range * 1.5) { 
+                                scene.remove(ring); geo.dispose(); mat.dispose(); return; 
+                            }
+                            
+                            ring.scale.set(s, s, s);
+                            ring.material.opacity -= fadeRate;
+                            
+                            if (ring.material.opacity <= 0) {
+                                scene.remove(ring); geo.dispose(); mat.dispose(); return; 
+                            }
+                            
+                            requestAnimationFrame(anim);
+                        };
+                        anim();
+                    }, delay);
                 };
-                anim();
+
+                // New Base Speed (Original 0.02 * 0.4)
+                const speed = (range * 2) * 0.008;
+
+                // 1. MAIN BLAST (Ground Level)
+                spawnRing(0, 0.3, speed, 0.08, 0);
+
+                // 2. ECHO 1 (Mid-Air)
+                spawnRing(100, 0.2, speed, 0.02, 1.0);
+
+                // 3. ECHO 2 (Upper Dissipation)
+                spawnRing(200, 0.1, speed, 0.01, 2.0);
             }
         }
 
@@ -3592,8 +3799,6 @@
                 metalness: 0.1,
                 transparent: true, 
                 opacity: 0.5,      
-                transmission: 0.25, 
-                thickness: 0.5,     
                 emissive: 0xffffff,       
                 emissiveIntensity: 1,
                 depthWrite: false 
@@ -4306,34 +4511,52 @@
         }
 
         function spawnImpact(pos, color=0xffffff, scale=1.0) {
-            const matCore = new THREE.SpriteMaterial({ map: textures.glow, color: 0xffffff, transparent: true, blending: THREE.AdditiveBlending });
+            // Core White Flash
+            const matCore = new THREE.SpriteMaterial({ 
+                map: textures.glow, 
+                color: 0xffffff, 
+                transparent: true, 
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
             const core = new THREE.Sprite(matCore);
-            core.renderOrder = 2;
+            core.renderOrder = 0; 
             core.position.copy(pos);
             core.scale.setScalar(scale);
             scene.add(core);
             particles.push({ mesh: core, life: 0.1, maxLife: 0.1, type: 'flash', scaleStart: scale, scaleEnd: scale * 0.5 });
 
-            const matGlow = new THREE.SpriteMaterial({ map: textures.glow, color: color, transparent: true, blending: THREE.AdditiveBlending, opacity: 0.8 });
+            // Colored Outer Glow
+            const matGlow = new THREE.SpriteMaterial({ 
+                map: textures.glow, 
+                color: color, 
+                transparent: true, 
+                blending: THREE.AdditiveBlending, 
+                opacity: 0.8,
+                depthWrite: false
+            });
             const glow = new THREE.Sprite(matGlow);
-            glow.renderOrder = 2;
+            glow.renderOrder = 0;
             glow.position.copy(pos);
             glow.scale.setScalar(scale * 2);
             scene.add(glow);
             particles.push({ mesh: glow, life: 0.25, maxLife: 0.25, type: 'flash', scaleStart: scale * 2, scaleEnd: scale * 4 });
         }
 
-        function spawnParticles(pos, col, count, speed=1.0) {
+        function spawnParticles(pos, col, count, speed=1.0, sizeMod=1.0) {
             for(let i=0; i<count; i++) {
                 const mat = new THREE.SpriteMaterial({ 
                     map: textures.glow, 
                     color: col, 
                     transparent: true, 
-                    blending: THREE.AdditiveBlending 
+                    blending: THREE.AdditiveBlending,
+                    depthWrite: false
                 });
                 const m = new THREE.Sprite(mat);
-                m.renderOrder = 2;
-                const s = 0.2 + Math.random() * 0.3;
+                m.renderOrder = 0;
+                
+                // Apply sizeMod
+                const s = (0.2 + Math.random() * 0.3) * sizeMod;
                 m.scale.set(s, s, s);
                 m.position.copy(pos);
                 scene.add(m);
@@ -4365,7 +4588,12 @@
                 
                 const geo = new THREE.RingGeometry(0.5, 0.8 + (i*0.1), 32); 
                 const mat = new THREE.MeshBasicMaterial({ 
-                    color: layerColor, transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending
+                    color: layerColor, 
+                    transparent: true, 
+                    opacity: 0.8, 
+                    side: THREE.DoubleSide, 
+                    depthWrite: false,
+                    blending: THREE.AdditiveBlending
                 });
                 
                 const mesh = new THREE.Mesh(geo, mat);
