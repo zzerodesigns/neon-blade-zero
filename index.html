@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v47.6.0</title>
+    <title>Neon Blade: Melee Arena v47.7.0</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -32,6 +32,39 @@
         .hud-right-col {
             display: flex; flex-direction: column; align-items: flex-end; gap: 6px;
         }
+
+        /* MINIMAP - Liquid Glass Style */
+            #minimap-container {
+                position: relative;
+                /* SIZE TUNING: Change these two values to resize */
+                width: 160px; 
+                height: 160px; 
+                
+                margin-top: 9px;
+                border-radius: 50%;
+                
+                /* GLASS EFFECT */
+                background: rgba(0, 15, 30, 0.2); /* Low opacity for see-through */
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+                
+                border: 1px solid rgba(51, 204, 255, 0.3);
+                box-shadow: 0 0 30px rgba(0,0,0,0.5); /* Deep shadow to pop off background */
+            }
+
+            #minimap {
+                width: 100%; height: 100%;
+                display: block;
+                border-radius: 50%;
+            }
+
+            #minimap-north {
+                position: absolute;
+                top: 5px; left: 50%; transform: translateX(-50%);
+                color: #ffcc00; font-weight: bold; font-family: 'Arial', sans-serif;
+                font-size: 10px; pointer-events: none;
+                display: none; /* We will position this manually in JS */
+            }
 
         .hud-panel {
             background: rgba(0, 0, 0, 0.6);
@@ -502,6 +535,13 @@
                 <div id="fps-display">
                     <div class="fps-inner">FPS: 0</div>
                 </div>
+                
+                <!-- NEW: MINIMAP CONTAINER -->
+                <div id="minimap-container" style="display:none;">
+                    <canvas id="minimap"></canvas>
+                    <div id="minimap-ring"></div>
+                    <div id="minimap-north">N</div>
+                </div>
             </div>
         </div>
         
@@ -655,7 +695,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.6.0<br>--- Grenade Visuals ---</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.7.0<br>- Physics Fixes & Minimap HUD -</div>
         </div>
     </div>
 
@@ -764,6 +804,132 @@
             { count: 1000, title: "DEATH INCARNATE" }
         ];
         
+        const Minimap = {
+            canvas: null,
+            ctx: null,
+            visible: false,
+            zoom: 3.5, 
+            
+            init: function() {
+                this.canvas = document.getElementById('minimap');
+                this.ctx = this.canvas.getContext('2d');
+                const dpr = window.devicePixelRatio || 1;
+                
+                // Match CSS size (160)
+                this.size = 160;
+
+                this.canvas.width = this.size * dpr;
+                this.canvas.height = this.size * dpr;
+                this.ctx.scale(dpr, dpr);
+            },
+
+            toggle: function() {
+                this.visible = !this.visible;
+                const el = document.getElementById('minimap-container');
+                el.style.display = this.visible ? 'block' : 'none';
+                AudioSys.playUI(this.visible);
+            },
+
+            update: function() {
+                if (!this.visible || !player || !this.ctx) return;
+
+                // 1. Dynamic Zoom
+                const speed = new THREE.Vector2(player.velocity.x, player.velocity.z).length();
+                
+                // Math.max(x, y - (speed * z)):
+                // x = zoom limit, y = base zoom (lower number = smaller zoom = bigger area), z = zoom sensitivity (bigger = faster)
+                const targetZoom = Math.max(1.0, 3.0 - (speed * 0.1));
+                
+                this.zoom += (targetZoom - this.zoom) * 0.1;
+
+                // 2. Clear using dynamic size
+                const sz = this.size; 
+                const center = sz / 2;
+                this.ctx.clearRect(0, 0, sz, sz);
+                
+                // 3. Setup Transform
+                this.ctx.save();
+                this.ctx.translate(center, center);
+                this.ctx.rotate(camera.rotation.y); 
+                this.ctx.scale(this.zoom, this.zoom);
+                this.ctx.translate(-camera.position.x, -camera.position.z); 
+
+                // 4. Draw Walls
+                if (spatialGrid) {
+                    // Calculate visible range relative to zoom
+                    const range = (sz / this.zoom) * 0.8; 
+                    _groundBox.min.set(camera.position.x - range, -100, camera.position.z - range);
+                    _groundBox.max.set(camera.position.x + range, 100, camera.position.z + range);
+                    
+                    const nearby = spatialGrid.query(_groundBox, _groundSet);
+                    
+                    // Brighter wall color for better contrast on glass
+                    this.ctx.fillStyle = (currentTheme === 1) ? 'rgba(200, 200, 200, 0.6)' : 'rgba(100, 220, 255, 0.6)';
+                    
+                    nearby.forEach(item => {
+                        if (!item.mesh.userData.isFloor) {
+                            const w = item.box.max.x - item.box.min.x;
+                            const d = item.box.max.z - item.box.min.z;
+                            this.ctx.fillRect(item.box.min.x, item.box.min.z, w, d);
+                        }
+                    });
+                }
+
+                // 5 Draw Portals
+                portals.forEach(p => {
+                    // Convert hex int (0x00ffff) to string ('#00ffff')
+                    const hex = '#' + p.color.toString(16).padStart(6, '0');
+                    
+                    // Draw Outer Glow (Semi-transparent)
+                    this.ctx.fillStyle = hex;
+                    this.ctx.globalAlpha = 0.4;
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.mesh.position.x, p.mesh.position.z, 4.0, 0, Math.PI * 2);
+                    this.ctx.fill();
+                    
+                    // Draw Inner Core (Solid)
+                    this.ctx.globalAlpha = 1.0;
+                    this.ctx.beginPath();
+                    this.ctx.arc(p.mesh.position.x, p.mesh.position.z, 1.5, 0, Math.PI * 2);
+                    this.ctx.fill();
+                });
+                
+                // Reset alpha for the next steps
+                this.ctx.globalAlpha = 1.0;
+
+                // 6. Draw Enemies
+                this.ctx.fillStyle = '#ff3333';
+                enemies.forEach(e => {
+                    if (e.isDeadCorpse) return;
+                    this.ctx.beginPath();
+                    const r = 0.8 + (e.type.scale * 0.3);
+                    this.ctx.arc(e.mesh.position.x, e.mesh.position.z, r, 0, Math.PI * 2);
+                    this.ctx.fill();
+                });
+
+                // 7. Draw North
+                this.ctx.fillStyle = '#ffcc00';
+                this.ctx.font = "bold 5px Arial"; 
+                this.ctx.textAlign = "center";
+                // Adjust North offset based on new size (sz/2 minus padding)
+                this.ctx.fillText("N", camera.position.x, camera.position.z - ( (center - 15) / this.zoom));
+
+                this.ctx.restore();
+
+                // 8. Draw Player
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.shadowBlur = 5;
+                this.ctx.shadowColor = '#ffffff';
+                this.ctx.beginPath();
+                this.ctx.moveTo(center, center - 5);
+                this.ctx.lineTo(center - 4, center + 4);
+                this.ctx.lineTo(center, center + 2.5);
+                this.ctx.lineTo(center + 4, center + 4);
+                this.ctx.fill();
+                this.ctx.shadowBlur = 0;
+            }
+        };
+
         const InputManager = {
             keys: { w: false, a: false, s: false, d: false, space: false, shift: false, c: false, q: false, f: false, r: false, e: false },
             mouseDown: false,
@@ -816,6 +982,7 @@
                         }
                         break;
                     case 't': if(!e.repeat) toggleTheme(); break;
+                    case 'm': Minimap.toggle(); break;
                 }
             },
             onKeyUp: function(e) {
@@ -2448,7 +2615,9 @@
                             const overlapX = Math.min(this.playerBox.max.x - wall.box.min.x, wall.box.max.x - this.playerBox.min.x);
                             const overlapY = Math.min(this.playerBox.max.y - wall.box.min.y, wall.box.max.y - this.playerBox.min.y);
                             const overlapZ = Math.min(this.playerBox.max.z - wall.box.min.z, wall.box.max.z - this.playerBox.min.z);
-                            if (overlapY > 0.1 && overlapZ > 0) {
+                            
+                            // FIX: Added (overlapX < overlapZ) to ensure we don't resolve X when hitting a Z-face
+                            if (overlapY > 0.1 && overlapZ > 0 && overlapX < overlapZ) {
                                 const wallCenterX = (wall.box.min.x + wall.box.max.x) / 2;
                                 if (camera.position.x < wallCenterX) camera.position.x -= overlapX;
                                 else camera.position.x += overlapX;
@@ -2458,11 +2627,8 @@
 
                                 if (!this.onGround && InputManager.keys.c) {
                                     this.isWallSliding = true;
-                                    // FIX: Tilt based on Camera View vs Wall Normal
-                                    // Normal points TO player. (-1 if player on left, 1 if player on right)
                                     const normalX = (camera.position.x < wallCenterX) ? -1 : 1; 
                                     const dot = camRight.x * normalX;
-                                    // If dot > 0: Wall is on Left (Tilt Right/-). Else Wall is on Right (Tilt Left/+)
                                     this.wallSlideTilt = (dot > 0) ? -wallTiltAmount : wallTiltAmount;
                                 }
                             }
@@ -2480,7 +2646,9 @@
                             const overlapX = Math.min(this.playerBox.max.x - wall.box.min.x, wall.box.max.x - this.playerBox.min.x);
                             const overlapY = Math.min(this.playerBox.max.y - wall.box.min.y, wall.box.max.y - this.playerBox.min.y);
                             const overlapZ = Math.min(this.playerBox.max.z - wall.box.min.z, wall.box.max.z - this.playerBox.min.z);
-                            if (overlapY > 0.1 && overlapX > 0) {
+                            
+                            // FIX: Added (overlapZ < overlapX) to ensure we don't resolve Z when hitting an X-face
+                            if (overlapY > 0.1 && overlapX > 0 && overlapZ < overlapX) {
                                 const wallCenterZ = (wall.box.min.z + wall.box.max.z) / 2;
                                 if (camera.position.z < wallCenterZ) camera.position.z -= overlapZ;
                                 else camera.position.z += overlapZ;
@@ -2490,7 +2658,6 @@
 
                                 if (!this.onGround && InputManager.keys.c) {
                                     this.isWallSliding = true;
-                                    // FIX: Tilt based on Camera View vs Wall Normal
                                     const normalZ = (camera.position.z < wallCenterZ) ? -1 : 1;
                                     const dot = camRight.z * normalZ;
                                     this.wallSlideTilt = (dot > 0) ? -wallTiltAmount : wallTiltAmount;
@@ -3824,6 +3991,7 @@
             createTeleportMarker();
             InputManager.init();
             player.init();
+            Minimap.init();
             renderStatsContent();
 
             window.addEventListener('resize', onWindowResize);
@@ -4785,9 +4953,14 @@
              if (normal) {
                  dest.addScaledVector(normal, 0.8);
              }
-             const groundHeight = getGroundHeight(dest.x, dest.z);
-             if (dest.y < groundHeight + 1.6) {
-                 dest.y = groundHeight + 1.601;
+             
+             // FIX: Only snap to floor if we hit a floor/ceiling OR if there is no normal (air teleport)
+             // If we hit a wall (normal.y near 0), skipping this prevents snapping to the roof of the wall.
+             if (!normal || Math.abs(normal.y) > 0.5) {
+                 const groundHeight = getGroundHeight(dest.x, dest.z);
+                 if (dest.y < groundHeight + 1.6) {
+                     dest.y = groundHeight + 1.601;
+                 }
              }
 
              const tempBox = new THREE.Box3();
@@ -6061,6 +6234,7 @@
                      btn.style.letterSpacing = "2px";
                 }
             }
+            Minimap.update();
             renderer.render(scene, camera);
         }
 
