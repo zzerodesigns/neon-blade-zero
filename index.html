@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v47.7.0</title>
+    <title>Neon Blade: Melee Arena v47.8.0</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -695,7 +695,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.7.0<br>- Physics Fixes & Minimap HUD -</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.8.0<br>- Teleport Stability & Recall Beacon -</div>
         </div>
     </div>
 
@@ -936,10 +936,18 @@
             init: function() {
                 document.addEventListener('keydown', (e) => this.onKeyDown(e));
                 document.addEventListener('keyup', (e) => this.onKeyUp(e));
+                
+                // Prevent Right-Click Menu
+                window.addEventListener('contextmenu', (e) => e.preventDefault());
+                
                 document.addEventListener('mousedown', (e) => {
                     if (e.button === 0) this.mouseDown = true;
                     if (isLocked && e.button === 0) {
                         player.onAttackInput();
+                    }
+                    // Right Click Handler
+                    if (e.button === 2 && isLocked) {
+                        player.onSecondaryInput();
                     }
                 });
                 document.addEventListener('mouseup', () => { this.mouseDown = false; });
@@ -2223,6 +2231,9 @@
                 this.isRegenerating = false;
                 this.teleportActive = false;
                 this.teleportTarget = null;
+                this.lastTeleportDest = null;
+                this.teleportLocked = false;
+                this.lockedTeleportDest = null;
                 this.airTimeStart = 0;
                 this.lastSlideTime = 0;
                 this.lastJumpTime = 0;
@@ -2316,11 +2327,51 @@
                 }
             }
 
+            onSecondaryInput() {
+                // Allow input if we are Aiming OR if we have a Lock to clear
+                if (teleportMode === 'AIM' && (this.teleportActive || this.teleportLocked)) {
+                    if (!this.teleportLocked) {
+                        // ENGAGE LOCK (Only if aiming)
+                        if (this.teleportTarget && this.teleportActive) {
+                            this.teleportLocked = true;
+                            this.lockedTeleportDest = this.teleportTarget.clone();
+                            spawnParticles(this.lockedTeleportDest, 0x00ffff, 20);
+                            AudioSys.playUI(true);
+                        }
+                    } else {
+                        // RELEASE LOCK (Global)
+                        this.teleportLocked = false;
+                        this.lockedTeleportDest = null;
+                        AudioSys.playUI(false);
+                    }
+                }
+            }
+
             onTeleportInput() {
-                if(teleportMode === 'INSTANT') tryInstantTeleport();
+                if(teleportMode === 'INSTANT') {
+                    tryInstantTeleport();
+                }
                 else if(teleportMode === 'AIM') {
+                    // 1. Priority: Explicit Lock (Beacon)
+                    if (this.teleportLocked && this.lockedTeleportDest) {
+                        executeTeleport(this.lockedTeleportDest, null);
+                        return;
+                    }
+
+                    // 2. Priority: Buffered Warp (Held Click)
+                    if (InputManager.mouseDown && this.lastTeleportDest) {
+                         executeTeleport(this.lastTeleportDest, null);
+                         return;
+                    }
+
+                    // 3. Standard Toggle
                     this.teleportActive = !this.teleportActive;
-                    if(this.teleportActive) this.tpAimStartTime = 0; 
+                    // If we turn it off, also break the lock
+                    if (!this.teleportActive) {
+                        this.teleportLocked = false;
+                    } else {
+                        this.tpAimStartTime = 0;
+                    }
                 }
             }
             
@@ -2577,7 +2628,9 @@
                             const overlapX = Math.min(this.playerBox.max.x - wall.box.min.x, wall.box.max.x - this.playerBox.min.x);
                             const overlapZ = Math.min(this.playerBox.max.z - wall.box.min.z, wall.box.max.z - this.playerBox.min.z);
                             
-                            if (overlapX > 0 && overlapZ > 0) {
+                            // FIX: Added (overlapY < overlapX && overlapY < overlapZ)
+                            // This prevents the Y-solver from "claiming" a collision if you are actually hitting the side of a tall object.
+                            if (overlapX > 0 && overlapZ > 0 && overlapY < overlapX && overlapY < overlapZ) {
                                 if (this.velocity.y < 0) {
                                     if (this.playerBox.min.y < wall.box.max.y && this.playerBox.min.y > wall.box.min.y) {
                                         camera.position.y += overlapY;
@@ -2736,52 +2789,105 @@
             }
 
             handleTeleport(dt) {
-                if (teleportMode === 'AIM' && this.teleportActive) {
-                    const result = getTeleportTarget();
+                // If Aim Mode is active OR we are Locked (keep marker visible if locked even if Q toggled off? 
+                // No, aiming relies on Q being active. Right click just freezes the target.)
+                if (teleportMode === 'AIM' && (this.teleportActive || this.teleportLocked)) {
                     
-                    // 1. Position: Snap exactly to the hit point (Feet Location).
-                    // We do NOT add a normal offset here, so the ring sits exactly on the floor/surface.
-                    teleportMarker.position.copy(result.point);
-                    this.teleportTarget = result.point;
+                    if (this.teleportLocked && this.lockedTeleportDest) {
+                        // --- LOCKED MODE ---
+                        // No math, no raycast. Just render at saved pos.
+                        
+                        // Ensure World Space
+                        if (teleportMarker.parent !== scene) scene.add(teleportMarker);
+                        
+                        // Feet Position (LockedDest is already Feet Level)
+                        teleportMarker.position.copy(this.lockedTeleportDest);
+                        teleportMarker.rotation.set(0, 0, 0);
+                        
+                        // Treat the locked pos as the target for highlights
+                        this.teleportTarget = this.lockedTeleportDest;
+                        
+                    } else {
+                        // --- SCANNING MODE ---
+                        const result = getTeleportTarget();
+                        let dest = result.point.clone();
 
-                    // 2. Orientation: Force Upright (World Y-Up).
-                    // The marker represents the player's body and feet, which always stay upright 
-                    // regardless of the surface angle (walls/slopes).
-                    teleportMarker.rotation.set(0, 0, 0); 
+                        if (result.hit && result.normal) {
+                            if (Math.abs(result.normal.y) < 0.5) {
+                                dest.addScaledVector(result.normal, 0.8);
+                            }
+                        }
+                        
+                        const gh = getGroundHeight(dest.x, dest.z);
+                        if (dest.y < gh + 0.01) dest.y = gh + 0.01;
+
+                        const tempBox = _box3_1; 
+                        const halfW = 0.3;
+                        tempBox.min.set(dest.x - halfW, dest.y, dest.z - halfW);
+                        tempBox.max.set(dest.x + halfW, dest.y + 1.8, dest.z + halfW);
+                        
+                        if (spatialGrid) {
+                            const nearby = spatialGrid.query(tempBox); 
+                            for(const wall of nearby) {
+                                if (wall.mesh.userData.isFloor) continue;
+                                if (tempBox.intersectsBox(wall.box)) {
+                                    const overlapX = Math.min(tempBox.max.x - wall.box.min.x, wall.box.max.x - tempBox.min.x);
+                                    const overlapZ = Math.min(tempBox.max.z - wall.box.min.z, wall.box.max.z - tempBox.min.z);
+                                    const wallCenterX = (wall.box.min.x + wall.box.max.x) / 2;
+                                    const wallCenterZ = (wall.box.min.z + wall.box.max.z) / 2;
+                                    if (overlapX < overlapZ) {
+                                        const sign = (dest.x < wallCenterX) ? -1 : 1;
+                                        dest.x += (overlapX + 0.05) * sign;
+                                    } else {
+                                        const sign = (dest.z < wallCenterZ) ? -1 : 1;
+                                        dest.z += (overlapZ + 0.05) * sign;
+                                    }
+                                    tempBox.min.set(dest.x - halfW, dest.y, dest.z - halfW);
+                                    tempBox.max.set(dest.x + halfW, dest.y + 1.8, dest.z + halfW);
+                                }
+                            }
+                        }
+
+                        this.teleportTarget = dest;
+
+                        if (result.hit) {
+                            if (teleportMarker.parent !== scene) scene.add(teleportMarker);
+                            teleportMarker.position.copy(dest);
+                            teleportMarker.rotation.set(0, 0, 0);
+                        } else {
+                            if (teleportMarker.parent !== camera) camera.add(teleportMarker);
+                            teleportMarker.position.set(0, 0, -CONFIG.teleportRange);
+                            teleportMarker.rotation.set(-camera.rotation.x, 0, 0);
+                        }
+                    }
                     
                     teleportMarker.visible = true;
 
-                    // --- Enemy Highlighting Logic ---
+                    // --- SHARED: Highlight & Animation ---
                     let closestEnemy = null;
                     let closestDist = 999;
                     for (const enemy of enemies) {
                         if (enemy.isDeadCorpse) continue;
-                        const dist = this.teleportTarget.distanceTo(enemy.mesh.position);
+                        const checkPos = this.teleportTarget.clone().add(new THREE.Vector3(0,1,0));
+                        const dist = checkPos.distanceTo(enemy.mesh.position);
                         const threshold = 2.5 + (enemy.type.scale || 1);
                         if (dist < threshold && dist < closestDist) {
                             closestDist = dist;
                             closestEnemy = enemy;
                         }
                     }
-
-                    if (lastHoveredEnemy && lastHoveredEnemy !== closestEnemy) {
-                        lastHoveredEnemy.setHighlight(false);
-                    }
-                    if (closestEnemy) {
-                        closestEnemy.setHighlight(true);
-                        lastHoveredEnemy = closestEnemy;
-                    } else {
-                        lastHoveredEnemy = null;
-                    }
+                    if (lastHoveredEnemy && lastHoveredEnemy !== closestEnemy) lastHoveredEnemy.setHighlight(false);
+                    if (closestEnemy) { closestEnemy.setHighlight(true); lastHoveredEnemy = closestEnemy; } 
+                    else { lastHoveredEnemy = null; }
                     
-                    // --- Visual Animation & Colors ---
                     const t = performance.now();
                     teleportMarker.userData.diamond.rotation.y += dt * 2.0;
-                    
                     if (!this.tpAimStartTime) this.tpAimStartTime = performance.now();
                     const timeActive = performance.now() - this.tpAimStartTime;
                     const cycle = (Math.cos(timeActive * 0.0015) + 1) / 2; 
                     
+                    // Locked Color override? Optional. 
+                    // For now keeping standard colors but maybe higher intensity if locked could be nice.
                     const baseCol = new THREE.Color(0x00ffff); 
                     const whiteCol = new THREE.Color(0xffffff);
                     const targetColor = baseCol.clone().lerp(whiteCol, cycle);
@@ -2790,39 +2896,29 @@
                     materials.marker.opacity = targetOpacity;
                     materials.marker.color.copy(targetColor);
                     materials.marker.emissive.copy(targetColor);
-                    materials.marker.emissiveIntensity = 2.0 * cycle;
-                    
+                    materials.marker.emissiveIntensity = this.teleportLocked ? 3.0 : (2.0 * cycle); // Brighter when locked
+
                     teleportMarker.userData.ringMat.opacity = targetOpacity;
                     teleportMarker.userData.ringMat.color.copy(targetColor);
                     teleportMarker.userData.ringMat.emissive.copy(targetColor);
-                    teleportMarker.userData.ringMat.emissiveIntensity = 2.0 * cycle;
+                    teleportMarker.userData.ringMat.emissiveIntensity = this.teleportLocked ? 3.0 : (2.0 * cycle);
 
-                    // 3. Diamond Animation: Relative to the Ring
-                    // The Ring is at 0 (Feet). The Diamond floats at body height (~1.5m).
-                    // This maintains the correct relative distance regardless of where the marker is.
                     const pulse = Math.sin(t * 0.003); 
                     const hoverY = 1.5 + pulse * 0.2;
-                    
                     teleportMarker.userData.diamond.position.y = hoverY;
                     teleportMarker.userData.ring.scale.setScalar(1 + pulse * 0.05);
-
                     document.getElementById('icon-q').classList.add('active');
                 } else {
+                    if (teleportMarker.parent === camera) scene.add(teleportMarker);
                     teleportMarker.visible = false;
                     this.tpAimStartTime = 0; 
                     document.getElementById('icon-q').classList.remove('active');
-                    if (lastHoveredEnemy) {
-                        lastHoveredEnemy.setHighlight(false);
-                        lastHoveredEnemy = null;
-                    }
+                    if (lastHoveredEnemy) { lastHoveredEnemy.setHighlight(false); lastHoveredEnemy = null; }
                 }
                 
                 const ch = document.getElementById('crosshair');
-                if (slashActive || (teleportMode === 'AIM' && this.teleportActive)) {
-                    ch.style.opacity = 0;
-                } else {
-                    ch.style.opacity = 1;
-                }
+                if (slashActive || (teleportMode === 'AIM' && this.teleportActive)) ch.style.opacity = 0;
+                else ch.style.opacity = 1;
             }
         }
 
@@ -4930,8 +5026,8 @@
 
         function tryAimTeleport() {
             if (player.teleportTarget) {
-                const res = getTeleportTarget(); 
-                executeTeleport(player.teleportTarget, res.normal);
+                // Pass 'null' for normal because handleTeleport already handled the offset math
+                executeTeleport(player.teleportTarget, null); 
                 player.teleportActive = false; 
             }
         }
@@ -4949,28 +5045,28 @@
                  return;
              }
              player.energy -= CONFIG.teleportCost;
+             
+             // Target represents feet position
              const dest = target.clone();
-             if (normal) {
+             
+             // Apply wall offset only for vertical surfaces to prevent floating on floors
+             if (normal && Math.abs(normal.y) < 0.5) {
                  dest.addScaledVector(normal, 0.8);
              }
              
-             // FIX: Only snap to floor if we hit a floor/ceiling OR if there is no normal (air teleport)
-             // If we hit a wall (normal.y near 0), skipping this prevents snapping to the roof of the wall.
-             if (!normal || Math.abs(normal.y) > 0.5) {
-                 const groundHeight = getGroundHeight(dest.x, dest.z);
-                 if (dest.y < groundHeight + 1.6) {
-                     dest.y = groundHeight + 1.601;
-                 }
+             // Apply ground snap to ensure feet sit exactly on the floor
+             const groundHeight = getGroundHeight(dest.x, dest.z);
+             if (dest.y < groundHeight + 0.01) {
+                 dest.y = groundHeight + 0.01;
              }
 
+             // Apply physics resolution using spatial grid
              const tempBox = new THREE.Box3();
              const halfW = 0.3; 
-             
-             tempBox.min.set(dest.x - halfW, dest.y - 1.6, dest.z - halfW);
-             tempBox.max.set(dest.x + halfW, dest.y + 0.2, dest.z + halfW);
+             tempBox.min.set(dest.x - halfW, dest.y, dest.z - halfW);
+             tempBox.max.set(dest.x + halfW, dest.y + 1.8, dest.z + halfW);
 
              const collisions = spatialGrid.query(tempBox);
-             
              for(const wall of collisions) {
                  if (wall.mesh.userData.isFloor) continue;
                  if (tempBox.intersectsBox(wall.box)) {
@@ -4985,25 +5081,32 @@
                          const sign = (dest.z < wallCenterZ) ? -1 : 1;
                          dest.z += (overlapZ + 0.05) * sign;
                      }
-                     tempBox.min.set(dest.x - halfW, dest.y - 1.6, dest.z - halfW);
-                     tempBox.max.set(dest.x + halfW, dest.y + 0.2, dest.z + halfW);
+                     tempBox.min.set(dest.x - halfW, dest.y, dest.z - halfW);
+                     tempBox.max.set(dest.x + halfW, dest.y + 1.8, dest.z + halfW);
                  }
              }
+
              const startInAir = !player.onGround;
              const finalGround = getGroundHeight(dest.x, dest.z);
-             const endInAir = (dest.y - (finalGround + 1.6)) > 0.5;
+             const endInAir = (dest.y - finalGround) > 0.5;
 
              player.lastTeleportWasAerial = startInAir || endInAir;
              player.hasPhaseStruck = false; 
 
              spawnParticles(camera.position, 0x00ffaa, 20); 
-             camera.position.copy(dest);
+             
+             // Save destination for buffered warp logic
+             player.lastTeleportDest = dest.clone();
+
+             // Update camera position (Feet + EyeHeight)
+             camera.position.set(dest.x, dest.y + 1.6, dest.z);
+             
              player.jumpsRemaining = 1; 
              player.onGround = false; 
              if(!startInAir) player.airTimeStart = performance.now();
              player.lastTeleportTime = performance.now(); 
              AudioSys.playTeleport();
-             spawnParticles(dest, 0x00ffaa, 30);
+             spawnParticles(camera.position, 0x00ffaa, 30);
         }
 
         function updateComboUI() {
