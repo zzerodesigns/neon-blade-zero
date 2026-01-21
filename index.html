@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v47.8.0</title>
+    <title>Neon Blade: Melee Arena v47.9.5</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -36,9 +36,9 @@
         /* MINIMAP - Liquid Glass Style */
             #minimap-container {
                 position: relative;
-                /* SIZE TUNING: Change these two values to resize */
-                width: 160px; 
-                height: 160px; 
+                /* Minimap size: Change these two values to resize */
+                width: 180px; 
+                height: 180px; 
                 
                 margin-top: 9px;
                 border-radius: 50%;
@@ -695,7 +695,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.8.0<br>- Teleport Stability & Recall Beacon -</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.9.5<br>- Audio Overhaul -</div>
         </div>
     </div>
 
@@ -707,13 +707,13 @@
             baseSpeed: 7, 
             crouchSpeed: 3, 
             sprintSpeed: 14, 
-            jumpForce: 14, 
-            wallJumpForce: 15,
-            wallPushForce: 13,
+            jumpForce: 20, 
+            wallJumpForce: 22,
+            wallPushForce: 18,
             gravity: 30, 
             frictionGround: 6.0, 
             frictionAir: 0.02, 
-            airControl: 2.0,  
+            airControl: 2.5,  
             frictionSlide: 0.8, 
             frictionWall: 0.5, 
             slideBoost: 15, 
@@ -815,8 +815,8 @@
                 this.ctx = this.canvas.getContext('2d');
                 const dpr = window.devicePixelRatio || 1;
                 
-                // Match CSS size (160)
-                this.size = 160;
+                // Minimap size - Match CSS size (180)
+                this.size = 180;
 
                 this.canvas.width = this.size * dpr;
                 this.canvas.height = this.size * dpr;
@@ -1070,7 +1070,29 @@
             masterGain: null,
             slideOsc: null,
             slideGain: null,
-            currentVol: 0.5, // Store volume state
+            currentVol: 1.5, // Store volume state
+
+            getDistanceMod: function(pos) {
+                if (!pos) return 1.0; 
+                const dist = camera.position.distanceTo(pos);
+                
+                // INVERSE SQUARE LOGIC
+                // 'refDist' is the distance where volume drops to 50%
+                // Smaller number = Drops off faster (more intimate)
+                // Larger number = Carries further (more arcade)
+                const refDist = 40; 
+                
+                // Formula: ref / (ref + dist)
+                // Result: Never hits absolute zero, preserving the "Tail"
+                return refDist / (refDist + dist);
+            },
+
+            getLinearMod: function(pos, range) {
+                if (!pos) return 1.0;
+                const dist = camera.position.distanceTo(pos);
+                // Hard silence beyond 'range' (100m)
+                return Math.max(0, 1 - (dist / range));
+            },
 
             init: function() {
                 window.AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -1114,51 +1136,101 @@
             },
 
             toggleSlideSound: function(active) {
-                    if(!this.ctx) return;
-                    const t = this.ctx.currentTime;
-                    if(active && !this.slideOsc) {
-                        const bufferSize = this.ctx.sampleRate; 
-                        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-                        const data = buffer.getChannelData(0);
-                        for(let i=0; i<bufferSize; i++) data[i] = Math.random()*2-1;
+                if (!this.ctx) return;
+                const t = this.ctx.currentTime;
 
-                        this.slideOsc = this.ctx.createBufferSource();
-                        this.slideOsc.buffer = buffer;
-                        this.slideOsc.loop = true;
+                if (active && !this.slideOsc) {
+                    const bSize = this.ctx.sampleRate * 10;
+                    const b = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
+                    const d = b.getChannelData(0);
+                    for (let i = 0; i < bSize; i++) d[i] = Math.random() * 2 - 1;
 
-                        const filter = this.ctx.createBiquadFilter();
-                        filter.type = 'lowpass';
-                        filter.frequency.setValueAtTime(300, t); 
-                        
-                        this.slideGain = this.ctx.createGain();
-                        this.slideGain.gain.setValueAtTime(0, t);
-                        this.slideGain.gain.linearRampToValueAtTime(0.15, t + 0.3); 
+                    this.slideOsc = this.ctx.createBufferSource();
+                    this.slideOsc.buffer = b;
+                    this.slideOsc.loop = true;
 
-                        this.slideOsc.connect(filter);
-                        filter.connect(this.slideGain);
-                        this.slideGain.connect(this.masterGain);
-                        this.slideOsc.start();
-                    } else if (!active && this.slideOsc) {
-                        try {
-                            this.slideGain.gain.linearRampToValueAtTime(0, t + 0.2);
-                            this.slideOsc.stop(t + 0.2);
-                        } catch(e) {}
-                        this.slideOsc = null;
-                        this.slideGain = null;
-                    }
-                },
+                    const f = this.ctx.createBiquadFilter();
+                    f.type = 'lowpass';
+                    f.frequency.setValueAtTime(140, t); 
+                    f.Q.value = 0.5;
 
-            playJump: function() { 
+                    this.slideGain = this.ctx.createGain();
+                    this.slideGain.gain.setValueAtTime(0, t);
+                    
+                    // --- 10-FRAME ATTACK ---
+                    // 0.166s = 10 frames @ 60fps. The "Snappy but Smooth" sweet spot.
+                    const maxVolume = 0.4; 
+                    this.slideGain.gain.linearRampToValueAtTime(maxVolume, t + 0.166); 
+
+                    const runDrift = () => {
+                        if (!this.slideGain || !this.slideOsc) return;
+                        const now = this.ctx.currentTime;
+                        const duration = 6 + Math.random() * 4; 
+                        const nextFreq = 120 + Math.random() * 80;
+                        f.frequency.exponentialRampToValueAtTime(nextFreq, now + duration);
+                        this.slideDriftTimeout = setTimeout(runDrift, duration * 1000);
+                    };
+
+                    this.slideOsc.connect(f);
+                    f.connect(this.slideGain);
+                    this.slideGain.connect(this.masterGain);
+                    this.slideOsc.start();
+                    runDrift();
+
+                } else if (!active && this.slideOsc) {
+                    if (this.slideDriftTimeout) clearTimeout(this.slideDriftTimeout);
+                    
+                    const g = this.slideGain.gain;
+                    const s = this.slideOsc;
+
+                    g.cancelScheduledValues(t);
+                    g.setValueAtTime(g.value, t);
+                    
+                    // 0.17 Constant = 0.85s Total Fade.
+                    const timeConstant = 0.17; 
+                    g.setTargetAtTime(0, t, timeConstant);
+                    
+                    s.stop(t + (timeConstant * 6));
+
+                    this.slideOsc = null;
+                    this.slideGain = null;
+                }
+            },
+
+            playBotSlide: function(pos) {
+                // PLACEHOLDER: Audio disabled.
+                // Previous procedural noise generation caused harsh low-end transients ("thuds").
+                // Leaving function empty to maintain compatibility with bot logic until
+                // a dedicated audio asset is available.
+                return;
+            },
+
+            playJump: function(pos) { 
                 if(!this.ctx) return;
                 const osc = this.ctx.createOscillator();
                 const gain = this.ctx.createGain();
+                
+                const distGain = this.ctx.createGain();
+                
+                if (pos) {
+                    // BOT: Linear Cutoff at 30m
+                    distGain.gain.value = this.getLinearMod(pos, 30);
+                } else {
+                    // PLAYER: Global
+                    distGain.gain.value = 1.0;
+                }
+                distGain.connect(this.masterGain);
+
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(200, this.ctx.currentTime);
                 osc.frequency.linearRampToValueAtTime(400, this.ctx.currentTime + 0.2);
+                
+                // VOLUME: 0.1 (Same as player)
                 gain.gain.setValueAtTime(0.1, this.ctx.currentTime);
                 gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+                
                 osc.connect(gain);
-                gain.connect(this.masterGain);
+                gain.connect(distGain);
                 osc.start();
                 osc.stop(this.ctx.currentTime + 0.2);
             },
@@ -1260,376 +1332,432 @@
                 });
             },
             
-            playMiss: function() {
+            playMiss: function(pos) {
                 if (!this.ctx) return;
                 const t = this.ctx.currentTime;
+                const silence = t + 0.4;
+                const terminate = t + 0.5;
 
-                // 1. GENERATE A SLIGHTLY LONGER NOISE BUFFER
-                const bSize = this.ctx.sampleRate * 0.4; // Increased to 0.4s for a fuller swing
+                const master = this.ctx.createGain();
+                const dist = this.ctx.createGain();
+                dist.gain.value = pos ? this.getDistanceMod(pos) : 1.0;
+                
+                master.gain.setValueAtTime(0.8, t);
+                master.gain.setValueAtTime(0.8, t + 0.38);
+                master.gain.linearRampToValueAtTime(0, silence);
+
+                master.connect(dist);
+                dist.connect(this.masterGain || this.ctx.destination);
+
+                const bSize = this.ctx.sampleRate * 0.4; 
                 const b = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
                 const d = b.getChannelData(0);
                 for (let i = 0; i < bSize; i++) d[i] = Math.random() * 2 - 1;
 
-                // 2. THE WHOOSH (Air displacement)
                 const n = this.ctx.createBufferSource();
                 n.buffer = b;
 
                 const nf = this.ctx.createBiquadFilter();
-                nf.type = 'bandpass'; // Bandpass creates that "whistling" air sound
+                nf.type = 'bandpass';
                 nf.Q.value = 5;
-                // Sweep the frequency down to simulate the object moving away
                 nf.frequency.setValueAtTime(2000, t);
                 nf.frequency.exponentialRampToValueAtTime(400, t + 0.3);
 
                 const ng = this.ctx.createGain();
                 ng.gain.setValueAtTime(0, t);
-                ng.gain.linearRampToValueAtTime(0.4, t + 0.1); // Quick fade in
-                ng.gain.exponentialRampToValueAtTime(0.001, t + 0.4); // Longer fade out
+                ng.gain.linearRampToValueAtTime(0.35, t + 0.1);
+                ng.gain.exponentialRampToValueAtTime(0.001, t + 0.39);
+
+                const ghost = this.ctx.createOscillator();
+                const gg = this.ctx.createGain();
+                ghost.type = 'sine';
+                ghost.frequency.setValueAtTime(200, t);
+                ghost.frequency.exponentialRampToValueAtTime(50, t + 0.3);
+
+                gg.gain.setValueAtTime(0, t);
+                gg.gain.linearRampToValueAtTime(0.08, t + 0.1);
+                gg.gain.exponentialRampToValueAtTime(0.001, t + 0.29);
 
                 n.connect(nf);
                 nf.connect(ng);
-                ng.connect(this.masterGain);
-
-                // 3. THE "DISSAPOINTMENT" LAYER (Low-end ghost)
-                // This adds a subtle "oomph" to the miss so it feels physical, but hollow.
-                const ghost = this.ctx.createOscillator();
-                ghost.type = 'sine';
-                ghost.frequency.setValueAtTime(200, t);
-                ghost.frequency.exponentialRampToValueAtTime(50, t + 0.3); // Pitch drops away
-
-                const ghostGain = this.ctx.createGain();
-                ghostGain.gain.setValueAtTime(0, t);
-                ghostGain.gain.linearRampToValueAtTime(0.2, t + 0.1);
-                ghostGain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
-
-                ghost.connect(ghostGain);
-                ghostGain.connect(this.masterGain);
+                ng.connect(master);
+                ghost.connect(gg);
+                gg.connect(master);
 
                 n.start(t);
                 ghost.start(t);
-                n.stop(t + 0.4);
-                ghost.stop(t + 0.4);
+                n.stop(terminate);
+                ghost.stop(terminate);
             },
 
-            playHit: function() {
+            playHit: function(pos) {
                 if (!this.ctx) return;
                 const t = this.ctx.currentTime;
 
-                // --- 1. SIGNAL CHAIN ---
-                const masterGain = this.ctx.createGain();
-                masterGain.gain.value = 0.85; 
-                
-                const compressor = this.ctx.createDynamicsCompressor();
-                compressor.threshold.setValueAtTime(-18, t); // Slightly higher threshold for more "punch"
-                compressor.knee.setValueAtTime(20, t);
-                compressor.ratio.setValueAtTime(12, t);
-                compressor.attack.setValueAtTime(0.002, t); // Faster attack to clamp the hit
-                compressor.release.setValueAtTime(0.2, t);
+                const master = this.ctx.createGain();
+                const vol = 0.85 * (pos ? this.getDistanceMod(pos) : 1.0);
+                master.gain.setValueAtTime(vol, t);
+                master.gain.setValueAtTime(vol, t + 0.89);
+                master.gain.linearRampToValueAtTime(0, t + 0.9);
 
-                compressor.connect(masterGain);
-                masterGain.connect(this.masterGain);
+                const comp = this.ctx.createDynamicsCompressor();
+                comp.threshold.setValueAtTime(-18, t);
+                comp.knee.setValueAtTime(20, t);
+                comp.ratio.setValueAtTime(12, t);
+                comp.attack.setValueAtTime(0.002, t);
+                comp.release.setValueAtTime(0.2, t);
 
-                // --- 2. SHARED NOISE BUFFER ---
-                const bufferSize = this.ctx.sampleRate * 2;
-                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-                const data = buffer.getChannelData(0);
-                for (let i = 0; i < bufferSize; i++) { data[i] = Math.random() * 2 - 1; }
+                comp.connect(master);
+                master.connect(this.masterGain || this.ctx.destination);
 
-                // --- 3. THE IMPACT (Revised for more weight) ---
-                
-                // The "Crack" (Transient)
-                const impactSrc = this.ctx.createBufferSource();
-                impactSrc.buffer = buffer;
-                const impactFilter = this.ctx.createBiquadFilter();
-                impactFilter.type = 'highpass';
-                impactFilter.frequency.setValueAtTime(2500, t);
-                const impactGain = this.ctx.createGain();
-                impactGain.gain.setValueAtTime(1.4, t);
-                impactGain.gain.exponentialRampToValueAtTime(0.01, t + 0.04);
-                impactSrc.connect(impactFilter);
-                impactFilter.connect(impactGain);
-                impactGain.connect(compressor);
-                impactSrc.start(t);
-                impactSrc.stop(t + 0.05);
+                const bSize = this.ctx.sampleRate * 2;
+                const b = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
+                const d = b.getChannelData(0);
+                for (let i = 0; i < bSize; i++) d[i] = Math.random() * 2 - 1;
 
-                // NEW: THE "HEAVY BODY" THUD (Added weight)
-                const heavyThud = this.ctx.createOscillator();
-                heavyThud.type = 'triangle'; // Triangle provides more "chest-hit" harmonics
-                const thudFilter = this.ctx.createBiquadFilter();
-                thudFilter.type = 'lowpass';
-                thudFilter.frequency.setValueAtTime(100, t); // Filter out the "buzz," keep the weight
-                
-                heavyThud.frequency.setValueAtTime(100, t); 
-                heavyThud.frequency.exponentialRampToValueAtTime(30, t + 0.15);
-                
-                const thudGain = this.ctx.createGain();
-                thudGain.gain.setValueAtTime(1.0, t);
-                thudGain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
-                
-                heavyThud.connect(thudFilter);
-                thudFilter.connect(thudGain);
-                thudGain.connect(compressor);
-                heavyThud.start(t);
-                heavyThud.stop(t + 0.3);
+                // IMPACT
+                const impSrc = this.ctx.createBufferSource();
+                const impF = this.ctx.createBiquadFilter();
+                const impG = this.ctx.createGain();
+                impSrc.buffer = b;
+                impF.type = 'highpass';
+                impF.frequency.setValueAtTime(2500, t);
+                impG.gain.setValueAtTime(1.4, t);
+                impG.gain.exponentialRampToValueAtTime(0.01, t + 0.04);
+                impG.gain.linearRampToValueAtTime(0, t + 0.05);
+                impSrc.connect(impF); impF.connect(impG); impG.connect(comp);
+                impSrc.start(t); impSrc.stop(t + 0.15);
 
-                // Original Thump (Sine) - kept for the low-end "foundation"
-                const thumpOsc = this.ctx.createOscillator();
-                thumpOsc.type = 'sine';
-                thumpOsc.frequency.setValueAtTime(150, t); 
-                thumpOsc.frequency.exponentialRampToValueAtTime(40, t + 0.1);
-                const thumpGain = this.ctx.createGain();
-                thumpGain.gain.setValueAtTime(0.6, t); // Lowered slightly to make room for heavyThud
-                thumpGain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
-                thumpOsc.connect(thumpGain);
-                thumpGain.connect(compressor);
-                thumpOsc.start(t);
-                thumpOsc.stop(t + 0.2);
+                // THUD
+                const thud = this.ctx.createOscillator();
+                const thudF = this.ctx.createBiquadFilter();
+                const thudG = this.ctx.createGain();
+                thud.type = 'triangle';
+                thudF.type = 'lowpass';
+                thudF.frequency.setValueAtTime(100, t);
+                thud.frequency.setValueAtTime(100, t);
+                thud.frequency.exponentialRampToValueAtTime(30, t + 0.15);
+                thudG.gain.setValueAtTime(1.0, t);
+                thudG.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+                thudG.gain.linearRampToValueAtTime(0, t + 0.26);
+                thud.connect(thudF); thudF.connect(thudG); thudG.connect(comp);
+                thud.start(t); thud.stop(t + 0.4);
 
-                // --- 4. THE BODY (Scrape, Whoosh, & Ring) ---
-                // [Scrape Logic]
-                const noiseSrc = this.ctx.createBufferSource();
-                noiseSrc.buffer = buffer;
-                const scrapeFilter = this.ctx.createBiquadFilter();
-                scrapeFilter.type = 'bandpass';
-                scrapeFilter.Q.value = 10; 
-                scrapeFilter.frequency.setValueAtTime(800, t); 
-                scrapeFilter.frequency.exponentialRampToValueAtTime(9000, t + 0.22); 
-                const scrapeGain = this.ctx.createGain();
-                scrapeGain.gain.setValueAtTime(0, t);
-                scrapeGain.gain.linearRampToValueAtTime(1.1, t + 0.15); 
-                scrapeGain.gain.exponentialRampToValueAtTime(0.001, t + 0.3); 
-                noiseSrc.connect(scrapeFilter);
-                scrapeFilter.connect(scrapeGain);
-                scrapeGain.connect(compressor);
-                noiseSrc.start(t);
-                noiseSrc.stop(t + 0.4);
+                // BODY - Delayed by 10ms to prevent compressor "knocking"
+                const bodySrc = this.ctx.createBufferSource();
+                const bodyF = this.ctx.createBiquadFilter();
+                const bodyG = this.ctx.createGain();
+                bodySrc.buffer = b;
+                bodyF.type = 'bandpass';
+                bodyF.Q.value = 10;
+                bodyF.frequency.setValueAtTime(800, t + 0.01);
+                bodyF.frequency.exponentialRampToValueAtTime(9000, t + 0.23);
+                bodyG.gain.setValueAtTime(0, t);
+                bodyG.gain.setValueAtTime(0, t + 0.01); 
+                bodyG.gain.linearRampToValueAtTime(1.1, t + 0.16);
+                bodyG.gain.exponentialRampToValueAtTime(0.001, t + 0.31);
+                bodyG.gain.linearRampToValueAtTime(0, t + 0.32);
+                bodySrc.connect(bodyF); bodyF.connect(bodyG); bodyG.connect(comp);
+                bodySrc.start(t + 0.01); bodySrc.stop(t + 0.51);
 
-                // [Whoosh Logic]
-                const whooshSrc = this.ctx.createBufferSource();
-                whooshSrc.buffer = buffer;
-                const whooshFilter = this.ctx.createBiquadFilter();
-                whooshFilter.type = 'lowpass';
-                whooshFilter.frequency.setValueAtTime(400, t);
-                whooshFilter.frequency.exponentialRampToValueAtTime(150, t + 0.25);
-                const whooshGain = this.ctx.createGain();
-                whooshGain.gain.setValueAtTime(0, t);
-                whooshGain.gain.linearRampToValueAtTime(0.6, t + 0.12);
-                whooshGain.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
-                whooshSrc.connect(whooshFilter);
-                whooshFilter.connect(whooshGain);
-                whooshGain.connect(compressor);
-                whooshSrc.start(t);
-                whooshSrc.stop(t + 0.35);
-
-                // [Metallic Ring Logic]
-                const partials = [2800, 3500, 5200, 8000];
-                partials.forEach((freq, index) => {
-                    const osc = this.ctx.createOscillator();
-                    osc.type = index === 0 ? 'sine' : 'triangle';
-                    osc.frequency.setValueAtTime(freq, t);
-                    osc.frequency.linearRampToValueAtTime(freq - 30, t + 0.6); 
-                    const oscGain = this.ctx.createGain();
-                    const peakTime = t + 0.2; 
-                    oscGain.gain.setValueAtTime(0, t);
-                    oscGain.gain.setValueAtTime(0, peakTime - 0.04);
-                    oscGain.gain.linearRampToValueAtTime(0.1 / (index + 1), peakTime); 
-                    oscGain.gain.exponentialRampToValueAtTime(0.0001, peakTime + 0.4 + (index * 0.05)); 
-                    osc.connect(oscGain);
-                    oscGain.connect(compressor);
-                    osc.start(t);
-                    osc.stop(t + 0.9); 
+                // METALLIC RING
+                [2800, 3500, 5200, 8000].forEach((f, i) => {
+                    const o = this.ctx.createOscillator();
+                    const og = this.ctx.createGain();
+                    const peak = t + 0.2;
+                    const end = peak + 0.4 + (i * 0.05);
+                    o.type = i === 0 ? 'sine' : 'triangle';
+                    o.frequency.setValueAtTime(f, t);
+                    o.frequency.linearRampToValueAtTime(f - 30, t + 0.6);
+                    og.gain.setValueAtTime(0, t);
+                    og.gain.setValueAtTime(0, peak - 0.04);
+                    og.gain.linearRampToValueAtTime(0.1 / (i + 1), peak);
+                    og.gain.exponentialRampToValueAtTime(0.0001, end);
+                    og.gain.linearRampToValueAtTime(0, end + 0.01);
+                    o.connect(og); og.connect(comp);
+                    o.start(t); o.stop(t + 1.1);
                 });
-
-                // --- 5. THE RESONANCE (Vibration) ---
-                const vibOsc = this.ctx.createOscillator();
-                vibOsc.type = 'sine';
-                vibOsc.frequency.setValueAtTime(50, t); 
-                vibOsc.frequency.exponentialRampToValueAtTime(25, t + 0.8);
-                const tremoloOsc = this.ctx.createOscillator();
-                tremoloOsc.type = 'sine';
-                tremoloOsc.frequency.setValueAtTime(8, t);
-                const tremoloGain = this.ctx.createGain();
-                tremoloGain.gain.setValueAtTime(0.3, t); // Slightly less tremolo for cleaner impact
-                tremoloOsc.connect(tremoloGain);
-                const vibGain = this.ctx.createGain();
-                vibGain.gain.setValueAtTime(0, t);
-                vibGain.gain.linearRampToValueAtTime(0.8, t + 0.05);
-                vibGain.gain.exponentialRampToValueAtTime(0.15, t + 0.3);
-                vibGain.gain.exponentialRampToValueAtTime(0.001, t + 0.7);
-                tremoloGain.connect(vibGain.gain);
-                vibOsc.connect(vibGain);
-                vibGain.connect(compressor);
-                vibOsc.start(t);
-                vibOsc.stop(t + 0.75);
-                tremoloOsc.start(t);
-                tremoloOsc.stop(t + 0.75);
-
-                // --- 6. THE TAIL (Subtle & Shorter) ---
-                const tailSrc = this.ctx.createBufferSource();
-                tailSrc.buffer = buffer;
-                const tailFilter = this.ctx.createBiquadFilter();
-                tailFilter.type = 'lowpass';
-                tailFilter.frequency.setValueAtTime(800, t); // Darker reverb
-                const tailGain = this.ctx.createGain();
-                tailGain.gain.setValueAtTime(0, t);
-                tailGain.gain.linearRampToValueAtTime(0.08, t + 0.08); // Lower peak volume (0.08 vs 0.15)
-                tailGain.gain.exponentialRampToValueAtTime(0.001, t + 0.7); // Faster fade (0.7s vs 1.2s)
-                tailSrc.connect(tailFilter);
-                tailFilter.connect(tailGain);
-                tailGain.connect(compressor);
-                tailSrc.start(t);
-                tailSrc.stop(t + 0.7);
             },
 
-            playTeleport: function() {
+            playTeleport: function(pos) {
                 if(!this.ctx) return;
                 const t = this.ctx.currentTime;
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(200, t);
-                osc.frequency.exponentialRampToValueAtTime(2000, t + 0.1);
-                gain.gain.setValueAtTime(0.2, t);
-                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.2);
-                osc.connect(gain);
-                gain.connect(this.masterGain);
-                osc.start();
-                osc.stop(t + 0.2);
+                const pMod = 0.98 + Math.random() * 0.04;
+                
+                const masterGain = this.ctx.createGain();
+                const distGain = this.ctx.createGain();
+                distGain.gain.value = pos ? this.getLinearMod(pos, 100) : 1.0;
+                
+                masterGain.connect(distGain);
+                distGain.connect(this.masterGain);
+
+                // Stage 1: Tech Snap (The Lead Edge)
+                const seal = this.ctx.createOscillator();
+                const sealG = this.ctx.createGain();
+                seal.type = 'sine';
+                seal.frequency.setValueAtTime(160 * pMod, t);
+                seal.frequency.exponentialRampToValueAtTime(3500 * pMod, t + 0.1); 
+                
+                sealG.gain.setValueAtTime(0, t);
+                // 20ms attack: The safest balance for headphones
+                sealG.gain.linearRampToValueAtTime(0.16, t + 0.02); 
+                sealG.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+                sealG.gain.linearRampToValueAtTime(0, t + 0.09);
+                
+                seal.connect(sealG); sealG.connect(masterGain);
+                seal.start(t); 
+                seal.stop(t + 0.2);
+
+                // Stage 2: Suction (Micro-Staggered by 5ms)
+                // This delay prevents the "pressure front" from hitting the ear all at once
+                const t2 = t + 0.005;
+                const pop = this.ctx.createOscillator();
+                const popG = this.ctx.createGain();
+                pop.type = 'sine';
+                pop.frequency.setValueAtTime(250 * pMod, t2);
+                pop.frequency.exponentialRampToValueAtTime(2500 * pMod, t2 + 0.1); 
+                
+                popG.gain.setValueAtTime(0, t2);
+                popG.gain.linearRampToValueAtTime(0.1, t2 + 0.06); 
+                popG.gain.exponentialRampToValueAtTime(0.001, t2 + 0.12);
+                popG.gain.linearRampToValueAtTime(0, t2 + 0.13);
+                
+                pop.connect(popG); popG.connect(masterGain);
+                pop.start(t2); 
+                pop.stop(t2 + 0.25);
+
+                // Stage 3: Phased Body (Micro-Staggered by 10ms)
+                const t3 = t + 0.01;
+                [1.0, 1.03].forEach(mult => {
+                    const body = this.ctx.createOscillator();
+                    const bodyG = this.ctx.createGain();
+                    body.type = 'sine';
+                    body.frequency.setValueAtTime(180 * pMod * mult, t3); 
+                    body.frequency.exponentialRampToValueAtTime(1350 * pMod, t3 + 0.2);
+                    
+                    bodyG.gain.setValueAtTime(0, t3);
+                    bodyG.gain.linearRampToValueAtTime(0.08, t3 + 0.04); 
+                    bodyG.gain.exponentialRampToValueAtTime(0.001, t3 + 0.28); 
+                    bodyG.gain.linearRampToValueAtTime(0, t3 + 0.29);
+                    
+                    body.connect(bodyG); bodyG.connect(masterGain);
+                    body.start(t3); 
+                    body.stop(t3 + 0.45);
+                });
             },
             
-            playExplosion: function(type) {
+            playFrag: function(pos) {
                 if (!this.ctx) return;
                 const t = this.ctx.currentTime;
 
-                // SIGNAL MANAGEMENT: Prevents digital clipping while preserving transient peaks
-                const masterLimit = this.ctx.createDynamicsCompressor();
-                masterLimit.threshold.setValueAtTime(-1, t);
-                masterLimit.knee.setValueAtTime(0, t);
-                masterLimit.ratio.setValueAtTime(20, t);
-                masterLimit.connect(this.masterGain);
+                const masterGain = this.ctx.createGain();
+                const distGain = this.ctx.createGain();
+                distGain.gain.value = pos ? this.getDistanceMod(pos) : 1.0;
+                
+                const hp = this.ctx.createBiquadFilter();
+                hp.type = 'highpass';
+                hp.frequency.setValueAtTime(35, t); 
 
-                // NOISE SOURCE: Re-generating buffer for consistent texture
+                masterGain.connect(hp);
+                hp.connect(distGain);
+                distGain.connect(this.masterGain);
+
+                const tSub = t + 0.006;
+                const tBody = t + 0.012;
+
+                const osc = this.ctx.createOscillator();
+                const og = this.ctx.createGain();
+                osc.type = 'triangle'; 
+                osc.frequency.setValueAtTime(65, tBody); 
+                osc.frequency.exponentialRampToValueAtTime(30, tBody + 0.3); 
+                og.gain.setValueAtTime(0, tBody);
+                og.gain.linearRampToValueAtTime(0.6, tBody + 0.03); 
+                og.gain.exponentialRampToValueAtTime(0.001, tBody + 0.6); 
+                og.gain.linearRampToValueAtTime(0, tBody + 0.61); 
+
+                const sub = this.ctx.createOscillator();
+                const subG = this.ctx.createGain();
+                sub.type = 'sine';
+                sub.frequency.setValueAtTime(55, tSub);
+                sub.frequency.exponentialRampToValueAtTime(25, tSub + 0.4);
+                subG.gain.setValueAtTime(0, tSub);
+                subG.gain.linearRampToValueAtTime(0.7, tSub + 0.025); 
+                subG.gain.exponentialRampToValueAtTime(0.001, tSub + 0.4);
+                subG.gain.linearRampToValueAtTime(0, tSub + 0.41);
+
+                const bSize = this.ctx.sampleRate * 1.2;
+                const b = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
+                const d = b.getChannelData(0);
+                for(let i=0; i<bSize; i++) d[i] = Math.random() * 2 - 1;
+                
+                const n = this.ctx.createBufferSource();
+                n.buffer = b;
+                const ng = this.ctx.createGain();
+                const nf = this.ctx.createBiquadFilter();
+                nf.type = 'lowpass';
+                nf.frequency.setValueAtTime(450, t); 
+                nf.frequency.linearRampToValueAtTime(60, t + 0.6);
+                ng.gain.setValueAtTime(0, t);
+                ng.gain.linearRampToValueAtTime(0.6, t + 0.02);
+                ng.gain.linearRampToValueAtTime(0, t + 1.0); 
+
+                n.connect(nf); nf.connect(ng); ng.connect(masterGain);
+                osc.connect(og); og.connect(masterGain);
+                sub.connect(subG); subG.connect(masterGain);
+
+                osc.start(tBody); osc.stop(tBody + 0.7); 
+                sub.start(tSub); sub.stop(tSub + 0.5); 
+                n.start(t); n.stop(t + 1.1);
+            },
+
+            playVoid: function(pos) {
+                if (!this.ctx) return;
+                const t = this.ctx.currentTime;
+                
+                const peak = t + 0.30;
+                const silence = t + 0.33; // Slightly extended for the smooth-out
+                const killNode = t + 0.50;
+
+                const masterGain = this.ctx.createGain();
+                const distGain = this.ctx.createGain();
+                distGain.gain.value = pos ? this.getDistanceMod(pos) : 1.0;
+                
+                // TWO-STAGE MASTER EXIT
+                masterGain.gain.setValueAtTime(1, t);
+                masterGain.gain.setValueAtTime(1, peak);
+                // Drop to 1% volume at 0.31s
+                masterGain.gain.linearRampToValueAtTime(0.01, t + 0.31); 
+                // Spend the last 20ms reaching absolute zero
+                masterGain.gain.linearRampToValueAtTime(0, silence); 
+
+                masterGain.connect(distGain);
+                distGain.connect(this.masterGain || this.ctx.destination);
+
+                // 1. SUCTION
+                const osc = this.ctx.createOscillator();
+                const og = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(40, t); 
+                osc.frequency.exponentialRampToValueAtTime(600, peak); 
+                og.gain.setValueAtTime(0, t);
+                og.gain.linearRampToValueAtTime(0.2, t + 0.20); 
+                og.gain.linearRampToValueAtTime(0, silence); 
+
+                // 2. THE SNAP
+                const tSnap = t + 0.302;
+                const snapOsc = this.ctx.createOscillator();
+                const snapG = this.ctx.createGain();
+                snapOsc.type = 'triangle';
+                snapOsc.frequency.setValueAtTime(150, tSnap); 
+                snapOsc.frequency.exponentialRampToValueAtTime(100, silence);
+                snapG.gain.setValueAtTime(0, tSnap);
+                snapG.gain.linearRampToValueAtTime(0.4, tSnap + 0.008); 
+                snapG.gain.linearRampToValueAtTime(0, silence);
+
+                // 3. TEXTURE
+                const bSize = this.ctx.sampleRate * 0.5;
+                const b = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
+                const d = b.getChannelData(0);
+                for(let i=0; i<bSize; i++) d[i] = Math.random() * 2 - 1;
+                const n = this.ctx.createBufferSource();
+                n.buffer = b;
+                const ng = this.ctx.createGain();
+                const nf = this.ctx.createBiquadFilter();
+                nf.type = 'bandpass';
+                nf.frequency.setValueAtTime(100, t);
+                nf.frequency.exponentialRampToValueAtTime(1500, peak); 
+                nf.Q.value = 2.0; 
+                ng.gain.setValueAtTime(0, t);
+                ng.gain.linearRampToValueAtTime(0.2, t + 0.25); 
+                ng.gain.linearRampToValueAtTime(0, silence); 
+
+                n.connect(nf); nf.connect(ng); ng.connect(masterGain);
+                osc.connect(og); og.connect(masterGain);
+                snapOsc.connect(snapG); snapG.connect(masterGain);
+
+                osc.start(t); osc.stop(killNode); 
+                n.start(t); n.stop(killNode);
+                snapOsc.start(tSnap); snapOsc.stop(killNode); 
+            },
+
+            playImpulse: function(pos) {
+                if (!this.ctx) return;
+                const t = this.ctx.currentTime;
+
+                // 1. SIGNAL MANAGEMENT
+                const masterGain = this.ctx.createGain();
+                const distGain = this.ctx.createGain();
+                distGain.gain.value = pos ? this.getDistanceMod(pos) : 1.0;
+                
+                // Subsonic Filter: Removes eardrum pressure without losing the 'thud'
+                const hp = this.ctx.createBiquadFilter();
+                hp.type = 'highpass';
+                hp.frequency.setValueAtTime(40, t); 
+
+                masterGain.connect(hp);
+                hp.connect(distGain);
+                distGain.connect(this.masterGain);
+
+                // 2. PRIMARY BODY (Triangle Wave - Staggered by 15ms)
+                const tBody = t + 0.015;
+                const osc = this.ctx.createOscillator();
+                const og = this.ctx.createGain();
+                osc.type = 'triangle'; 
+                osc.frequency.setValueAtTime(60, tBody); 
+                osc.frequency.exponentialRampToValueAtTime(550, tBody + 0.08); 
+                osc.frequency.exponentialRampToValueAtTime(80, tBody + 0.5); 
+                
+                og.gain.setValueAtTime(0, tBody);
+                og.gain.linearRampToValueAtTime(0.4, tBody + 0.035); // 35ms attack
+                og.gain.exponentialRampToValueAtTime(0.001, tBody + 0.5); 
+                og.gain.linearRampToValueAtTime(0, tBody + 0.51); // Safety gate
+
+                // 3. SUB-BASS LAYER (Sine Wave - Staggered by 8ms)
+                const tSub = t + 0.008;
+                const sub = this.ctx.createOscillator();
+                const subGain = this.ctx.createGain();
+                sub.type = 'sine';
+                sub.frequency.setValueAtTime(70, tSub);
+                sub.frequency.exponentialRampToValueAtTime(35, tSub + 0.15);
+                
+                subGain.gain.setValueAtTime(0, tSub);
+                subGain.gain.linearRampToValueAtTime(0.45, tSub + 0.03); 
+                subGain.gain.exponentialRampToValueAtTime(0.001, tSub + 0.25);
+                subGain.gain.linearRampToValueAtTime(0, tSub + 0.26); // Safety gate
+
+                // 4. NOISE SOURCE (Air Texture - Starts at 0ms)
                 const bSize = this.ctx.sampleRate * 0.8;
                 const b = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
                 const d = b.getChannelData(0);
-                for(let i=0; i<bSize; i++) d[i] = Math.random()*2-1;
+                for(let i=0; i<bSize; i++) d[i] = Math.random() * 2 - 1;
                 
                 const n = this.ctx.createBufferSource();
                 n.buffer = b;
                 const ng = this.ctx.createGain();
                 const nf = this.ctx.createBiquadFilter();
 
-                // PRIMARY OSCILLATORS
-                const osc = this.ctx.createOscillator();
-                const og = this.ctx.createGain();
-
-                // SUB-BASS LAYER: Pure sine for felt weight without harmonic clutter
-                const sub = this.ctx.createOscillator();
-                const subGain = this.ctx.createGain();
-                sub.type = 'sine';
-                sub.connect(subGain);
-                subGain.connect(masterLimit);
-
-                if (type === 'VOID') {
-                    // Charge Phase
-                    osc.type = 'sine';
-                    osc.frequency.setValueAtTime(40, t); 
-                    osc.frequency.exponentialRampToValueAtTime(600, t + 0.3); 
-                    og.gain.setValueAtTime(0, t);
-                    og.gain.linearRampToValueAtTime(0.25, t + 0.25); 
-                    og.gain.linearRampToValueAtTime(0, t + 0.3); 
-
-                    // The Snap (Mechanical Impact)
-                    const snapOsc = this.ctx.createOscillator();
-                    const snapGain = this.ctx.createGain();
-                    snapOsc.type = 'triangle';
-                    snapOsc.frequency.setValueAtTime(100, t + 0.31); 
-                    snapOsc.frequency.exponentialRampToValueAtTime(40, t + 0.45);
-                    snapGain.gain.setValueAtTime(0, t + 0.31);
-                    snapGain.gain.linearRampToValueAtTime(0.5, t + 0.32); 
-                    snapGain.gain.exponentialRampToValueAtTime(0.001, t + 0.7); 
-                    
-                    // Void Sub (Synchronized with Snap)
-                    sub.frequency.setValueAtTime(50, t + 0.31);
-                    sub.frequency.exponentialRampToValueAtTime(20, t + 0.6);
-                    subGain.gain.setValueAtTime(0, t + 0.31);
-                    subGain.gain.linearRampToValueAtTime(0.4, t + 0.32);
-                    subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.7); 
-
-                    snapOsc.connect(snapGain);
-                    snapGain.connect(masterLimit);
-                    snapOsc.start(t + 0.31); 
-                    snapOsc.stop(t + 0.85); 
-                    sub.start(t + 0.31); 
-                    sub.stop(t + 0.85); 
-
-                    nf.type = 'bandpass';
-                    nf.frequency.setValueAtTime(100, t);
-                    nf.frequency.exponentialRampToValueAtTime(1500, t + 0.3); 
-                    nf.Q.value = 2.0; 
-                    ng.gain.setValueAtTime(0, t);
-                    ng.gain.linearRampToValueAtTime(0.3, t + 0.25); 
-                    ng.gain.linearRampToValueAtTime(0, t + 0.3); 
-                    
-                } else if (type === 'IMPULSE') {
-                    // Pneumatic Air Texture
-                    osc.type = 'triangle';
-                    osc.frequency.setValueAtTime(40, t); 
-                    osc.frequency.exponentialRampToValueAtTime(550, t + 0.08); 
-                    osc.frequency.exponentialRampToValueAtTime(30, t + 0.6); 
-                    og.gain.setValueAtTime(0, t);
-                    og.gain.linearRampToValueAtTime(0.5, t + 0.015); 
-                    og.gain.exponentialRampToValueAtTime(0.001, t + 0.6); 
-
-                    // Impulse Sub (Provides the 'Push' sensation)
-                    sub.frequency.setValueAtTime(70, t);
-                    sub.frequency.exponentialRampToValueAtTime(30, t + 0.2);
-                    subGain.gain.setValueAtTime(0, t);
-                    subGain.gain.linearRampToValueAtTime(0.8, t + 0.01); 
-                    subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.4);
-                    sub.start(t); sub.stop(t + 0.5);
-
-                    nf.type = 'lowpass';
-                    nf.frequency.setValueAtTime(600, t); 
-                    nf.frequency.exponentialRampToValueAtTime(40, t + 0.6);
-                    nf.Q.setValueAtTime(1.5, t); // Softer resonance to reduce fatiguing chirps
-                    ng.gain.setValueAtTime(0.35, t); 
-                    ng.gain.exponentialRampToValueAtTime(0.001, t + 0.7); 
-
-                } else { 
-                    // STANDARD/FRAG
-                    osc.type = 'triangle'; 
-                    osc.frequency.setValueAtTime(65, t); 
-                    osc.frequency.exponentialRampToValueAtTime(30, t + 0.3); 
-                    og.gain.setValueAtTime(0.7, t); 
-                    og.gain.exponentialRampToValueAtTime(0.001, t + 1.0);
-
-                    // Frag Sub (Adds density to the explosion)
-                    sub.frequency.setValueAtTime(55, t);
-                    sub.frequency.exponentialRampToValueAtTime(25, t + 0.4);
-                    subGain.gain.setValueAtTime(0.8, t);
-                    subGain.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
-                    sub.start(t); sub.stop(t + 0.75);
-
-                    nf.type = 'lowpass';
-                    nf.frequency.setValueAtTime(450, t); 
-                    nf.frequency.linearRampToValueAtTime(60, t + 0.6);
-                    nf.Q.value = 1.0; 
-                    ng.gain.setValueAtTime(0.8, t); 
-                    ng.gain.linearRampToValueAtTime(0, t + 1.5); 
-                }
-
-                // FINAL SIGNAL COUPLING
-                n.connect(nf); 
-                nf.connect(ng); 
-                ng.connect(masterLimit);
+                nf.type = 'lowpass';
+                nf.frequency.setValueAtTime(800, t); 
+                nf.frequency.exponentialRampToValueAtTime(50, t + 0.6);
                 
-                osc.connect(og); 
-                og.connect(masterLimit);
+                ng.gain.setValueAtTime(0, t);
+                ng.gain.linearRampToValueAtTime(0.3, t + 0.02);
+                ng.gain.exponentialRampToValueAtTime(0.001, t + 0.7); 
+                ng.gain.linearRampToValueAtTime(0, t + 0.71); 
 
-                osc.start(t); 
-                osc.stop(t + 1.6); // Buffer to ensure all ramps finalize
-                n.start(t);
+                // 5. COUPLING & START/STOP
+                n.connect(nf); nf.connect(ng); ng.connect(masterGain);
+                osc.connect(og); og.connect(masterGain);
+                sub.connect(subGain); subGain.connect(masterGain);
+
+                osc.start(tBody); 
+                osc.stop(tBody + 0.6); 
+                
+                sub.start(tSub); 
+                sub.stop(tSub + 0.4); 
+                
+                n.start(t); 
+                n.stop(t + 0.8);
             },
 
             playThrow: function() {
@@ -1826,7 +1954,7 @@
         class WorldState {
             constructor(name, config) {
                 this.name = name;
-                this.config = config; // size, bots, etc.
+                this.config = config;
                 this.initialized = false;
                 
                 this.worldObjects = [];
@@ -1841,6 +1969,11 @@
                 this.group.visible = false; 
                 
                 this.savedPlayerPos = new THREE.Vector3(0, 2, 0);
+                this.savedPlayerRot = new THREE.Euler(0, 0, 0, 'YXZ');
+                this.savedPlayerVel = new THREE.Vector3(0, 0, 0);
+                this.savedProjectiles = [];
+                this.savedLockState = { active: false, pos: null };
+                this.hasEntered = false;
             }
         }
 
@@ -1878,9 +2011,22 @@
                 const next = this.worlds[name];
                 if (!next || next === this.current) return;
                 
-                // 1. Save State of current
+                // 1. Save State of Current World
                 if (this.current) {
                     this.current.savedPlayerPos.copy(camera.position);
+                    this.current.savedPlayerRot.copy(camera.rotation);
+                    this.current.savedPlayerVel.copy(player.velocity);
+                    
+                    // Save Lock State
+                    this.current.savedLockState = {
+                        active: player.teleportLocked,
+                        pos: player.lockedTeleportDest ? player.lockedTeleportDest.clone() : null
+                    };
+
+                    // Hibernate projectiles
+                    this.current.savedProjectiles = [...projectiles];
+                    this.current.savedProjectiles.forEach(p => scene.remove(p.mesh));
+                    
                     this.current.group.visible = false;
                 }
                 
@@ -1889,15 +2035,14 @@
                     scene.remove(p.mesh); p.mesh.geometry.dispose(); p.mesh.material.dispose(); 
                 });
                 particles.length = 0;
-                projectiles.forEach(p => { 
-                    scene.remove(p.mesh); p.mesh.geometry.dispose(); p.mesh.material.dispose(); 
-                });
-                projectiles.length = 0;
+                
                 weatherParticles.forEach(p => {
                     scene.remove(p.mesh);
                     if(p.mesh.material) p.mesh.material.dispose();
                 });
                 weatherParticles.length = 0;
+
+                projectiles.length = 0;
 
                 // 3. Swap to New
                 this.current = next;
@@ -1922,13 +2067,43 @@
                 // 5. Reveal & Restore
                 next.group.visible = true;
                 
-                // Reset player slightly above center to ensure they don't spawn inside a maze wall
-                if (next.config.type === 'MAZE') {
-                    camera.position.set(0, 5, 0); 
+                // Restore Player Physics
+                if (!next.hasEntered && next.config.type === 'MAZE') {
+                    camera.position.set(0, 60, 0);
+                    camera.rotation.set(0, 0, 0);
+                    player.velocity.set(0, 0, 0);
                 } else {
                     camera.position.copy(next.savedPlayerPos);
+                    camera.rotation.copy(next.savedPlayerRot);
+                    player.velocity.copy(next.savedPlayerVel);
                 }
-                player.velocity.set(0,0,0);
+                next.hasEntered = true;
+
+                // Restore Lock State
+                player.teleportLocked = next.savedLockState.active;
+                player.lockedTeleportDest = next.savedLockState.pos;
+                
+                // Update Visual Marker
+                if (typeof teleportMarker !== 'undefined' && teleportMarker) {
+                    if (player.teleportLocked && player.lockedTeleportDest) {
+                        if (teleportMarker.parent !== scene) scene.add(teleportMarker);
+                        teleportMarker.position.copy(player.lockedTeleportDest);
+                        teleportMarker.rotation.set(0,0,0);
+                        teleportMarker.visible = true;
+                    } else {
+                        teleportMarker.visible = false;
+                        player.teleportActive = false;
+                    }
+                }
+
+                // Restore Projectiles
+                if (next.savedProjectiles.length > 0) {
+                    next.savedProjectiles.forEach(p => {
+                        scene.add(p.mesh);
+                        projectiles.push(p);
+                    });
+                    next.savedProjectiles = [];
+                }
                 
                 // Update Shadows
                 const halfSize = next.config.size / 2;
@@ -1976,13 +2151,37 @@
                 const wallThick = 10;
                 const offset = hSize + (wallThick / 2);
 
+                // Floor
                 this.createBox(0, -1, 0, size, 2, size, materials.floor, true, false, ws, true, -1);
 
-                // Outer Boundary Walls
-                this.createBox(0, 50, -offset, size, 100, wallThick, materials.wall, false, true, ws, true, -1);
-                this.createBox(0, 50, offset, size, 100, wallThick, materials.wall, false, true, ws, true, -1);
-                this.createBox(-offset, 50, 0, wallThick, 100, size, materials.wall, false, true, ws, true, -1);
-                this.createBox(offset, 50, 0, wallThick, 100, size, materials.wall, false, true, ws, true, -1);
+                // --- Wall Generation ---
+                if (ws.name === 'TITAN') {
+                    // TITAN: 5-Stack Ring Structure with Gaps
+                    const baseHeight = 100; // Doubled from 50
+                    const gapHeight = 100;  // Gap equal to wall height
+                    const layers = 5;
+
+                    for (let i = 0; i < layers; i++) {
+                        // Calculate Y position for this ring
+                        // Layer 0: Y=50 (Center of 100-high block sitting on floor)
+                        // Layer 1: Y=50 + 100 + 100 = 250
+                        const yPos = (baseHeight / 2) + (i * (baseHeight + gapHeight));
+                        
+                        // Create 4 walls for this ring
+                        this.createBox(0, yPos, -offset, size, baseHeight, wallThick, materials.wall, false, true, ws, true, -1);
+                        this.createBox(0, yPos, offset, size, baseHeight, wallThick, materials.wall, false, true, ws, true, -1);
+                        this.createBox(-offset, yPos, 0, wallThick, baseHeight, size, materials.wall, false, true, ws, true, -1);
+                        this.createBox(offset, yPos, 0, wallThick, baseHeight, size, materials.wall, false, true, ws, true, -1);
+                    }
+                } else {
+                    // STANDARD (Arena / Maze): Single continuous wall
+                    // Original height 50, center 25 (sitting on floor) -> visual top 50
+                    // Actually, original code used center 50, height 100. Let's stick to that for standard maps.
+                    this.createBox(0, 50, -offset, size, 100, wallThick, materials.wall, false, true, ws, true, -1);
+                    this.createBox(0, 50, offset, size, 100, wallThick, materials.wall, false, true, ws, true, -1);
+                    this.createBox(-offset, 50, 0, wallThick, 100, size, materials.wall, false, true, ws, true, -1);
+                    this.createBox(offset, 50, 0, wallThick, 100, size, materials.wall, false, true, ws, true, -1);
+                }
             },
 
             buildOpenArena: function(ws) {
@@ -1990,10 +2189,44 @@
                 const size = cfg.size;
                 const scaleMod = cfg.scale;
 
-                this.spawnDecorations(Math.floor(25 * scaleMod), 2*scaleMod, 7*scaleMod, size*0.75, size*0.75, ws);
-                this.spawnDecorations(Math.floor(8 * scaleMod), 10*scaleMod, 20*scaleMod, size*0.85, size*0.85, ws);
-                this.spawnDecorations(Math.floor(4 * scaleMod), 25*scaleMod, 45*scaleMod, size*0.9, size*0.9, ws);
-                this.spawnDecorations(Math.max(1, Math.floor(1 * scaleMod)), 60*scaleMod, 80*scaleMod, size*0.75, size*0.75, ws);
+                // 1. Heavies (High Anchors)
+                this.spawnDecorations(
+                    Math.floor(12 * scaleMod), 
+                    12*scaleMod, 22*scaleMod, 
+                    size*0.4, size*0.4, 
+                    20 * scaleMod, 120 * scaleMod, 
+                    ws
+                );
+
+                // 2. Mid-Field Verticality
+                this.spawnDecorations(
+                    Math.floor(20 * scaleMod), 
+                    6*scaleMod, 12*scaleMod, 
+                    size*0.7, size*0.7, 
+                    30 * scaleMod, 200 * scaleMod, 
+                    ws
+                );
+
+                // 3. Outer Perimeter Scatter
+                this.spawnDecorations(
+                    Math.floor(35 * scaleMod), 
+                    3*scaleMod, 8*scaleMod, 
+                    size*0.9, size*0.9, 
+                    40 * scaleMod, 300 * scaleMod, 
+                    ws
+                );
+                
+                // 4. Original Ground Anchors (Small)
+                this.spawnDecorations(Math.floor(15 * scaleMod), 2*scaleMod, 4*scaleMod, size*0.85, size*0.85, null, null, ws);
+
+                // 5. Large Ground Blocks
+                this.spawnDecorations(
+                    Math.floor(25 * scaleMod),
+                    8 * scaleMod, 15 * scaleMod,
+                    size * 0.8, size * 0.8,
+                    null, null, // Force Ground
+                    ws
+                );
             },
 
             buildMaze: function(ws) {
@@ -2060,7 +2293,7 @@
                     }
                 }
 
-                // 3. Spawn Decorations
+                // 3. Spawn Decorations (Patched for new Constructor)
                 for (let x = 0; x < cols; x++) {
                     for (let y = 0; y < rows; y++) {
                         if (Math.random() < 0.4) {
@@ -2075,7 +2308,8 @@
                             const maxScale = cellSize * 0.45; 
                             const scale = minScale + Math.random() * (maxScale - minScale);
                             
-                            new Decoration(cx + jx, cz + jz, scale, ws);
+                            // scale passed as Y to keep it on floor
+                            new Decoration(cx + jx, scale, cz + jz, scale, ws);
                         }
                     }
                 }
@@ -2129,7 +2363,6 @@
                 const mesh = new THREE.Mesh(geo, mat);
                 mesh.position.set(x, y, z);
                 
-                // Unified Render Order Logic
                 mesh.renderOrder = (customOrder !== null) ? customOrder : 0;
                 
                 if (disableCull) mesh.frustumCulled = false;
@@ -2156,12 +2389,12 @@
                 if (!isFloor) ws.walls.push(mesh);
             },
             
-            spawnDecorations: function(count, minScale, maxScale, rangeX, rangeZ, ws) {
+            spawnDecorations: function(count, minScale, maxScale, rangeX, rangeZ, minY, maxY, ws) {
                 const obstacleBounds = [];
                 for(let i=0; i<count; i++) {
                     let attempts = 0;
                     let valid = false;
-                    let x, z, scale;
+                    let x, y, z, scale;
                     while(!valid && attempts < 20) {
                         attempts++;
                         x = (Math.random() - 0.5) * rangeX;
@@ -2169,13 +2402,23 @@
                         if(Math.abs(x) < 25 && Math.abs(z) < 25) continue;
                         
                         scale = minScale + Math.random() * (maxScale - minScale);
+                        
+                        // Height Placement Logic
+                        if (minY !== null && maxY !== null) {
+                            y = minY + Math.random() * (maxY - minY);
+                        } else {
+                            y = scale; // Floor
+                        }
+
                         const radius = scale * 1.5; 
                         valid = true;
+                        
+                        // 2D Collision Check for verticality
                         for(const b of obstacleBounds) {
-                            if(Math.hypot(x - b.x, z - b.z) < (radius + b.r) + 2) { valid = false; break; }
+                            if(Math.hypot(x - b.x, z - b.z) < (radius + b.r) + 4) { valid = false; break; }
                         }
                         if(valid) {
-                            new Decoration(x, z, scale, ws);
+                            new Decoration(x, y, z, scale, ws);
                             obstacleBounds.push({x: x, z: z, r: radius});
                         }
                     }
@@ -2188,16 +2431,14 @@
                 const pairCount = Math.max(4, Math.floor(range / 50)); 
                 
                 for(let i=0; i<pairCount*2; i++) {
-                    let x, z;
+                    let x, z, y;
                     let attempts = 0;
-                    do {
-                        x = (Math.random()-0.5)*range;
-                        z = (Math.random()-0.5)*range;
-                        attempts++;
-                        if (attempts > 5) break; 
-                    } while(Math.abs(x) < 15 && Math.abs(z) < 15);
                     
-                    const y = getGroundHeight(x, z); 
+                    x = (Math.random()-0.5)*range;
+                    z = (Math.random()-0.5)*range;
+                    y = getRandomSpawnY(x, z);
+                    
+                    if (y <= -999) { y = 0; x = 0; z = 0; }
                     portalLocs.push({x, y, z});
                 }
                 
@@ -2207,7 +2448,7 @@
                     const p2 = new Portal(portalLocs[i*2+1].x, portalLocs[i*2+1].y, portalLocs[i*2+1].z, c, null, ws);
                     p1.target = p2; p2.target = p1;
                 }
-            }
+            },
         };
 
         // --- PLAYER CONTROLLER CLASS (v46.2) ---
@@ -2352,29 +2593,25 @@
                     tryInstantTeleport();
                 }
                 else if(teleportMode === 'AIM') {
-                    // 1. Priority: Explicit Lock (Beacon)
-                    if (this.teleportLocked && this.lockedTeleportDest) {
-                        executeTeleport(this.lockedTeleportDest, null);
+                    // 1. Priority: Locked Destination (Explicit Beacon OR Implicit Buffer)
+                    if (this.lockedTeleportDest) {
+                        // Force teleport to the exact locked coordinates
+                        executeTeleport(this.lockedTeleportDest, null, true);
                         return;
                     }
 
-                    // 2. Priority: Buffered Warp (Held Click)
-                    if (InputManager.mouseDown && this.lastTeleportDest) {
-                         executeTeleport(this.lastTeleportDest, null);
-                         return;
-                    }
-
-                    // 3. Standard Toggle
+                    // 2. Standard Toggle
                     this.teleportActive = !this.teleportActive;
-                    // If we turn it off, also break the lock
+                    // Turning Aim Mode OFF forces the lock to break, regardless of type
                     if (!this.teleportActive) {
                         this.teleportLocked = false;
+                        this.lockedTeleportDest = null;
                     } else {
                         this.tpAimStartTime = 0;
                     }
                 }
             }
-            
+
             beginAim(type) {
                 this.aimingGadget = type;
                 document.getElementById('icon-f').classList.toggle('active', type==='FRAG');
@@ -2789,86 +3026,60 @@
             }
 
             handleTeleport(dt) {
-                // If Aim Mode is active OR we are Locked (keep marker visible if locked even if Q toggled off? 
-                // No, aiming relies on Q being active. Right click just freezes the target.)
-                if (teleportMode === 'AIM' && (this.teleportActive || this.teleportLocked)) {
-                    
-                    if (this.teleportLocked && this.lockedTeleportDest) {
-                        // --- LOCKED MODE ---
-                        // No math, no raycast. Just render at saved pos.
-                        
-                        // Ensure World Space
+                // --- 1. Implicit Buffer Logic ---
+                if (teleportMode === 'AIM') {
+                    if (InputManager.mouseDown) {
+                        if (!this.lockedTeleportDest) {
+                            // Calculate and pin target on first frame of click
+                            const result = getTeleportTarget(CONFIG.teleportRange + 5.0);
+                            this.lockedTeleportDest = resolveTeleportPosition(result.point, result.normal);
+                        }
+                    } else if (!this.teleportLocked) {
+                        this.lockedTeleportDest = null; // Release buffer unless explicitly locked
+                    }
+                }
+
+                // --- 2. Visualization & State Management ---
+                const isActive = (teleportMode === 'AIM' && (this.teleportActive || this.teleportLocked));
+
+                if (isActive) {
+                    // Determine Target
+                    if (this.lockedTeleportDest) {
+                        this.teleportTarget = this.lockedTeleportDest;
                         if (teleportMarker.parent !== scene) scene.add(teleportMarker);
-                        
-                        // Feet Position (LockedDest is already Feet Level)
                         teleportMarker.position.copy(this.lockedTeleportDest);
                         teleportMarker.rotation.set(0, 0, 0);
-                        
-                        // Treat the locked pos as the target for highlights
-                        this.teleportTarget = this.lockedTeleportDest;
-                        
                     } else {
-                        // --- SCANNING MODE ---
-                        const result = getTeleportTarget();
-                        let dest = result.point.clone();
-
-                        if (result.hit && result.normal) {
-                            if (Math.abs(result.normal.y) < 0.5) {
-                                dest.addScaledVector(result.normal, 0.8);
-                            }
-                        }
-                        
-                        const gh = getGroundHeight(dest.x, dest.z);
-                        if (dest.y < gh + 0.01) dest.y = gh + 0.01;
-
-                        const tempBox = _box3_1; 
-                        const halfW = 0.3;
-                        tempBox.min.set(dest.x - halfW, dest.y, dest.z - halfW);
-                        tempBox.max.set(dest.x + halfW, dest.y + 1.8, dest.z + halfW);
-                        
-                        if (spatialGrid) {
-                            const nearby = spatialGrid.query(tempBox); 
-                            for(const wall of nearby) {
-                                if (wall.mesh.userData.isFloor) continue;
-                                if (tempBox.intersectsBox(wall.box)) {
-                                    const overlapX = Math.min(tempBox.max.x - wall.box.min.x, wall.box.max.x - tempBox.min.x);
-                                    const overlapZ = Math.min(tempBox.max.z - wall.box.min.z, wall.box.max.z - tempBox.min.z);
-                                    const wallCenterX = (wall.box.min.x + wall.box.max.x) / 2;
-                                    const wallCenterZ = (wall.box.min.z + wall.box.max.z) / 2;
-                                    if (overlapX < overlapZ) {
-                                        const sign = (dest.x < wallCenterX) ? -1 : 1;
-                                        dest.x += (overlapX + 0.05) * sign;
-                                    } else {
-                                        const sign = (dest.z < wallCenterZ) ? -1 : 1;
-                                        dest.z += (overlapZ + 0.05) * sign;
-                                    }
-                                    tempBox.min.set(dest.x - halfW, dest.y, dest.z - halfW);
-                                    tempBox.max.set(dest.x + halfW, dest.y + 1.8, dest.z + halfW);
-                                }
-                            }
-                        }
-
+                        // Live Scan
+                        const result = getTeleportTarget(CONFIG.teleportRange + 5.0);
+                        const dest = resolveTeleportPosition(result.point, result.normal);
                         this.teleportTarget = dest;
 
-                        if (result.hit) {
-                            if (teleportMarker.parent !== scene) scene.add(teleportMarker);
-                            teleportMarker.position.copy(dest);
-                            teleportMarker.rotation.set(0, 0, 0);
-                        } else {
+                        // Hybrid Attachment (Stick to camera if target at max range)
+                        const forward = new THREE.Vector3();
+                        camera.getWorldDirection(forward);
+                        const idealDest = camera.position.clone().addScaledVector(forward, CONFIG.teleportRange);
+
+                        if (!result.hit && dest.distanceToSquared(idealDest) < 0.01) {
                             if (teleportMarker.parent !== camera) camera.add(teleportMarker);
                             teleportMarker.position.set(0, 0, -CONFIG.teleportRange);
                             teleportMarker.rotation.set(-camera.rotation.x, 0, 0);
+                        } else {
+                            if (teleportMarker.parent !== scene) scene.add(teleportMarker);
+                            teleportMarker.position.copy(dest);
+                            teleportMarker.rotation.set(0, 0, 0);
                         }
                     }
                     
                     teleportMarker.visible = true;
 
-                    // --- SHARED: Highlight & Animation ---
+                    // Enemy Highlighting
                     let closestEnemy = null;
                     let closestDist = 999;
+                    const checkPos = this.teleportTarget.clone().add(new THREE.Vector3(0, 1, 0));
+                    
                     for (const enemy of enemies) {
                         if (enemy.isDeadCorpse) continue;
-                        const checkPos = this.teleportTarget.clone().add(new THREE.Vector3(0,1,0));
                         const dist = checkPos.distanceTo(enemy.mesh.position);
                         const threshold = 2.5 + (enemy.type.scale || 1);
                         if (dist < threshold && dist < closestDist) {
@@ -2876,27 +3087,31 @@
                             closestEnemy = enemy;
                         }
                     }
+
                     if (lastHoveredEnemy && lastHoveredEnemy !== closestEnemy) lastHoveredEnemy.setHighlight(false);
-                    if (closestEnemy) { closestEnemy.setHighlight(true); lastHoveredEnemy = closestEnemy; } 
-                    else { lastHoveredEnemy = null; }
+                    if (closestEnemy) { 
+                        closestEnemy.setHighlight(true); 
+                        lastHoveredEnemy = closestEnemy; 
+                    } else { 
+                        lastHoveredEnemy = null; 
+                    }
                     
+                    // Marker Animation (Pulse & Color)
                     const t = performance.now();
                     teleportMarker.userData.diamond.rotation.y += dt * 2.0;
                     if (!this.tpAimStartTime) this.tpAimStartTime = performance.now();
-                    const timeActive = performance.now() - this.tpAimStartTime;
-                    const cycle = (Math.cos(timeActive * 0.0015) + 1) / 2; 
                     
-                    // Locked Color override? Optional. 
-                    // For now keeping standard colors but maybe higher intensity if locked could be nice.
-                    const baseCol = new THREE.Color(0x00ffff); 
-                    const whiteCol = new THREE.Color(0xffffff);
-                    const targetColor = baseCol.clone().lerp(whiteCol, cycle);
+                    const cycle = (Math.cos((performance.now() - this.tpAimStartTime) * 0.0015) + 1) / 2;
                     const targetOpacity = 0.3 + (0.7 * cycle);
                     
+                    // Interpolate Color (Cyan -> White)
+                    const targetColor = new THREE.Color(0x00ffff).lerp(new THREE.Color(0xffffff), cycle);
+                    
+                    // Apply Visuals
                     materials.marker.opacity = targetOpacity;
                     materials.marker.color.copy(targetColor);
                     materials.marker.emissive.copy(targetColor);
-                    materials.marker.emissiveIntensity = this.teleportLocked ? 3.0 : (2.0 * cycle); // Brighter when locked
+                    materials.marker.emissiveIntensity = this.teleportLocked ? 3.0 : (2.0 * cycle);
 
                     teleportMarker.userData.ringMat.opacity = targetOpacity;
                     teleportMarker.userData.ringMat.color.copy(targetColor);
@@ -2904,21 +3119,26 @@
                     teleportMarker.userData.ringMat.emissiveIntensity = this.teleportLocked ? 3.0 : (2.0 * cycle);
 
                     const pulse = Math.sin(t * 0.003); 
-                    const hoverY = 1.5 + pulse * 0.2;
-                    teleportMarker.userData.diamond.position.y = hoverY;
+                    teleportMarker.userData.diamond.position.y = 1.5 + pulse * 0.2;
                     teleportMarker.userData.ring.scale.setScalar(1 + pulse * 0.05);
+                    
                     document.getElementById('icon-q').classList.add('active');
+
                 } else {
+                    // Inactive State Cleanup
                     if (teleportMarker.parent === camera) scene.add(teleportMarker);
                     teleportMarker.visible = false;
                     this.tpAimStartTime = 0; 
                     document.getElementById('icon-q').classList.remove('active');
-                    if (lastHoveredEnemy) { lastHoveredEnemy.setHighlight(false); lastHoveredEnemy = null; }
+                    if (lastHoveredEnemy) { 
+                        lastHoveredEnemy.setHighlight(false); 
+                        lastHoveredEnemy = null; 
+                    }
                 }
                 
+                // Crosshair State
                 const ch = document.getElementById('crosshair');
-                if (slashActive || (teleportMode === 'AIM' && this.teleportActive)) ch.style.opacity = 0;
-                else ch.style.opacity = 1;
+                ch.style.opacity = (slashActive || isActive) ? 0 : 1;
             }
         }
 
@@ -3001,7 +3221,7 @@
             
             teleportEntity(pos, vel) {
                 if (this.target) {
-                    AudioSys.playTeleport();
+                    AudioSys.playTeleport(this.mesh.position);
                     spawnParticles(pos.clone(), this.color, 20);
                     pos.copy(this.target.mesh.position);
                     const dir = vel.clone().normalize();
@@ -3310,7 +3530,11 @@
                 }
                 
                 spawnRipple(pos, new THREE.Vector3(0,1,0), color);
-                AudioSys.playExplosion(this.type);
+                
+                // Routed audio logic
+                if (this.type === 'IMPULSE') AudioSys.playImpulse(pos);
+                else if (this.type === 'VOID') AudioSys.playVoid(pos);
+                else AudioSys.playFrag(pos);
 
                 for (let e of enemies) {
                     if (e.isDeadCorpse) continue;
@@ -3710,7 +3934,7 @@
                     if(hitType === "CRIT") {
                          showKillMessage("CRITICAL HIT!", "critical");
                          spawnParticles(camera.position.clone().add(new THREE.Vector3(0,0,-2)), 0xff0000, 15);
-                         AudioSys.playHit(); 
+                         AudioSys.playHit(h.enemy.mesh.position); 
                     } else if(hitType === "GRAZE") {
                          showKillMessage("GRAZE", "graze");
                     }
@@ -3971,7 +4195,7 @@
             // Master Volume
             document.getElementById('set-vol').addEventListener('input', (e) => {
                 const val = parseFloat(e.target.value);
-                AudioSys.setVolume(val * 2.0);
+                AudioSys.setVolume(val * 3.0);
             });
 
             // "Traps" Logic
@@ -4443,7 +4667,7 @@
         const WARM_PALETTES = [0x8B4513, 0xA0522D, 0xCD853F, 0xD2691E, 0xBC8F8F];
 
         class Decoration {
-            constructor(x, z, scale, ws = null) {
+            constructor(x, y, z, scale, ws = null) {
                 this.scale = scale;
                 const size = 2;
                 this.palette = GIFT_PALETTES[Math.floor(Math.random() * GIFT_PALETTES.length)];
@@ -4452,7 +4676,11 @@
                 const colliderGeo = new THREE.BoxGeometry(size, size, size);
                 const colliderMat = new THREE.MeshBasicMaterial({ visible: false });
                 this.colliderMesh = new THREE.Mesh(colliderGeo, colliderMat);
-                this.colliderMesh.position.set(x, scale, z);
+                
+                // NEW: Use explicit Y. If null, default to floor (which is just 'scale' due to origin offset)
+                const finalY = (y !== null && y !== undefined) ? y : scale;
+                this.colliderMesh.position.set(x, finalY, z);
+                
                 this.colliderMesh.scale.setScalar(scale);
                 this.colliderMesh.geometry.computeBoundingBox();
                 
@@ -4474,7 +4702,7 @@
                 this.mat = materials.obstacle.clone();
                 this.visualMesh = new THREE.Mesh(visualGeo, this.mat);
                 
-                // Shadow Optimization for Decorations
+                // Shadow Optimization
                 if (ws && ws.config.bots > 100) {
                     this.visualMesh.castShadow = false;
                 } else {
@@ -4876,7 +5104,7 @@
             spawnParticles(pos, 0xffcc00, 30);
             spawnParticles(pos, 0x00ffff, 30);
             spawnParticles(pos, 0xff00ff, 30);
-            AudioSys.playTeleport(); 
+            AudioSys.playTeleport(this.mesh.position); 
         }
 
         function createTeleportMarker() {
@@ -4912,40 +5140,99 @@
             scene.add(teleportMarker);
         }
 
-        function getGroundHeight(x, z) {
-            // OPTIMIZATION: Main Floor Fast Check
-            let highestY = 0; 
+        function getGroundHeight(x, z, startY = null) {
+            let scanOriginY = 1000;
+            let scanDistance = 2000;
             
-            if (spatialGrid) {
-                // FIX: Use dedicated _groundBox to avoid overwriting _box3_1 during recursion
-                const queryBox = _groundBox; 
-                queryBox.min.set(x - 0.5, -10, z - 0.5);
-                queryBox.max.set(x + 0.5, 500, z + 0.5);
-                
-                // FIX: Pass _groundSet to avoid clearing the main physics querySet
-                const candidates = spatialGrid.query(queryBox, _groundSet);
-                
-                if (candidates.size > 0) {
-                    // FIX: Raise scan height to 1000 to clear Titan's massive skyscrapers
-                    // FIX: Increase .far to 1200 so it actually reaches the floor
-                    const rayOrigin = _groundVec1.set(x, 1000, z);
-                    globalRaycaster.set(rayOrigin, _groundVec2.set(0, -1, 0));
-                    globalRaycaster.far = 1200; 
-                    
-                    const candidateMeshes = [];
-                    candidates.forEach(c => {
-                        if (!c.mesh.userData.isFloor) candidateMeshes.push(c.mesh);
-                    });
+            if (startY !== null) {
+                scanOriginY = startY + 2.0;
+                scanDistance = 10.0;
+            }
 
-                    if (candidateMeshes.length > 0) {
-                        const intersects = globalRaycaster.intersectObjects(candidateMeshes);
-                        if (intersects.length > 0) {
-                            highestY = intersects[0].point.y;
-                        }
-                    }
+            if (spatialGrid) {
+                _groundBox.min.set(x - 0.5, scanOriginY - scanDistance, z - 0.5);
+                _groundBox.max.set(x + 0.5, scanOriginY, z + 0.5);
+                
+                spatialGrid.query(_groundBox, _groundSet);
+                
+                if (_groundSet.size === 0) return -999;
+
+                const candidateMeshes = [];
+                _groundSet.forEach(item => {
+                    candidateMeshes.push(item.mesh);
+                });
+
+                if (candidateMeshes.length > 0) {
+                    _groundVec1.set(x, scanOriginY, z);
+                    _groundVec2.set(0, -1, 0);
+                    globalRaycaster.set(_groundVec1, _groundVec2);
+                    globalRaycaster.far = scanDistance;
+                    
+                    const hits = globalRaycaster.intersectObjects(candidateMeshes);
+                    if (hits.length > 0) return hits[0].point.y;
                 }
             }
-            return highestY;
+            return -999;
+        }
+
+        function getRandomSpawnY(x, z) {
+            // --- TUNING KNOBS ---
+            const BIAS_HIGH = 0.60; // 60% chance to pick the absolute highest point
+            const BIAS_MID  = 0.30; // 30% chance to pick a middle platform
+            // Remaining 10% falls to ground
+            // --------------------
+
+            if (!spatialGrid) return getGroundHeight(x, z);
+            
+            _groundBox.min.set(x - 0.5, -100, z - 0.5);
+            _groundBox.max.set(x + 0.5, 500, z + 0.5);
+            
+            const candidates = new Set();
+            spatialGrid.query(_groundBox, candidates);
+            
+            if (candidates.size === 0) return getGroundHeight(x, z);
+
+            const candidateMeshes = [];
+            candidates.forEach(item => candidateMeshes.push(item.mesh));
+
+            if (candidateMeshes.length > 0) {
+                _groundVec1.set(x, 1000, z);
+                _groundVec2.set(0, -1, 0);
+                globalRaycaster.set(_groundVec1, _groundVec2);
+                globalRaycaster.far = 2000;
+                
+                const hits = globalRaycaster.intersectObjects(candidateMeshes);
+                const points = [];
+                
+                for(let hit of hits) {
+                    if (hit.face && hit.face.normal.y > 0.5) {
+                        points.push(hit.point.y);
+                    }
+                }
+                
+                if (points.length > 0) {
+                    // Sort descending (Highest first)
+                    points.sort((a, b) => b - a);
+                    
+                    const groundY = points[points.length - 1];
+                    const highPoints = points.filter(y => y > groundY + 20.0);
+                    const midPoints = points.filter(y => y > groundY + 5.0 && y <= groundY + 20.0);
+
+                    // 1. Try High Tier
+                    if (highPoints.length > 0 && Math.random() < BIAS_HIGH) {
+                        return highPoints[Math.floor(Math.random() * highPoints.length)];
+                    }
+                    
+                    // 2. Try Mid Tier
+                    if (midPoints.length > 0 && Math.random() < BIAS_MID) {
+                        return midPoints[Math.floor(Math.random() * midPoints.length)];
+                    }
+                    
+                    // 3. Fallback (Ground or Random)
+                    return points[Math.floor(Math.random() * points.length)];
+                }
+            }
+            return getGroundHeight(x, z);
         }
         
         function snapToFloor(pos) {
@@ -4959,16 +5246,16 @@
             }
         }
 
-        function getTeleportTarget() {
+        function getTeleportTarget(maxDist = CONFIG.teleportRange) {
             globalRaycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-            globalRaycaster.far = CONFIG.teleportRange;
+            globalRaycaster.far = maxDist;
             const intersects = globalRaycaster.intersectObjects(worldObjects);
             if (intersects.length > 0) {
                 return { point: intersects[0].point, hit: true, normal: intersects[0].face.normal };
             } else {
                 const dir = new THREE.Vector3();
                 camera.getWorldDirection(dir);
-                return { point: camera.position.clone().addScaledVector(dir, CONFIG.teleportRange), hit: false, normal: null };
+                return { point: camera.position.clone().addScaledVector(dir, maxDist), hit: false, normal: null };
             }
         }
 
@@ -5026,8 +5313,8 @@
 
         function tryAimTeleport() {
             if (player.teleportTarget) {
-                // Pass 'null' for normal because handleTeleport already handled the offset math
-                executeTeleport(player.teleportTarget, null); 
+                const force = player.teleportLocked;
+                executeTeleport(player.teleportTarget, null, force); 
                 player.teleportActive = false; 
             }
         }
@@ -5039,74 +5326,142 @@
             setTimeout(() => document.getElementById('icon-q').classList.remove('active'), 200);
         }
 
-        function executeTeleport(target, normal) {
-             if (player.energy < CONFIG.teleportCost) {
-                 AudioSys.playMiss();
-                 return;
-             }
-             player.energy -= CONFIG.teleportCost;
-             
-             // Target represents feet position
-             const dest = target.clone();
-             
-             // Apply wall offset only for vertical surfaces to prevent floating on floors
-             if (normal && Math.abs(normal.y) < 0.5) {
-                 dest.addScaledVector(normal, 0.8);
-             }
-             
-             // Apply ground snap to ensure feet sit exactly on the floor
-             const groundHeight = getGroundHeight(dest.x, dest.z);
-             if (dest.y < groundHeight + 0.01) {
-                 dest.y = groundHeight + 0.01;
-             }
+        function resolveTeleportPosition(target, normal) {
+            const dest = target.clone();
+            const origin = camera.position;
 
-             // Apply physics resolution using spatial grid
-             const tempBox = new THREE.Box3();
-             const halfW = 0.3; 
-             tempBox.min.set(dest.x - halfW, dest.y, dest.z - halfW);
-             tempBox.max.set(dest.x + halfW, dest.y + 1.8, dest.z + halfW);
+            // 1. Range Clamping
+            // Clamp immediately to ensure environmental queries happen at the actual destination
+            const distSq = dest.distanceToSquared(origin);
+            const maxSq = CONFIG.teleportRange * CONFIG.teleportRange;
+            if (distSq > maxSq) {
+                dest.sub(origin).normalize().multiplyScalar(CONFIG.teleportRange).add(origin);
+            }
 
-             const collisions = spatialGrid.query(tempBox);
-             for(const wall of collisions) {
-                 if (wall.mesh.userData.isFloor) continue;
-                 if (tempBox.intersectsBox(wall.box)) {
-                     const overlapX = Math.min(tempBox.max.x - wall.box.min.x, wall.box.max.x - tempBox.min.x);
-                     const overlapZ = Math.min(tempBox.max.z - wall.box.min.z, wall.box.max.z - tempBox.min.z);
-                     const wallCenterX = (wall.box.min.x + wall.box.max.x) / 2;
-                     const wallCenterZ = (wall.box.min.z + wall.box.max.z) / 2;
-                     if (overlapX < overlapZ) {
-                         const sign = (dest.x < wallCenterX) ? -1 : 1;
-                         dest.x += (overlapX + 0.05) * sign; 
-                     } else {
-                         const sign = (dest.z < wallCenterZ) ? -1 : 1;
-                         dest.z += (overlapZ + 0.05) * sign;
-                     }
-                     tempBox.min.set(dest.x - halfW, dest.y, dest.z - halfW);
-                     tempBox.max.set(dest.x + halfW, dest.y + 1.8, dest.z + halfW);
-                 }
-             }
+            // 2. Lateral Wall Offset
+            // Push away from vertical surfaces; ignore horizontal normals (floors/ceilings)
+            if (normal && Math.abs(normal.y) < 0.5) {
+                dest.addScaledVector(normal, 0.8);
+            }
 
-             const startInAir = !player.onGround;
-             const finalGround = getGroundHeight(dest.x, dest.z);
-             const endInAir = (dest.y - finalGround) > 0.5;
+            // 3. Vertical Environment Scan
+            // Determine physical ceiling height at target coordinates
+            const halfW = 0.3;
+            const playerHeight = 1.8;
+            const offsetBuffer = 2.0; 
+            let ceilingY = Infinity;
+            
+            if (spatialGrid) {
+                const scanBox = _box3_1; // Reuse global box
+                scanBox.min.set(dest.x - halfW, -100, dest.z - halfW);
+                scanBox.max.set(dest.x + halfW, 500, dest.z + halfW);
 
-             player.lastTeleportWasAerial = startInAir || endInAir;
-             player.hasPhaseStruck = false; 
+                const candidates = spatialGrid.query(scanBox);
+                for (const wall of candidates) {
+                    if (wall.mesh.userData.isFloor) continue;
+                    
+                    // Check if target is within the X/Z footprint of the block
+                    if (dest.x >= wall.box.min.x && dest.x <= wall.box.max.x &&
+                        dest.z >= wall.box.min.z && dest.z <= wall.box.max.z) {
+                        
+                        const wallBottom = wall.box.min.y;
+                        
+                        // Identify the lowest ceiling above (or enveloping) the target
+                        if (wallBottom > (dest.y - 0.5) && wallBottom < ceilingY) {
+                            ceilingY = wallBottom;
+                        }
+                    }
+                }
+            }
 
-             spawnParticles(camera.position, 0x00ffaa, 20); 
-             
-             // Save destination for buffered warp logic
-             player.lastTeleportDest = dest.clone();
+            // 4. Ceiling Constraint
+            // Force target to fit underneath detected ceiling
+            if (ceilingY !== Infinity) {
+                if (dest.y + offsetBuffer > ceilingY) {
+                    dest.y = ceilingY - offsetBuffer;
+                }
+            }
 
-             // Update camera position (Feet + EyeHeight)
-             camera.position.set(dest.x, dest.y + 1.6, dest.z);
-             
-             player.jumpsRemaining = 1; 
-             player.onGround = false; 
-             if(!startInAir) player.airTimeStart = performance.now();
-             player.lastTeleportTime = performance.now(); 
-             AudioSys.playTeleport();
-             spawnParticles(camera.position, 0x00ffaa, 30);
+            // 5. Floor Snapping
+            // Snap to ground if close, ensuring we don't violate ceiling constraints
+            const gh = getGroundHeight(dest.x, dest.z, dest.y);
+            if (dest.y > gh && dest.y - gh < 3.0) {
+                if (ceilingY === Infinity || (ceilingY - offsetBuffer) > gh) {
+                    if (dest.y < gh + 0.01) dest.y = gh + 0.01;
+                }
+            }
+            
+            // 6. Physics Resolution
+            // Resolve lateral collisions to prevent clipping into walls
+            const tempBox = _box3_1;
+            tempBox.min.set(dest.x - halfW, dest.y, dest.z - halfW);
+            tempBox.max.set(dest.x + halfW, dest.y + playerHeight, dest.z + halfW);
+
+            if (spatialGrid) {
+                const collisions = spatialGrid.query(tempBox);
+                for(const wall of collisions) {
+                    if (wall.mesh.userData.isFloor) continue;
+                    
+                    if (tempBox.intersectsBox(wall.box)) {
+                        // Ignore vertical overlaps (handled by steps 3-5)
+                        const overlapY = Math.min(tempBox.max.y - wall.box.min.y, wall.box.max.y - tempBox.min.y);
+                        const overlapX = Math.min(tempBox.max.x - wall.box.min.x, wall.box.max.x - tempBox.min.x);
+                        const overlapZ = Math.min(tempBox.max.z - wall.box.min.z, wall.box.max.z - tempBox.min.z);
+                        
+                        if (overlapY < overlapX && overlapY < overlapZ) continue;
+
+                        const wallCenterX = (wall.box.min.x + wall.box.max.x) / 2;
+                        const wallCenterZ = (wall.box.min.z + wall.box.max.z) / 2;
+                        
+                        if (overlapX < overlapZ) {
+                            const sign = (dest.x < wallCenterX) ? -1 : 1;
+                            dest.x += (overlapX + 0.05) * sign; 
+                        } else {
+                            const sign = (dest.z < wallCenterZ) ? -1 : 1;
+                            dest.z += (overlapZ + 0.05) * sign;
+                        }
+                        tempBox.min.set(dest.x - halfW, dest.y, dest.z - halfW);
+                        tempBox.max.set(dest.x + halfW, dest.y + playerHeight, dest.z + halfW);
+                    }
+                }
+            }
+            
+            return dest;
+        }
+
+        function executeTeleport(target, normal, force = false) {
+            if (player.energy < CONFIG.teleportCost) {
+                AudioSys.playMiss();
+                return;
+            }
+            player.energy -= CONFIG.teleportCost;
+            
+            let dest;
+            if (force) {
+                dest = target.clone();
+            } else {
+                dest = resolveTeleportPosition(target, normal);
+            }
+
+            const startInAir = !player.onGround;
+            const finalGround = getGroundHeight(dest.x, dest.z);
+            const endInAir = (dest.y - finalGround) > 0.5;
+
+            player.lastTeleportWasAerial = startInAir || endInAir;
+            player.hasPhaseStruck = false; 
+
+            spawnParticles(camera.position, 0x00ffaa, 20); 
+            
+            player.lastTeleportDest = dest.clone();
+
+            camera.position.set(dest.x, dest.y + 1.6, dest.z);
+            
+            player.jumpsRemaining = 1; 
+            player.onGround = false; 
+            if(!startInAir) player.airTimeStart = performance.now();
+            player.lastTeleportTime = performance.now(); 
+            AudioSys.playTeleport();
+            spawnParticles(camera.position, 0x00ffaa, 30);
         }
 
         function updateComboUI() {
@@ -5207,914 +5562,931 @@
         }
 
         class Enemy {
-    constructor(posOverride = null, typeOverride = null, initialState = 'ROAM', aggroDelay = 0, ws = null) {
-        this.mesh = new THREE.Group();
-        this.id = Math.random();
+            constructor(posOverride = null, typeOverride = null, initialState = 'ROAM', aggroDelay = 0, ws = null) {
+                this.mesh = new THREE.Group();
+                this.id = Math.random();
 
-        // --- 1. SPAWN LOGIC ---
-        let spawnY = 0;
+                // --- Spawn Logic ---
+                let spawnY = 0;
 
-        if (posOverride) {
-            this.mesh.position.copy(posOverride);
-            this.mesh.position.x += (Math.random() - 0.5) * 2;
-            this.mesh.position.z += (Math.random() - 0.5) * 2;
-            spawnY = this.mesh.position.y;
+                if (posOverride) {
+                    this.mesh.position.copy(posOverride);
+                    this.mesh.position.x += (Math.random() - 0.5) * 2;
+                    this.mesh.position.z += (Math.random() - 0.5) * 2;
+                    spawnY = this.mesh.position.y;
 
-            if (typeOverride) this.type = typeOverride;
-            else this.type = BOT_TYPES.NORMAL;
-        } else {
-            let x, z;
-            const usedDecorations = ws ? ws.decorations : decorations;
-            const spawnRange = ws ? ws.config.size * 0.4 : 175;
-            let validSpawn = false;
-
-            if (Math.random() < 0.4 && usedDecorations.length > 0) {
-                const dec = usedDecorations[Math.floor(Math.random() * usedDecorations.length)];
-                const range = (dec.scale - 2) * 0.6;
-                if (range > 2) {
-                    x = dec.visualMesh.position.x + (Math.random() - 0.5) * 2 * range;
-                    z = dec.visualMesh.position.z + (Math.random() - 0.5) * 2 * range;
-                    validSpawn = true;
-                }
-            }
-
-            if (!validSpawn) {
-                do {
-                    x = (Math.random() - 0.5) * (spawnRange * 2);
-                    z = (Math.random() - 0.5) * (spawnRange * 2);
-                } while (Math.abs(x) < 20 && Math.abs(z) < 20);
-            }
-
-            spawnY = getGroundHeight(x, z);
-
-            let r = Math.random();
-            let type = 'NORMAL';
-            if (spawnY > 35) {
-                if (r < 0.4) type = 'COLOSSUS'; else if (r < 0.9) type = 'TITAN'; else type = 'BRUTE';
-            } else if (spawnY > 5) {
-                if (r < 0.05) type = 'COLOSSUS'; else if (r < 0.4) type = 'TITAN'; else if (r < 0.8) type = 'BRUTE'; else type = 'NORMAL';
-            } else {
-                if (r < 0.01) type = 'COLOSSUS'; else if (r < 0.05) type = 'TITAN'; else if (r < 0.20) type = 'BRUTE'; else type = 'NORMAL';
-            }
-            this.type = BOT_TYPES[type];
-            this.mesh.position.set(x, spawnY + this.type.scale, z);
-        }
-
-        // --- 2. MESH SETUP ---
-        const bodyMat = new THREE.MeshPhysicalMaterial({
-            color: this.type.color, metalness: 0.1, roughness: 0.2, clearcoat: 0.5
-        });
-        this.body = new THREE.Mesh(sharedEnemyGeo, bodyMat);
-
-        if (ws && ws.config.bots > 100) this.body.castShadow = false;
-        else this.body.castShadow = true;
-
-        this.body.receiveShadow = true;
-        this.mesh.add(this.body);
-
-        this.outline = new THREE.LineSegments(sharedEnemyEdgeGeo, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.3 }));
-        this.outline.scale.setScalar(1.02);
-        this.mesh.add(this.outline);
-
-        const eyeGeo = new THREE.SphereGeometry(0.1, 8, 8);
-        this.eyeMat = new THREE.MeshBasicMaterial({ color: this.type.eye });
-        this.eyeL = new THREE.Mesh(eyeGeo, this.eyeMat);
-        this.eyeL.position.set(-0.2, 0.5, 0.5);
-        this.eyeR = new THREE.Mesh(eyeGeo, this.eyeMat);
-        this.eyeR.position.set(0.2, 0.5, 0.5);
-        this.mesh.add(this.eyeL); this.mesh.add(this.eyeR);
-        this.mesh.scale.setScalar(this.type.scale);
-
-        this.healthBarGroup = new THREE.Group();
-        const barGeo = new THREE.PlaneGeometry(1.2, 0.15);
-        const barMat = new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide });
-        this.healthBar = new THREE.Mesh(barGeo, barMat);
-        this.healthBar.position.z = 0.01;
-        this.healthBarGroup.add(this.healthBar);
-        const bgGeo = new THREE.PlaneGeometry(1.3, 0.25);
-        const bgMat = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide });
-        const bg = new THREE.Mesh(bgGeo, bgMat);
-        this.healthBarGroup.add(bg);
-        const uiScale = 1 + (this.type.scale - 1) * 0.5;
-        this.healthBarGroup.scale.setScalar(uiScale);
-        this.healthBarGroup.visible = false;
-
-        if (ws) {
-            ws.enemies.push(this);
-            ws.group.add(this.mesh);
-            ws.group.add(this.healthBarGroup);
-        } else {
-            enemies.push(this);
-            (currentWorldGroup || scene).add(this.mesh);
-            (currentWorldGroup || scene).add(this.healthBarGroup);
-        }
-
-        // --- 3. STATS & STATE ---
-        this.maxHealth = this.type.hp;
-        this.health = this.maxHealth;
-        this.velocity = new THREE.Vector3();
-        this.jumps = 0;
-        this.state = initialState;
-        this.hasAggroed = initialState === 'AGGRO';
-        this.reactionTimer = aggroDelay > 0 ? aggroDelay * 1000 : 0;
-
-        this.targetPos = new THREE.Vector3();
-        this.lastKnownPos = new THREE.Vector3();
-        this.searchTimer = 0;
-        this.pickRoamTarget();
-
-        this.lastAttack = performance.now();
-        this.actionTimer = 0;
-        this.isSprinting = false;
-        this.isSliding = false;
-        this.isDeadCorpse = false;
-        this.corpseTimer = 0;
-        this.confusedTimer = 0;
-        this.streak = 0;
-        this.lastHitTime = 0;
-        this.lastDamageTime = 0;
-        this.isRegenerating = false;
-        this.isRetreating = false;
-        this.pendingRetreat = false;
-        this.teleportTimer = 0;
-        this.teleportDelay = 0;
-        this.personalSpeedMod = 0.8 + Math.random() * 0.4;
-        this.portalCooldown = 0;
-        this.strafeDir = Math.random() < 0.5 ? 1 : -1;
-        this.strafeTimer = 0;
-        this.dodgeTimer = 0;
-        this.dodgeReactionTimer = 0;
-        this.ledgeTimer = 0;
-        this.lastPos = new THREE.Vector2(this.mesh.position.x, this.mesh.position.z);
-        this.stamina = 10;
-        this.maxStamina = 10;
-        this.staminaRegen = 3;
-        this.visionTimer = Math.random() * 0.5;
-        this.canSeePlayerCached = false;
-
-        // Variables for LOD smoothing/logic
-        this.targetRotation = this.mesh.rotation.y;
-        this.lastGroundHeight = 0;
-        this.groundCheckTimer = 0;
-        this.currentMoveSpeed = 0;
-        this.currentMoveDir = new THREE.Vector3();
-
-        this.updateTheme(currentTheme);
-    }
-
-    setHighlight(active) {
-        if (active) {
-            this.body.material.emissive.setHex(0xff0000);
-            this.body.material.emissiveIntensity = 1.0;
-            this.outline.material.color.setHex(0xffffff);
-            this.outline.material.opacity = 0.8;
-        } else {
-            this.updateTheme(currentTheme);
-            this.outline.scale.setScalar(1.02);
-        }
-    }
-
-    updateTheme(t) {
-        if (t === 2) {
-            this.outline.material.color.setHex(0x00ffff);
-            this.outline.material.opacity = 0.8;
-            this.body.material.color.setHex(0x000000);
-            this.body.material.emissive.setHex(0x000000);
-            this.body.material.emissiveIntensity = 0;
-        } else {
-            this.outline.material.color.setHex(0xffffff);
-            this.outline.material.opacity = 0.3;
-            this.body.material.color.setHex(this.type.color);
-            this.body.material.emissiveIntensity = 0;
-        }
-    }
-
-    pickRoamTarget() {
-        const myGround = getGroundHeight(this.mesh.position.x, this.mesh.position.z);
-        if (myGround > 2) {
-            for (let i = 0; i < 10; i++) {
-                const tx = this.mesh.position.x + (Math.random() - 0.5) * 60;
-                const tz = this.mesh.position.z + (Math.random() - 0.5) * 60;
-                if (Math.abs(tx) > 150 || Math.abs(tz) > 150) continue;
-                const tGround = getGroundHeight(tx, tz);
-                if (Math.abs(tGround - myGround) < 1.0) {
-                    this.targetPos.set(tx, this.mesh.position.y, tz);
-                    return;
-                }
-            }
-        }
-        const roamRange = WorldManager.current ? WorldManager.current.config.size * 0.3 : 150;
-        this.targetPos.set(
-            (Math.random() - 0.5) * roamRange,
-            this.mesh.position.y,
-            (Math.random() - 0.5) * roamRange
-        );
-    }
-
-    canSeePlayer(playerPos) {
-        if (this.isDeadCorpse || this.state === 'CONFUSED') return false;
-        return this.canSeePlayerCached;
-    }
-
-    checkVision(playerPos) {
-        if (this.isDeadCorpse || this.state === 'CONFUSED') return false;
-        // if (this.mesh.position.distanceTo(playerPos) > 300) return false;
-        _vec3_3.copy(this.mesh.position).add(new THREE.Vector3(0, 0.5, 0));
-        const distToPlayer = _vec3_3.distanceTo(playerPos);
-        _vec3_1.subVectors(playerPos, _vec3_3).normalize();
-        globalRaycaster.set(_vec3_3, _vec3_1);
-        globalRaycaster.far = 60;
-        const hits = globalRaycaster.intersectObjects(walls);
-        if (hits.length > 0 && hits[0].distance < distToPlayer) {
-            return false;
-        }
-        return true;
-    }
-
-   // --- 4. LOD CONTROLLER ---
-    update(dt, playerPos) {
-        // Calculate distance ONCE for both Visuals and Physics
-        const distSq = this.mesh.position.distanceToSquared(camera.position);
-        
-        // --- VISUAL LOD (Existing Logic) ---
-        let logicInterval = 1;
-        if (distSq > 22500) logicInterval = 10;
-        else if (distSq > 2500) logicInterval = 3;
-
-        if (distSq > 22500) {
-            this.outline.visible = false;
-            this.healthBarGroup.visible = false;
-            this.eyeL.visible = false;
-            this.eyeR.visible = false;
-        } else {
-            this.outline.visible = true;
-            this.eyeL.visible = true;
-            this.eyeR.visible = true;
-            if (this.hasAggroed && !this.isDeadCorpse) this.healthBarGroup.visible = true;
-        }
-
-        // --- LOGIC LOD ---
-        const shouldRunLogic = (frameCounter + Math.floor(this.id * 100)) % logicInterval === 0;
-        if (shouldRunLogic) {
-            this.updateLogic(dt * logicInterval, playerPos, logicInterval);
-        }
-
-        // --- PHYSICS LOD (New Hybrid Logic) ---
-        // Pass the distSq to updatePhysics so we know which precision mode to use
-        this.updatePhysics(dt, distSq);
-    }
-
-    // --- 5. LOGIC BRAIN ---
-    updateLogic(dt, playerPos, intervalMultiplier) {
-        if (this.isDeadCorpse) return;
-
-        // Ground Check
-        const distMoved = Math.hypot(this.mesh.position.x - this.lastPos.x, this.mesh.position.z - this.lastPos.y);
-        const isInAir = Math.abs(this.mesh.position.y - this.lastGroundHeight) > 2.0;
-
-        if (distMoved > 1.0 || isInAir || this.groundCheckTimer <= 0) {
-            this.lastGroundHeight = getGroundHeight(this.mesh.position.x, this.mesh.position.z);
-            this.groundCheckTimer = 0.5; 
-        } else {
-            this.groundCheckTimer -= dt;
-        }
-
-        // Timers
-        this.visionTimer -= dt;
-        if (this.visionTimer <= 0) {
-            this.canSeePlayerCached = this.checkVision(playerPos);
-            this.visionTimer = 0.3 + Math.random() * 0.2;
-        }
-
-        if (this.reactionTimer > 0) {
-            this.reactionTimer -= dt * 1000;
-            this.currentMoveSpeed = 0;
-            return;
-        }
-        
-        // Regen
-        const now = performance.now();
-        if (now - this.lastDamageTime > CONFIG.regenDelay && this.health < this.maxHealth) {
-            this.health += CONFIG.regenRate * dt;
-            if (this.health >= this.maxHealth) {
-                this.health = this.maxHealth;
-                this.isRetreating = false; 
-            }
-        }
-        
-        if (this.stamina < this.maxStamina) {
-            this.stamina = Math.min(this.maxStamina, this.stamina + this.staminaRegen * dt);
-        }
-
-        if (this.teleportTimer > 0) this.teleportTimer -= dt * 1000;
-        if (this.teleportDelay > 0) this.teleportDelay -= dt;
-        if (this.portalCooldown > 0) this.portalCooldown -= dt;
-        if (this.strafeTimer > 0) this.strafeTimer -= dt;
-        if (this.dodgeTimer > 0) this.dodgeTimer -= dt;
-        if (this.dodgeReactionTimer > 0) this.dodgeReactionTimer -= dt;
-        if (this.ledgeTimer > 0) this.ledgeTimer -= dt;
-
-        // Portals
-        if(this.portalCooldown <= 0) {
-             for(let p of portals) {
-                 if(this.mesh.position.distanceTo(p.mesh.position) < 3.0) {
-                     p.teleportEntity(this.mesh.position, this.velocity);
-                     this.portalCooldown = 0.5;
-                 }
-             }
-        }
-
-        let dest = this.targetPos;
-        let speed = (this.isSprinting ? CONFIG.botSprintSpeed : CONFIG.botSpeed) * this.type.speedMod * this.personalSpeedMod;
-        const hpPct = this.health / this.maxHealth;
-        const groundY = this.lastGroundHeight;
-
-        // --- State Machine ---
-        if (this.state === 'ROAM') {
-            speed = CONFIG.botRoamSpeed * this.type.speedMod * this.personalSpeedMod;
-            if (this.onGroundSafe(groundY)) {
-                const forward = new THREE.Vector3(0,0,1).applyAxisAngle(new THREE.Vector3(0,1,0), this.mesh.rotation.y);
-                const lookAheadPos = this.mesh.position.clone().addScaledVector(forward, 2.0); 
-                const aheadHeight = getGroundHeight(lookAheadPos.x, lookAheadPos.z);
-                if (groundY - aheadHeight > 3.0) {
-                    if (Math.random() < 0.1 * intervalMultiplier) this.pickRoamTarget();
-                }
-            }
-            if (new THREE.Vector2(this.mesh.position.x - dest.x, this.mesh.position.z - dest.z).length() < 3) {
-                this.pickRoamTarget();
-            }
-            if (this.onGroundSafe(groundY) && Math.random() < 0.005 * intervalMultiplier) {
-                this.velocity.y = 16; 
-                this.jumps = 1;
-                this.mesh.position.y += 0.2; 
-            }
-        } 
-        else if (this.state === 'AGGRO') {
-            if (this.canSeePlayer(playerPos)) {
-                this.lastKnownPos.copy(playerPos);
-                dest = playerPos;
-                const dist = this.mesh.position.distanceTo(playerPos);
-
-                // Retreat Logic
-                if (hpPct < 0.5 && !this.isRetreating && !this.pendingRetreat) {
-                    this.pendingRetreat = true;
-                    if (this.teleportDelay <= 0) {
-                        this.teleportDelay = getBotReactionTime(this) / 1000;
-                    }
-                }
-                if (this.pendingRetreat && this.teleportDelay <= 0) {
-                    this.isRetreating = true;
-                    this.pendingRetreat = false;
-                }
-                if (this.isRetreating) {
-                    speed = CONFIG.botSprintSpeed * this.type.speedMod * this.personalSpeedMod * 1.3;
-                    this.isSprinting = true;
-                    
-                    const slideBase = (hpPct < 0.25) ? 0.4 : 0.05;
-                    if(!this.isSliding && Math.random() < slideBase * intervalMultiplier) this.isSliding = true;
-
-                    const retreatDir = this.mesh.position.clone().sub(playerPos).normalize();
-                    globalRaycaster.set(this.mesh.position, retreatDir);
-                    globalRaycaster.far = 5;
-                    const wallsAhead = globalRaycaster.intersectObjects(walls);
-                    if (wallsAhead.length > 0) {
-                        let escapeFound = false;
-                        const leftDir = new THREE.Vector3(-retreatDir.z, 0, retreatDir.x);
-                        const rightDir = new THREE.Vector3(retreatDir.z, 0, -retreatDir.x);
-                        globalRaycaster.set(this.mesh.position, leftDir);
-                        if (globalRaycaster.intersectObjects(walls).length === 0) {
-                             retreatDir.copy(leftDir);
-                             escapeFound = true;
-                        } else {
-                             globalRaycaster.set(this.mesh.position, rightDir);
-                             if (globalRaycaster.intersectObjects(walls).length === 0) {
-                                 retreatDir.copy(rightDir);
-                                 escapeFound = true;
-                             }
-                        }
-                        if (!escapeFound && dist < 10) {
-                            if(this.onGroundSafe(groundY)) {
-                                this.velocity.y = 25; 
-                                this.jumps = 1;
-                                retreatDir.subVectors(playerPos, this.mesh.position).normalize();
-                            }
-                        } else if (!escapeFound) {
-                             retreatDir.set((Math.random()-0.5), 0, (Math.random()-0.5)).normalize();
-                        }
-                    }
-                    dest = this.mesh.position.clone().addScaledVector(retreatDir, 40);
-                    this.targetPos.copy(dest); 
-                }
-
-                // Teleport Logic
-                if (this.teleportTimer <= 0 && this.stamina >= 10 && this.teleportDelay <= 0) {
-                    let wantsToTp = false;
-                    if (dist < 15 && this.isRetreating) wantsToTp = true;
-                    if (dist > 25 && !this.isRetreating) wantsToTp = true; 
-                    if (dist < 15 && !this.isRetreating) wantsToTp = true; 
-                    if (wantsToTp && !this.teleportReactionPending) {
-                        this.teleportDelay = getBotReactionTime(this) / 1000;
-                        this.teleportReactionPending = true;
-                    }
-                    if (this.teleportDelay <= 0 && this.teleportReactionPending) {
-                        this.teleportReactionPending = false; 
-                        let tpChance = 0.005;
-                        if (this.isRetreating) tpChance = 0.05; 
-                        if (dist > 25) tpChance = 0.02; 
-                        
-                        if (Math.random() < tpChance * intervalMultiplier) {
-                            let newPos;
-                            const minRange = 5;
-                            const maxRange = 20;
-                            const tpRange = minRange + (1.0 - hpPct) * (maxRange - minRange);
-                            if (this.isRetreating) {
-                                const escapeDir = this.mesh.position.clone().sub(playerPos).normalize();
-                                escapeDir.x += (Math.random()-0.5)*0.5;
-                                escapeDir.z += (Math.random()-0.5)*0.5;
-                                escapeDir.normalize();
-                                newPos = this.mesh.position.clone().addScaledVector(escapeDir, tpRange);
-                            } 
-                            else if (dist > 25) { 
-                                const approachDir = playerPos.clone().sub(this.mesh.position).normalize();
-                                const travelDist = dist - 5; 
-                                if(travelDist > 5) {
-                                    newPos = this.mesh.position.clone().addScaledVector(approachDir, Math.min(travelDist, maxRange));
-                                }
-                            }
-                            else if (dist < 15 && !this.isRetreating) {
-                                const offset = new THREE.Vector3((Math.random()-0.5)*10, 0, (Math.random()-0.5)*10);
-                                newPos = this.mesh.position.clone().add(offset);
-                            }
-                            if (newPos) {
-                                const tpRayDir = newPos.clone().sub(this.mesh.position).normalize();
-                                const tpDist = newPos.distanceTo(this.mesh.position);
-                                globalRaycaster.set(this.mesh.position, tpRayDir);
-                                globalRaycaster.far = tpDist;
-                                const tpHits = globalRaycaster.intersectObjects(walls);
-                                if (tpHits.length > 0) {
-                                    newPos.copy(tpHits[0].point).addScaledVector(tpRayDir, -1.0);
-                                }
-                                if(getGroundHeight(newPos.x, newPos.z) > -10) {
-                                    spawnParticles(this.mesh.position, 0xff00ff, 15);
-                                    this.mesh.position.copy(newPos);
-                                    spawnParticles(this.mesh.position, 0xff00ff, 15);
-                                    AudioSys.playTeleport();
-                                    this.stamina -= 10;
-                                    this.teleportTimer = 500; 
-                                }
-                            }
-                        }
-                    }
-                }
-                
-                // Attack Logic
-                if (dist < 5 * this.type.scale) {
-                    const now = performance.now();
-                    if (now - this.lastAttack > CONFIG.botAttackCooldown) {
-                        this.lastAttack = now;
-                        spawnSlash(this.mesh); 
-                        AudioSys.playSlash();
-                        const lungeDir = playerPos.clone().sub(this.mesh.position).normalize();
-                        lungeDir.y = 0; lungeDir.normalize();
-                        const lungeForce = 25 + (this.type.scale * 5); 
-                        this.velocity.addScaledVector(lungeDir, lungeForce);
-                        const hitChance = 1.05 - (this.type.scale * 0.1); 
-                        if (Math.random() < hitChance) {
-                            if (now - this.lastHitTime > 2000) {
-                                this.streak = 0;
-                            }
-                            let dmg = CONFIG.botDamage * this.type.scale; 
-                            dmg += this.streak * 2; 
-                            dmg = Math.min(dmg, 40); 
-                            this.streak++;
-                            this.lastHitTime = now;
-                            damagePlayer(dmg); 
-                        }
-                        else {
-                            AudioSys.playMiss();
-                            this.streak = 0; 
-                        }
-                    }
-                }
-            } else {
-                dest = this.lastKnownPos;
-                if (this.mesh.position.distanceTo(dest) < 3) {
-                    this.state = 'SEARCH';
-                    this.searchTimer = 3000; 
-                    this.body.material.color.setHex(0xffaa00); 
-                }
-            }
-        } 
-        else if (this.state === 'SEARCH') {
-            speed = 0; 
-            this.searchTimer -= dt * 1000;
-            if (this.canSeePlayer(playerPos)) {
-                this.state = 'AGGRO';
-                this.body.material.color.setHex(0x8b0000);
-                this.reactionTimer = CONFIG.botAggroDelay; 
-            } else if (this.searchTimer <= 0) {
-                this.state = 'ROAM';
-                this.body.material.color.setHex(this.type.color);
-                this.pickRoamTarget();
-            }
-        }
-
-        this.actionTimer -= dt;
-        if (this.actionTimer <= 0) {
-            this.actionTimer = 0.5 + Math.random() * 1.5; 
-            let sprintChance = (this.type.skill >= 2 ? 0.7 : 0.3);
-            let slideChance = (this.type.skill >= 2 ? 0.4 : 0.1);
-            if (Math.random() < sprintChance) this.isSprinting = true;
-            else this.isSprinting = false; 
-            
-            if (this.isSprinting && Math.random() < slideChance) this.isSliding = true;
-            else this.isSliding = false;
-        }
-
-        // --- Calculate Movement Vector (Intent) ---
-        this.currentMoveSpeed = 0;
-        
-        if (this.type.speedMod !== 0 && this.state !== 'SEARCH' && this.state !== 'CONFUSED') {
-            _vec3_1.subVectors(dest, this.mesh.position);
-            _vec3_1.y = 0; 
-            _vec3_1.normalize();
-            _vec3_2.copy(_vec3_1);
-
-            if (this.state === 'AGGRO' && !this.isRetreating) {
-                _vec3_2.subVectors(playerPos, this.mesh.position);
-                _vec3_2.y = 0; 
-                _vec3_2.normalize();
-            }
-
-            if (this.state === 'AGGRO' && !this.isRetreating && this.canSeePlayer(playerPos)) {
-                const dist = this.mesh.position.distanceTo(playerPos);
-                if (this.dodgeTimer <= 0) {
-                    const playerAim = new THREE.Vector3();
-                    camera.getWorldDirection(playerAim);
-                    playerAim.y = 0; playerAim.normalize();
-                    const toBot = this.mesh.position.clone().sub(playerPos).normalize();
-                    if (playerAim.dot(toBot) > 0.9 && player.velocity.length() > 10) {
-                        if (this.dodgeReactionTimer <= 0) {
-                             this.dodgeReactionTimer = getBotReactionTime(this) / 1000;
-                        }
-                    }
-                }
-                if (this.dodgeReactionTimer > 0 && this.dodgeReactionTimer <= dt && this.dodgeTimer <= 0) {
-                    this.strafeDir *= -1; 
-                    this.dodgeTimer = 1.0; 
-                    this.dodgeReactionTimer = 0;
-                }
-                if (this.strafeTimer <= 0) {
-                    this.strafeDir *= -1;
-                    this.strafeTimer = 1.5 + Math.random() * 2.0;
-                }
-                const idealRange = 1.5 + (3.0 * this.type.scale);
-                if (dist < 15 + (10 * this.type.scale)) {
-                    const orbitVec = new THREE.Vector3(-_vec3_1.z, 0, _vec3_1.x).multiplyScalar(this.strafeDir);
-                    if (dist > idealRange) {
-                        _vec3_1.addScaledVector(orbitVec, 0.8).normalize();
-                    } else if (dist < idealRange - 2) {
-                        _vec3_1.multiplyScalar(-0.5).addScaledVector(orbitVec, 1.0).normalize();
-                    } else {
-                        const attackReady = (performance.now() - this.lastAttack > CONFIG.botAttackCooldown);
-                        if (attackReady) {
-                            _vec3_1.addScaledVector(orbitVec, 0.2).normalize(); 
-                        } else {
-                            _vec3_1.multiplyScalar(0.4).addScaledVector(orbitVec, 0.8).normalize(); 
-                        }
-                    }
-                    const predictPos = this.mesh.position.clone().addScaledVector(_vec3_1, 2.0);
-                    if (!this.onGroundSafe(getGroundHeight(predictPos.x, predictPos.z))) {
-                        if (this.ledgeTimer <= 0) {
-                            this.strafeDir *= -1;
-                            this.ledgeTimer = 0.5; 
-                        }
-                    }
-                }
-            }
-            
-            _vec3_1.normalize();
-            if (this.isSliding) speed *= 1.5;
-            
-            // Ledge Stop
-            if (this.onGroundSafe(groundY)) {
-                 const lookAhead = this.mesh.position.clone().addScaledVector(_vec3_1, 2.0);
-                 const nextGround = getGroundHeight(lookAhead.x, lookAhead.z);
-                 if (nextGround < groundY - 3) {
-                     speed = 0;
-                     if (this.state === 'ROAM') this.pickRoamTarget();
-                     else this.velocity.set(0,0,0);
-                 }
-            }
-
-            this.currentMoveDir.copy(_vec3_1);
-            this.currentMoveSpeed = speed;
-
-            let lookDir = _vec3_1;
-            if (this.state === 'AGGRO' && !this.isRetreating) {
-                lookDir = _vec3_2;
-            }
-            if (lookDir.lengthSq() > 0.1) {
-                this.targetRotation = Math.atan2(lookDir.x, lookDir.z);
-            }
-        }
-        
-        if (this.isSliding) {
-            if (currentTheme === 0 && Math.random() < 0.3 * intervalMultiplier) spawnSnowTrail(this.mesh.position);
-        }
-    }
-
-    // --- 6. PHYSICS & ANIMATION ---
-    updatePhysics(dt, distSq) {
-        // Eye Color
-        if (this.state === 'AGGRO') this.eyeMat.color.setHex(0xff0000);
-        else if (this.state === 'SEARCH') this.eyeMat.color.setHex(0xffaa00);
-        else this.eyeMat.color.setHex(this.type.eye);
-
-        // Dead State
-        if (this.isDeadCorpse) {
-            this.corpseTimer -= dt;
-            this.mesh.rotation.x = Math.PI / 2;
-            this.mesh.position.y = this.lastGroundHeight + 0.5; 
-            this.body.material.opacity = this.corpseTimer / 3.0;
-            this.body.material.transparent = true;
-            this.eyeMat.opacity = this.corpseTimer / 3.0;
-            this.eyeMat.transparent = true;
-            if (this.corpseTimer <= 0) {
-                this.remove();
-            }
-            return;
-        }
-
-        // Confused State
-        if (this.state === 'CONFUSED') {
-            this.confusedTimer -= dt;
-            this.mesh.rotation.x = -Math.PI / 2; 
-            this.mesh.position.y = this.lastGroundHeight + 0.5;
-            if (this.confusedTimer <= 0) {
-                this.state = this.hasAggroed ? 'AGGRO' : 'ROAM';
-                this.mesh.rotation.x = 0;
-            }
-            this.healthBarGroup.position.copy(this.mesh.position).add(new THREE.Vector3(0, 1.0 * this.type.scale, 0));
-            return;
-        }
-
-        // Gravity & Ground Physics
-        const groundY = this.lastGroundHeight;
-        const floorThreshold = groundY + (1 * this.type.scale);
-        
-        if (this.mesh.position.y > floorThreshold + 0.1) {
-            this.velocity.y -= CONFIG.gravity * dt;
-            
-            // Fall Recovery Jump (Double Jump logic)
-            let jumpChance = 0.05; 
-            if (this.isRetreating && (this.health/this.maxHealth) < 0.3) jumpChance = 0.3; 
-            if (this.velocity.y < -8 && this.jumps < 2 && Math.random() < jumpChance * dt * 60) {
-                 this.velocity.y = 18; 
-                 this.jumps++;
-            }
-        } else {
-            // Fall Damage / Confused Check
-            if (this.velocity.y < -22) { 
-                let shouldFall = true;
-                if (this.state === 'AGGRO') {
-                    if (Math.random() < 0.9) shouldFall = false; 
-                }
-                if (shouldFall) {
-                    this.state = 'CONFUSED';
-                    const impactSpeed = Math.abs(this.velocity.y);
-                    this.confusedTimer = 3.0 + Math.min(2.0, (impactSpeed - 22) / 5.0);
-                    this.velocity.y = 0;
-                    return;
-                }
-            }
-            this.velocity.y = 0;
-            this.mesh.position.y = floorThreshold;
-            this.jumps = 0;
-        }
-
-        // Horizontal Movement
-        if (this.currentMoveSpeed > 0) {
-            this.mesh.position.addScaledVector(this.currentMoveDir, this.currentMoveSpeed * dt);
-        }
-
-        // Velocity Application
-        this.mesh.position.addScaledVector(this.velocity, dt);
-        const drag = Math.exp(-2.0 * dt);
-        this.velocity.x *= drag;
-        this.velocity.z *= drag;
-
-        // --- OPTIMIZED STUCK LOGIC ---
-        // Check "Movement Efficiency" using squared distance (Avoids expensive Sqrt)
-        if (this.currentMoveSpeed > 0.5 && this.state !== 'SEARCH') {
-             // 1. Calculate actual distance squared
-             const dx = this.mesh.position.x - this.lastPos.x;
-             const dz = this.mesh.position.z - this.lastPos.y; // Vector2.y holds the Z coord
-             const distMovedSq = dx*dx + dz*dz;
-             
-             // 2. Calculate minimum expected distance squared
-             // (We expect to move at least 30% of intended speed)
-             const minDist = this.currentMoveSpeed * dt * 0.3;
-             const minExpectedSq = minDist * minDist;
-
-             // 3. Compare Squares (Much faster)
-             if (distMovedSq < minExpectedSq) {
-                 
-                 if (this.state === 'ROAM') {
-                     // Get current heading
-                     const fwdX = this.currentMoveDir.x;
-                     const fwdZ = this.currentMoveDir.z;
-                     
-                     const roll = Math.random();
-                     let newDirX, newDirZ;
-
-                     if (roll < 0.4) { 
-                         // Turn Right (Swap and invert X)
-                         newDirX = -fwdZ; newDirZ = fwdX; 
-                     } else if (roll < 0.8) { 
-                         // Turn Left (Swap and invert Z)
-                         newDirX = fwdZ; newDirZ = -fwdX; 
-                     } else { 
-                         // Turn Around (Invert both)
-                         newDirX = -fwdX; newDirZ = -fwdZ; 
-                     }
-                     
-                     // Project new target 15m away
-                     this.targetPos.x = this.mesh.position.x + (newDirX * 15);
-                     this.targetPos.z = this.mesh.position.z + (newDirZ * 15);
-                     
-                 } else if (this.state === 'AGGRO') {
-                     // Flip strafe direction
-                     this.strafeDir *= -1;
-                     this.strafeTimer = 0.5;
-                 }
-             }
-        }
-        
-        // Update Last Pos
-        this.lastPos.set(this.mesh.position.x, this.mesh.position.z);
-
-        // Rotation Smoothing
-        if (this.state === 'SEARCH') {
-            const lookTime = performance.now() * 0.002;
-            this.mesh.rotation.y = Math.sin(lookTime) * Math.PI;
-        } else {
-            let rotDiff = this.targetRotation - this.mesh.rotation.y;
-            while (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
-            while (rotDiff < -Math.PI) rotDiff += Math.PI * 2;
-            this.mesh.rotation.y += rotDiff * dt * 8;
-        }
-
-        if (this.isSliding) this.mesh.rotation.x = 0.5;
-        else if (this.state !== 'CONFUSED') this.mesh.rotation.x = 0;
-
-        // UI Updates
-        this.healthBarGroup.position.copy(this.mesh.position).add(new THREE.Vector3(0, 1.3 * this.type.scale, 0));
-        this.healthBarGroup.lookAt(camera.position);
-        if (this.hasAggroed) {
-            this.healthBarGroup.visible = true;
-            this.healthBar.scale.x = Math.max(0, this.health / this.maxHealth);
-        }
-
-        // --- OPTIMIZED COLLISION BOUNDS ---
-        // Use the passed distSq to determine precision
-        const isNear = distSq < 2500; // 50 meters (Same as Visual LOD threshold)
-
-        if (isNear) {
-            // ACCURATE MODE: Full matrix calculation (Preserves Game Feel for combat)
-            _box3_1.setFromObject(this.body);
-        } else {
-            // FAST MODE: Simple math approximation (Saves CPU for the swarm)
-            // We assume the bot is standing upright (which they mostly are)
-            const p = this.mesh.position;
-            const s = this.type.scale; // Respect the bot type scale (Titan/Brute/etc)
-            
-            // Hardcoded offset based on bot geometry (1x2x1 box roughly)
-            _box3_1.min.set(p.x - 0.5 * s, p.y, p.z - 0.5 * s);
-            _box3_1.max.set(p.x + 0.5 * s, p.y + 2 * s, p.z + 0.5 * s);
-        }
-        
-        const botBox = _box3_1;
-        
-        if(spatialGrid) {
-            const nearbyWalls = spatialGrid.query(botBox);
-            
-            for(const wb of nearbyWalls) {
-                if (wb.mesh.userData.isFloor) continue;
-                
-                // --- FIX: Vertical Clearance Check ---
-                // If the bot's center is higher than the box's top (minus a small step margin),
-                // we are standing ON it, not walking INTO it. Ignore collision.
-                // 0.5 is a safe margin for "step height".
-                if (this.mesh.position.y >= wb.box.max.y - 0.5) continue;
-
-                if(botBox.intersectsBox(wb.box)) {
-                     const xOverlap = Math.min(botBox.max.x - wb.box.min.x, wb.box.max.x - botBox.min.x);
-                     const zOverlap = Math.min(botBox.max.z - wb.box.min.z, wb.box.max.z - botBox.min.z);
-                     
-                     const wallX = wb.mesh.matrixWorld.elements[12];
-                     const wallZ = wb.mesh.matrixWorld.elements[14];
-                     
-                     if(xOverlap < zOverlap) {
-                         const sign = (this.mesh.position.x < wallX) ? -1 : 1;
-                         this.mesh.position.x += xOverlap * sign;
-                     } else {
-                         const sign = (this.mesh.position.z < wallZ) ? -1 : 1;
-                         this.mesh.position.z += zOverlap * sign;
-                     }
-                     
-                     // If we hit a wall while roaming, pick a new target immediately
-                     if (this.state === 'ROAM' && Math.random() > 0.1) {
-                         this.pickRoamTarget();
-                     }
-                }
-            }
-        }
-    }
-
-    onGroundSafe(groundY) {
-         return Math.abs(this.mesh.position.y - (groundY + this.type.scale)) < 0.5;
-    }
-
-    takeHit(amt) {
-        if(this.isDeadCorpse || this.state === 'CONFUSED') {
-            if(this.state === 'CONFUSED') {
-                amt *= 2;
-                if (this.health < this.maxHealth * 0.3) {
-                    this.state = 'AGGRO';
-                    this.confusedTimer = 0;
-                    this.mesh.rotation.x = 0;
-                    this.isRetreating = true;
-                    this.velocity.y = 15;
-                    this.jumps = 1;
-                }
-            }
-        }
-        amt *= this.type.dmgRed;
-        this.health -= amt;
-        this.lastDamageTime = performance.now(); 
-        this.body.material.color.setHex(0xffffff); 
-        setTimeout(() => { 
-            if(!this.isDeadCorpse && this.state !== 'CONFUSED') {
-                if (currentTheme === 2) { 
-                    this.body.material.color.setHex(0x000000);
+                    if (typeOverride) this.type = typeOverride;
+                    else this.type = BOT_TYPES.NORMAL;
                 } else {
-                    if(this.state === 'SEARCH') this.body.material.color.setHex(0xffaa00);
-                    else if(this.state === 'AGGRO') this.body.material.color.setHex(0x8b0000);
-                    else this.body.material.color.setHex(this.type.color);
-                }
-            }
-        }, 100);
-        if (this.state !== 'AGGRO' && this.state !== 'CONFUSED') {
-            this.state = 'AGGRO'; 
-            this.reactionTimer = CONFIG.botAggroDelay; 
-            this.hasAggroed = true;
-        }
-        if (this.health <= 0) {
-            addScore(1000 * this.type.scale);
-            GameStats.botKills++;
-            GameStats.checkKillMilestone();
-            spawnParticles(this.mesh.position, 0x8b0000, 20 * this.type.scale);
-            AudioSys.playHit();
-            let shouldSplit = false;
-            let nextType = BOT_TYPES.NORMAL;
-            let roll = Math.random();
-            if (this.type.name === "COLOSSUS") {
-                if (roll < 0.90) { shouldSplit = true; nextType = BOT_TYPES.TITAN; }
-            } else if (this.type.name === "TITAN") {
-                if (roll < 0.70) { shouldSplit = true; nextType = BOT_TYPES.BRUTE; }
-            } else if (this.type.name === "BRUTE") {
-                if (roll < 0.40) { shouldSplit = true; nextType = BOT_TYPES.NORMAL; }
-            }
-            if (!shouldSplit) {
-                this.isDeadCorpse = true;
-                this.corpseTimer = 3.0;
-                this.healthBarGroup.visible = false;
-                this.outline.visible = false;
-                showKillMessage("THREAT NEUTRALIZED");
-            } else {
-                const count = Math.random() > 0.5 ? 2 : 1;
-                const delays = [0.2, 0.5];
-                for(let i=0; i<count; i++) {
-                    new Enemy(this.mesh.position, nextType, 'AGGRO', delays[i], WorldManager.current);
-                }
-                showKillMessage(this.type.name + " SPLIT!");
-                this.remove();
-            }
-        }
-    }
+                    let x, z;
+                    const usedDecorations = ws ? ws.decorations : decorations;
+                    const spawnRange = ws ? ws.config.size * 0.4 : 175;
+                    let validSpawn = false;
 
-    remove() {
-        if (this.mesh.parent) {
-            this.mesh.parent.remove(this.mesh);
+                    // Try spawning near decoration
+                    if (Math.random() < 0.4 && usedDecorations.length > 0) {
+                        const dec = usedDecorations[Math.floor(Math.random() * usedDecorations.length)];
+                        const range = (dec.scale - 2) * 0.6;
+                        if (range > 2) {
+                            x = dec.visualMesh.position.x + (Math.random() - 0.5) * 2 * range;
+                            z = dec.visualMesh.position.z + (Math.random() - 0.5) * 2 * range;
+                            validSpawn = true;
+                        }
+                    }
+
+                    // Fallback random spawn
+                    if (!validSpawn) {
+                        do {
+                            x = (Math.random() - 0.5) * (spawnRange * 2);
+                            z = (Math.random() - 0.5) * (spawnRange * 2);
+                        } while (Math.abs(x) < 20 && Math.abs(z) < 20);
+                    }
+
+                    spawnY = getRandomSpawnY(x, z);
+                    if (spawnY <= -999) spawnY = 0;
+
+                    // Determine Type based on Height
+                    let r = Math.random();
+                    let type = 'NORMAL';
+                    if (spawnY > 35) {
+                        if (r < 0.4) type = 'COLOSSUS';
+                        else if (r < 0.9) type = 'TITAN';
+                        else type = 'BRUTE';
+                    } else if (spawnY > 5) {
+                        if (r < 0.05) type = 'COLOSSUS';
+                        else if (r < 0.4) type = 'TITAN';
+                        else if (r < 0.8) type = 'BRUTE';
+                        else type = 'NORMAL';
+                    } else {
+                        if (r < 0.01) type = 'COLOSSUS';
+                        else if (r < 0.05) type = 'TITAN';
+                        else if (r < 0.20) type = 'BRUTE';
+                        else type = 'NORMAL';
+                    }
+                    this.type = BOT_TYPES[type];
+                    this.mesh.position.set(x, spawnY + this.type.scale, z);
+                }
+
+                // --- Mesh Setup ---
+                const bodyMat = new THREE.MeshPhysicalMaterial({
+                    color: this.type.color,
+                    metalness: 0.1,
+                    roughness: 0.2,
+                    clearcoat: 0.5
+                });
+                this.body = new THREE.Mesh(sharedEnemyGeo, bodyMat);
+
+                if (ws && ws.config.bots > 100) this.body.castShadow = false;
+                else this.body.castShadow = true;
+
+                this.body.receiveShadow = true;
+                this.mesh.add(this.body);
+
+                this.outline = new THREE.LineSegments(sharedEnemyEdgeGeo, new THREE.LineBasicMaterial({
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: 0.3
+                }));
+                this.outline.scale.setScalar(1.02);
+                this.mesh.add(this.outline);
+
+                const eyeGeo = new THREE.SphereGeometry(0.1, 8, 8);
+                this.eyeMat = new THREE.MeshBasicMaterial({ color: this.type.eye });
+                this.eyeL = new THREE.Mesh(eyeGeo, this.eyeMat);
+                this.eyeL.position.set(-0.2, 0.5, 0.5);
+                this.eyeR = new THREE.Mesh(eyeGeo, this.eyeMat);
+                this.eyeR.position.set(0.2, 0.5, 0.5);
+                this.mesh.add(this.eyeL);
+                this.mesh.add(this.eyeR);
+                this.mesh.scale.setScalar(this.type.scale);
+
+                // --- Health Bar UI ---
+                this.healthBarGroup = new THREE.Group();
+                const barGeo = new THREE.PlaneGeometry(1.2, 0.15);
+                const barMat = new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide });
+                this.healthBar = new THREE.Mesh(barGeo, barMat);
+                this.healthBar.position.z = 0.01;
+                this.healthBarGroup.add(this.healthBar);
+                const bgGeo = new THREE.PlaneGeometry(1.3, 0.25);
+                const bgMat = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide });
+                const bg = new THREE.Mesh(bgGeo, bgMat);
+                this.healthBarGroup.add(bg);
+                const uiScale = 1 + (this.type.scale - 1) * 0.5;
+                this.healthBarGroup.scale.setScalar(uiScale);
+                this.healthBarGroup.visible = false;
+
+                if (ws) {
+                    ws.enemies.push(this);
+                    ws.group.add(this.mesh);
+                    ws.group.add(this.healthBarGroup);
+                } else {
+                    enemies.push(this);
+                    (currentWorldGroup || scene).add(this.mesh);
+                    (currentWorldGroup || scene).add(this.healthBarGroup);
+                }
+
+                // --- Stats & State ---
+                this.maxHealth = this.type.hp;
+                this.health = this.maxHealth;
+                this.velocity = new THREE.Vector3();
+                this.jumps = 0;
+                this.state = initialState;
+                this.hasAggroed = initialState === 'AGGRO';
+                this.reactionTimer = aggroDelay > 0 ? aggroDelay * 1000 : 0;
+
+                this.targetPos = new THREE.Vector3();
+                this.lastKnownPos = new THREE.Vector3();
+                this.searchTimer = 0;
+                this.pickRoamTarget();
+
+                this.lastAttack = performance.now();
+                this.actionTimer = 0;
+                this.isSprinting = false;
+                this.isSliding = false;
+                this.wasSliding = false;
+                this.isDeadCorpse = false;
+                this.corpseTimer = 0;
+                this.confusedTimer = 0;
+                this.streak = 0;
+                this.lastHitTime = 0;
+                this.lastDamageTime = 0;
+                this.isRegenerating = false;
+                this.isRetreating = false;
+                this.pendingRetreat = false;
+                this.teleportTimer = 0;
+                this.teleportDelay = 0;
+                this.personalSpeedMod = 0.8 + Math.random() * 0.4;
+                this.portalCooldown = 0;
+                this.strafeDir = Math.random() < 0.5 ? 1 : -1;
+                this.strafeTimer = 0;
+                this.dodgeTimer = 0;
+                this.dodgeReactionTimer = 0;
+                this.ledgeTimer = 0;
+                this.lastPos = new THREE.Vector2(this.mesh.position.x, this.mesh.position.z);
+                this.stamina = 10;
+                this.maxStamina = 10;
+                this.staminaRegen = 3;
+                this.visionTimer = Math.random() * 0.5;
+                this.canSeePlayerCached = false;
+
+                // LOD variables
+                this.targetRotation = this.mesh.rotation.y;
+                this.lastGroundHeight = 0;
+                this.groundCheckTimer = 0;
+                this.currentMoveSpeed = 0;
+                this.currentMoveDir = new THREE.Vector3();
+
+                this.updateTheme(currentTheme);
+            }
+
+            setHighlight(active) {
+                if (active) {
+                    this.body.material.emissive.setHex(0xff0000);
+                    this.body.material.emissiveIntensity = 1.0;
+                    this.outline.material.color.setHex(0xffffff);
+                    this.outline.material.opacity = 0.8;
+                } else {
+                    this.updateTheme(currentTheme);
+                    this.outline.scale.setScalar(1.02);
+                }
+            }
+
+            updateTheme(t) {
+                if (t === 2) {
+                    this.outline.material.color.setHex(0x00ffff);
+                    this.outline.material.opacity = 0.8;
+                    this.body.material.color.setHex(0x000000);
+                    this.body.material.emissive.setHex(0x000000);
+                    this.body.material.emissiveIntensity = 0;
+                } else {
+                    this.outline.material.color.setHex(0xffffff);
+                    this.outline.material.opacity = 0.3;
+                    this.body.material.color.setHex(this.type.color);
+                    this.body.material.emissiveIntensity = 0;
+                }
+            }
+
+            pickRoamTarget() {
+                const myGround = getGroundHeight(this.mesh.position.x, this.mesh.position.z, this.mesh.position.y);
+
+                if (myGround > -500) {
+                    for (let i = 0; i < 10; i++) {
+                        const tx = this.mesh.position.x + (Math.random() - 0.5) * 60;
+                        const tz = this.mesh.position.z + (Math.random() - 0.5) * 60;
+                        if (Math.abs(tx) > 150 || Math.abs(tz) > 150) continue;
+
+                        const tGround = getGroundHeight(tx, tz, this.mesh.position.y);
+
+                        if (Math.abs(tGround - myGround) < 3.0 && tGround > -500) {
+                            this.targetPos.set(tx, tGround, tz);
+                            return;
+                        }
+                    }
+                }
+
+                const roamRange = WorldManager.current ? WorldManager.current.config.size * 0.3 : 150;
+                this.targetPos.set(
+                    (Math.random() - 0.5) * roamRange,
+                    this.mesh.position.y,
+                    (Math.random() - 0.5) * roamRange
+                );
+            }
+
+            canSeePlayer(playerPos) {
+                if (this.isDeadCorpse || this.state === 'CONFUSED') return false;
+                return this.canSeePlayerCached;
+            }
+
+            checkVision(playerPos) {
+                if (this.isDeadCorpse || this.state === 'CONFUSED') return false;
+                _vec3_3.copy(this.mesh.position).add(new THREE.Vector3(0, 0.5, 0));
+                const distToPlayer = _vec3_3.distanceTo(playerPos);
+                _vec3_1.subVectors(playerPos, _vec3_3).normalize();
+                globalRaycaster.set(_vec3_3, _vec3_1);
+                globalRaycaster.far = 60;
+                const hits = globalRaycaster.intersectObjects(walls);
+                if (hits.length > 0 && hits[0].distance < distToPlayer) {
+                    return false;
+                }
+                return true;
+            }
+
+            performJump(forceMultiplier = 1.0) {
+                this.velocity.y = CONFIG.jumpForce * forceMultiplier;
+                this.jumps++;
+                this.mesh.position.y += 0.2; // Prevent ground stickiness
+                
+                // Visuals: Calculate feet position using shared vector (Zero Allocation)
+                _vec3_1.copy(this.mesh.position);
+                _vec3_1.y -= this.type.scale;
+                
+                // Use shared vector for "Up" direction (Zero Allocation)
+                _vec3_2.set(0, 1, 0);
+                
+                spawnRipple(_vec3_1, _vec3_2, this.type.eye);
+                
+                AudioSys.playJump(this.mesh.position);
+            }
+
+            update(dt, playerPos) {
+                const distSq = this.mesh.position.distanceToSquared(camera.position);
+
+                // --- Visual LOD ---
+                let logicInterval = 1;
+                if (distSq > 22500) logicInterval = 10;
+                else if (distSq > 2500) logicInterval = 3;
+
+                if (distSq > 22500) {
+                    this.outline.visible = false;
+                    this.healthBarGroup.visible = false;
+                    this.eyeL.visible = false;
+                    this.eyeR.visible = false;
+                } else {
+                    this.outline.visible = true;
+                    this.eyeL.visible = true;
+                    this.eyeR.visible = true;
+                    if (this.hasAggroed && !this.isDeadCorpse) this.healthBarGroup.visible = true;
+                }
+
+                // --- Logic LOD ---
+                const shouldRunLogic = (frameCounter + Math.floor(this.id * 100)) % logicInterval === 0;
+                if (shouldRunLogic) {
+                    this.updateAI(dt * logicInterval, playerPos, logicInterval);
+                }
+
+                // --- Physics LOD (Always runs) ---
+                this.updatePhysics(dt, distSq);
+            }
+
+            updateAI(dt, playerPos, intervalMultiplier) {
+                if (this.isDeadCorpse) return;
+
+                // Ground Check
+                const distMoved = Math.hypot(this.mesh.position.x - this.lastPos.x, this.mesh.position.z - this.lastPos.y);
+                const isInAir = Math.abs(this.mesh.position.y - this.lastGroundHeight) > 2.0;
+
+                if (distMoved > 1.0 || isInAir || this.groundCheckTimer <= 0) {
+                    this.lastGroundHeight = getGroundHeight(this.mesh.position.x, this.mesh.position.z, this.mesh.position.y);
+                    this.groundCheckTimer = 0.5;
+                } else {
+                    this.groundCheckTimer -= dt;
+                }
+
+                // Timers
+                this.visionTimer -= dt;
+                if (this.visionTimer <= 0) {
+                    this.canSeePlayerCached = this.checkVision(playerPos);
+                    this.visionTimer = 0.3 + Math.random() * 0.2;
+                }
+
+                if (this.reactionTimer > 0) {
+                    this.reactionTimer -= dt * 1000;
+                    this.currentMoveSpeed = 0;
+                    return;
+                }
+
+                // Stats Regen
+                const now = performance.now();
+                if (now - this.lastDamageTime > CONFIG.regenDelay && this.health < this.maxHealth) {
+                    this.health += CONFIG.regenRate * dt;
+                    if (this.health >= this.maxHealth) {
+                        this.health = this.maxHealth;
+                        this.isRetreating = false;
+                    }
+                }
+
+                if (this.stamina < this.maxStamina) {
+                    this.stamina = Math.min(this.maxStamina, this.stamina + this.staminaRegen * dt);
+                }
+
+                if (this.teleportTimer > 0) this.teleportTimer -= dt * 1000;
+                if (this.teleportDelay > 0) this.teleportDelay -= dt;
+                if (this.portalCooldown > 0) this.portalCooldown -= dt;
+                if (this.strafeTimer > 0) this.strafeTimer -= dt;
+                if (this.dodgeTimer > 0) this.dodgeTimer -= dt;
+                if (this.dodgeReactionTimer > 0) this.dodgeReactionTimer -= dt;
+                if (this.ledgeTimer > 0) this.ledgeTimer -= dt;
+
+                // Portals
+                if (this.portalCooldown <= 0) {
+                    for (let p of portals) {
+                        if (this.mesh.position.distanceTo(p.mesh.position) < 3.0) {
+                            p.teleportEntity(this.mesh.position, this.velocity);
+                            this.portalCooldown = 0.5;
+                        }
+                    }
+                }
+
+                let dest = this.targetPos;
+                let speed = (this.isSprinting ? CONFIG.botSprintSpeed : CONFIG.botSpeed) * this.type.speedMod * this.personalSpeedMod;
+                const hpPct = this.health / this.maxHealth;
+                const groundY = this.lastGroundHeight;
+
+                // --- State Machine ---
+                if (this.state === 'ROAM') {
+                    speed = CONFIG.botRoamSpeed * this.type.speedMod * this.personalSpeedMod;
+
+                    // Universal Vertical Recycling
+                    if (this.mesh.position.y < 20) {
+                        if (Math.random() < 0.002 * intervalMultiplier) {
+                            const range = WorldManager.current ? WorldManager.current.config.size * 0.4 : 150;
+                            const tx = (Math.random() - 0.5) * 2 * range;
+                            const tz = (Math.random() - 0.5) * 2 * range;
+                            const ty = getRandomSpawnY(tx, tz);
+
+                            if (ty > 50) {
+                                spawnParticles(this.mesh.position, 0x00ffff, 20);
+                                this.mesh.position.set(tx, ty + this.type.scale, tz);
+                                this.velocity.set(0, 0, 0);
+                                this.targetPos.set(tx, ty, tz);
+                                spawnParticles(this.mesh.position, 0x00ffff, 20);
+                                return;
+                            }
+                        }
+                    }
+
+                    if (this.onGroundSafe(groundY)) {
+                        const forward = new THREE.Vector3(0, 0, 1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.mesh.rotation.y);
+                        const lookAheadPos = this.mesh.position.clone().addScaledVector(forward, 2.0);
+                        const aheadHeight = getGroundHeight(lookAheadPos.x, lookAheadPos.z);
+                        if (groundY - aheadHeight > 3.0) {
+                            if (Math.random() < 0.1 * intervalMultiplier) this.pickRoamTarget();
+                        }
+                    }
+                    if (new THREE.Vector2(this.mesh.position.x - dest.x, this.mesh.position.z - dest.z).length() < 3) {
+                        this.pickRoamTarget();
+                    }
+                    if (this.onGroundSafe(groundY) && Math.random() < 0.005 * intervalMultiplier) {
+                        this.performJump(0.8); // Casual roam hop (approx 16 force)
+                    }
+                } else if (this.state === 'AGGRO') {
+                    if (this.canSeePlayer(playerPos)) {
+                        this.lastKnownPos.copy(playerPos);
+                        dest = playerPos;
+                        const dist = this.mesh.position.distanceTo(playerPos);
+
+                        // Retreat Logic
+                        if (hpPct < 0.5 && !this.isRetreating && !this.pendingRetreat) {
+                            this.pendingRetreat = true;
+                            if (this.teleportDelay <= 0) {
+                                this.teleportDelay = getBotReactionTime(this) / 1000;
+                            }
+                        }
+                        if (this.pendingRetreat && this.teleportDelay <= 0) {
+                            this.isRetreating = true;
+                            this.pendingRetreat = false;
+                        }
+                        if (this.isRetreating) {
+                            speed = CONFIG.botSprintSpeed * this.type.speedMod * this.personalSpeedMod * 1.3;
+                            this.isSprinting = true;
+
+                            const slideBase = (hpPct < 0.25) ? 0.4 : 0.05;
+                            if (!this.isSliding && Math.random() < slideBase * intervalMultiplier) this.isSliding = true;
+
+                            const retreatDir = this.mesh.position.clone().sub(playerPos).normalize();
+                            globalRaycaster.set(this.mesh.position, retreatDir);
+                            globalRaycaster.far = 5;
+                            const wallsAhead = globalRaycaster.intersectObjects(walls);
+                            if (wallsAhead.length > 0) {
+                                let escapeFound = false;
+                                const leftDir = new THREE.Vector3(-retreatDir.z, 0, retreatDir.x);
+                                const rightDir = new THREE.Vector3(retreatDir.z, 0, -retreatDir.x);
+                                globalRaycaster.set(this.mesh.position, leftDir);
+                                if (globalRaycaster.intersectObjects(walls).length === 0) {
+                                    retreatDir.copy(leftDir);
+                                    escapeFound = true;
+                                } else {
+                                    globalRaycaster.set(this.mesh.position, rightDir);
+                                    if (globalRaycaster.intersectObjects(walls).length === 0) {
+                                        retreatDir.copy(rightDir);
+                                        escapeFound = true;
+                                    }
+                                }
+                                if (!escapeFound && dist < 10) {
+                                    if (this.onGroundSafe(groundY)) {
+                                        this.performJump(1.25); // Panic jump (approx 25 force)
+                                        retreatDir.subVectors(playerPos, this.mesh.position).normalize();
+                                    }
+                                } else if (!escapeFound) {
+                                    retreatDir.set((Math.random() - 0.5), 0, (Math.random() - 0.5)).normalize();
+                                }
+                            }
+                            dest = this.mesh.position.clone().addScaledVector(retreatDir, 40);
+                            this.targetPos.copy(dest);
+                        }
+
+                        // Teleport Logic
+                        if (this.teleportTimer <= 0 && this.stamina >= 10 && this.teleportDelay <= 0) {
+                            let wantsToTp = false;
+                            if (dist < 15 && this.isRetreating) wantsToTp = true;
+                            if (dist > 25 && !this.isRetreating) wantsToTp = true;
+                            if (dist < 15 && !this.isRetreating) wantsToTp = true;
+                            if (wantsToTp && !this.teleportReactionPending) {
+                                this.teleportDelay = getBotReactionTime(this) / 1000;
+                                this.teleportReactionPending = true;
+                            }
+                            if (this.teleportDelay <= 0 && this.teleportReactionPending) {
+                                this.teleportReactionPending = false;
+                                let tpChance = 0.005;
+                                if (this.isRetreating) tpChance = 0.05;
+                                if (dist > 25) tpChance = 0.02;
+
+                                if (Math.random() < tpChance * intervalMultiplier) {
+                                    let newPos;
+                                    const minRange = 5;
+                                    const maxRange = 20;
+                                    const tpRange = minRange + (1.0 - hpPct) * (maxRange - minRange);
+                                    if (this.isRetreating) {
+                                        const escapeDir = this.mesh.position.clone().sub(playerPos).normalize();
+                                        escapeDir.x += (Math.random() - 0.5) * 0.5;
+                                        escapeDir.z += (Math.random() - 0.5) * 0.5;
+                                        escapeDir.normalize();
+                                        newPos = this.mesh.position.clone().addScaledVector(escapeDir, tpRange);
+                                    } else if (dist > 25) {
+                                        const approachDir = playerPos.clone().sub(this.mesh.position).normalize();
+                                        const travelDist = dist - 5;
+                                        if (travelDist > 5) {
+                                            newPos = this.mesh.position.clone().addScaledVector(approachDir, Math.min(travelDist, maxRange));
+                                        }
+                                    } else if (dist < 15 && !this.isRetreating) {
+                                        const offset = new THREE.Vector3((Math.random() - 0.5) * 10, 0, (Math.random() - 0.5) * 10);
+                                        newPos = this.mesh.position.clone().add(offset);
+                                    }
+                                    if (newPos) {
+                                        const tpRayDir = newPos.clone().sub(this.mesh.position).normalize();
+                                        const tpDist = newPos.distanceTo(this.mesh.position);
+                                        globalRaycaster.set(this.mesh.position, tpRayDir);
+                                        globalRaycaster.far = tpDist;
+                                        const tpHits = globalRaycaster.intersectObjects(walls);
+                                        if (tpHits.length > 0) {
+                                            newPos.copy(tpHits[0].point).addScaledVector(tpRayDir, -1.0);
+                                        }
+                                        if (getGroundHeight(newPos.x, newPos.z) > -10) {
+                                            spawnParticles(this.mesh.position, 0xff00ff, 15);
+                                            this.mesh.position.copy(newPos);
+                                            spawnParticles(this.mesh.position, 0xff00ff, 15);
+                                            AudioSys.playTeleport(this.mesh.position);
+                                            this.stamina -= 10;
+                                            this.teleportTimer = 500;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Attack Logic
+                        if (dist < 5 * this.type.scale) {
+                            const now = performance.now();
+                            if (now - this.lastAttack > CONFIG.botAttackCooldown) {
+                                this.lastAttack = now;
+                                spawnSlash(this.mesh);
+                                AudioSys.playSlash(this.mesh.position);
+                                const lungeDir = playerPos.clone().sub(this.mesh.position).normalize();
+                                lungeDir.y = 0;
+                                lungeDir.normalize();
+                                const lungeForce = 25 + (this.type.scale * 5);
+                                this.velocity.addScaledVector(lungeDir, lungeForce);
+                                const hitChance = 1.05 - (this.type.scale * 0.1);
+                                if (Math.random() < hitChance) {
+                                    if (now - this.lastHitTime > 2000) {
+                                        this.streak = 0;
+                                    }
+                                    let dmg = CONFIG.botDamage * this.type.scale;
+                                    dmg += this.streak * 2;
+                                    dmg = Math.min(dmg, 40);
+                                    this.streak++;
+                                    this.lastHitTime = now;
+                                    damagePlayer(dmg);
+                                } else {
+                                    AudioSys.playMiss();
+                                    this.streak = 0;
+                                }
+                            }
+                        }
+                    } else {
+                        dest = this.lastKnownPos;
+                        if (this.mesh.position.distanceTo(dest) < 3) {
+                            this.state = 'SEARCH';
+                            this.searchTimer = 3000;
+                            this.body.material.color.setHex(0xffaa00);
+                        }
+                    }
+                } else if (this.state === 'SEARCH') {
+                    speed = 0;
+                    this.searchTimer -= dt * 1000;
+                    if (this.canSeePlayer(playerPos)) {
+                        this.state = 'AGGRO';
+                        this.body.material.color.setHex(0x8b0000);
+                        this.reactionTimer = CONFIG.botAggroDelay;
+                    } else if (this.searchTimer <= 0) {
+                        this.state = 'ROAM';
+                        this.body.material.color.setHex(this.type.color);
+                        this.pickRoamTarget();
+                    }
+                }
+
+                this.actionTimer -= dt;
+                if (this.actionTimer <= 0) {
+                    this.actionTimer = 0.5 + Math.random() * 1.5;
+                    let sprintChance = (this.type.skill >= 2 ? 0.7 : 0.3);
+                    let slideChance = (this.type.skill >= 2 ? 0.4 : 0.1);
+                    this.isSprinting = Math.random() < sprintChance;
+
+                    const wantsToSlide = this.isSprinting && Math.random() < slideChance;
+
+                    if (wantsToSlide && !this.wasSliding) {
+                        AudioSys.playBotSlide(this.mesh.position);
+                    }
+
+                    this.isSliding = wantsToSlide;
+                    this.wasSliding = wantsToSlide;
+                }
+
+                // --- Intent Calculation ---
+                this.currentMoveSpeed = 0;
+
+                if (this.type.speedMod !== 0 && this.state !== 'SEARCH' && this.state !== 'CONFUSED') {
+                    _vec3_1.subVectors(dest, this.mesh.position);
+                    _vec3_1.y = 0;
+                    _vec3_1.normalize();
+                    _vec3_2.copy(_vec3_1);
+
+                    if (this.state === 'AGGRO' && !this.isRetreating) {
+                        _vec3_2.subVectors(playerPos, this.mesh.position);
+                        _vec3_2.y = 0;
+                        _vec3_2.normalize();
+                    }
+
+                    if (this.state === 'AGGRO' && !this.isRetreating && this.canSeePlayer(playerPos)) {
+                        const dist = this.mesh.position.distanceTo(playerPos);
+                        if (this.dodgeTimer <= 0) {
+                            const playerAim = new THREE.Vector3();
+                            camera.getWorldDirection(playerAim);
+                            playerAim.y = 0;
+                            playerAim.normalize();
+                            const toBot = this.mesh.position.clone().sub(playerPos).normalize();
+                            if (playerAim.dot(toBot) > 0.9 && player.velocity.length() > 10) {
+                                if (this.dodgeReactionTimer <= 0) {
+                                    this.dodgeReactionTimer = getBotReactionTime(this) / 1000;
+                                }
+                            }
+                        }
+                        if (this.dodgeReactionTimer > 0 && this.dodgeReactionTimer <= dt && this.dodgeTimer <= 0) {
+                            this.strafeDir *= -1;
+                            this.dodgeTimer = 1.0;
+                            this.dodgeReactionTimer = 0;
+                        }
+                        if (this.strafeTimer <= 0) {
+                            this.strafeDir *= -1;
+                            this.strafeTimer = 1.5 + Math.random() * 2.0;
+                        }
+                        const idealRange = 1.5 + (3.0 * this.type.scale);
+                        if (dist < 15 + (10 * this.type.scale)) {
+                            const orbitVec = new THREE.Vector3(-_vec3_1.z, 0, _vec3_1.x).multiplyScalar(this.strafeDir);
+                            if (dist > idealRange) {
+                                _vec3_1.addScaledVector(orbitVec, 0.8).normalize();
+                            } else if (dist < idealRange - 2) {
+                                _vec3_1.multiplyScalar(-0.5).addScaledVector(orbitVec, 1.0).normalize();
+                            } else {
+                                const attackReady = (performance.now() - this.lastAttack > CONFIG.botAttackCooldown);
+                                if (attackReady) {
+                                    _vec3_1.addScaledVector(orbitVec, 0.2).normalize();
+                                } else {
+                                    _vec3_1.multiplyScalar(0.4).addScaledVector(orbitVec, 0.8).normalize();
+                                }
+                            }
+                            const predictPos = this.mesh.position.clone().addScaledVector(_vec3_1, 2.0);
+                            if (!this.onGroundSafe(getGroundHeight(predictPos.x, predictPos.z))) {
+                                if (this.ledgeTimer <= 0) {
+                                    this.strafeDir *= -1;
+                                    this.ledgeTimer = 0.5;
+                                }
+                            }
+                        }
+                    }
+
+                    _vec3_1.normalize();
+                    if (this.isSliding) speed *= 1.5;
+
+                    // Ledge Stop
+                    if (this.state === 'ROAM' && this.onGroundSafe(groundY)) {
+                        const lookAhead = this.mesh.position.clone().addScaledVector(_vec3_1, 2.0);
+                        const nextGround = getGroundHeight(lookAhead.x, lookAhead.z);
+                        if (nextGround < groundY - 3) {
+                            speed = 0;
+                            if (this.state === 'ROAM') this.pickRoamTarget();
+                            else this.velocity.set(0, 0, 0);
+                        }
+                    }
+
+                    this.currentMoveDir.copy(_vec3_1);
+                    this.currentMoveSpeed = speed;
+
+                    let lookDir = _vec3_1;
+                    if (this.state === 'AGGRO' && !this.isRetreating) {
+                        lookDir = _vec3_2;
+                    }
+                    if (lookDir.lengthSq() > 0.1) {
+                        this.targetRotation = Math.atan2(lookDir.x, lookDir.z);
+                    }
+
+                    // Anti-Stuck Logic
+                    if (speed > 0.5) {
+                        const dx = this.mesh.position.x - this.lastPos.x;
+                        const dz = this.mesh.position.z - this.lastPos.y;
+                        const distMoved = Math.sqrt(dx * dx + dz * dz);
+
+                        if (distMoved < speed * dt * 0.1) {
+                            if (this.state === 'ROAM') {
+                                const r = Math.random();
+                                if (r < 0.3) _vec3_1.x *= -1;
+                                else if (r < 0.6) _vec3_1.z *= -1;
+                                else _vec3_1.negate();
+                                this.targetRotation = Math.atan2(_vec3_1.x, _vec3_1.z);
+                            } else if (this.state === 'AGGRO') {
+                                this.strafeDir *= -1;
+                            }
+                        }
+                    }
+                    this.lastPos.set(this.mesh.position.x, this.mesh.position.z);
+                }
+
+                if (this.isSliding) {
+                    if (currentTheme === 0 && Math.random() < 0.3 * intervalMultiplier) spawnSnowTrail(this.mesh.position);
+                }
+            }
+
+            updatePhysics(dt, distSq) {
+                // Visuals
+                if (this.state === 'AGGRO') this.eyeMat.color.setHex(0xff0000);
+                else if (this.state === 'SEARCH') this.eyeMat.color.setHex(0xffaa00);
+                else this.eyeMat.color.setHex(this.type.eye);
+
+                // Dead State
+                if (this.isDeadCorpse) {
+                    this.corpseTimer -= dt;
+                    this.mesh.rotation.x = Math.PI / 2;
+                    this.mesh.position.y = this.lastGroundHeight + 0.5;
+                    this.body.material.opacity = this.corpseTimer / 3.0;
+                    this.body.material.transparent = true;
+                    this.eyeMat.opacity = this.corpseTimer / 3.0;
+                    this.eyeMat.transparent = true;
+                    if (this.corpseTimer <= 0) {
+                        this.remove();
+                    }
+                    return;
+                }
+
+                // Confused State
+                if (this.state === 'CONFUSED') {
+                    this.confusedTimer -= dt;
+                    this.mesh.rotation.x = -Math.PI / 2;
+                    this.mesh.position.y = this.lastGroundHeight + 0.5;
+                    if (this.confusedTimer <= 0) {
+                        this.state = this.hasAggroed ? 'AGGRO' : 'ROAM';
+                        this.mesh.rotation.x = 0;
+                    }
+                    this.healthBarGroup.position.copy(this.mesh.position).add(new THREE.Vector3(0, 1.0 * this.type.scale, 0));
+                    return;
+                }
+
+                // Gravity & Ground Physics
+                const groundY = this.lastGroundHeight;
+                const floorThreshold = groundY + (1 * this.type.scale);
+
+                if (this.mesh.position.y > floorThreshold + 0.1) {
+                    this.velocity.y -= CONFIG.gravity * dt;
+
+                    // Fall Recovery Jump (Double Jump logic)
+                    let jumpChance = 0.05;
+                    if (this.isRetreating && (this.health / this.maxHealth) < 0.3) jumpChance = 0.3;
+                    if (this.velocity.y < -8 && this.jumps < 2 && Math.random() < jumpChance * dt * 60) {
+                        this.performJump(0.9); // Air recovery (approx 18 force)
+                    }
+                } else {
+                    // Fall Damage / Confused Check
+                    if (this.velocity.y < -22) {
+                        let shouldFall = true;
+                        if (this.state === 'AGGRO') {
+                            if (Math.random() < 0.9) shouldFall = false;
+                        }
+                        if (shouldFall) {
+                            this.state = 'CONFUSED';
+                            const impactSpeed = Math.abs(this.velocity.y);
+                            this.confusedTimer = 3.0 + Math.min(2.0, (impactSpeed - 22) / 5.0);
+                            this.velocity.y = 0;
+                            return;
+                        }
+                    }
+                    this.velocity.y = 0;
+                    this.mesh.position.y = floorThreshold;
+                    this.jumps = 0;
+                }
+
+                // Rotation Smoothing
+                if (this.state === 'SEARCH') {
+                    const lookTime = performance.now() * 0.002;
+                    this.mesh.rotation.y = Math.sin(lookTime) * Math.PI;
+                } else {
+                    let rotDiff = this.targetRotation - this.mesh.rotation.y;
+                    while (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
+                    while (rotDiff < -Math.PI) rotDiff += Math.PI * 2;
+                    this.mesh.rotation.y += rotDiff * dt * 8;
+                }
+
+                if (this.isSliding) this.mesh.rotation.x = 0.5;
+                else if (this.state !== 'CONFUSED') this.mesh.rotation.x = 0;
+
+                // Move Execution
+                if (this.currentMoveSpeed > 0) {
+                    this.mesh.position.addScaledVector(this.currentMoveDir, this.currentMoveSpeed * dt);
+                }
+                this.mesh.position.addScaledVector(this.velocity, dt);
+
+                // Drag
+                const drag = Math.exp(-2.0 * dt);
+                this.velocity.x *= drag;
+                this.velocity.z *= drag;
+
+                // UI Updates
+                this.healthBarGroup.position.copy(this.mesh.position).add(new THREE.Vector3(0, 1.3 * this.type.scale, 0));
+                this.healthBarGroup.lookAt(camera.position);
+                if (this.hasAggroed) {
+                    this.healthBarGroup.visible = true;
+                    this.healthBar.scale.x = Math.max(0, this.health / this.maxHealth);
+                }
+
+                // Collision Bounds & Resolution
+                const isNear = distSq < 2500;
+                if (isNear) {
+                    _box3_1.setFromObject(this.body);
+                } else {
+                    const p = this.mesh.position;
+                    const s = this.type.scale;
+                    _box3_1.min.set(p.x - 0.5 * s, p.y, p.z - 0.5 * s);
+                    _box3_1.max.set(p.x + 0.5 * s, p.y + 2 * s, p.z + 0.5 * s);
+                }
+
+                const botBox = _box3_1;
+
+                if (spatialGrid) {
+                    const nearbyWalls = spatialGrid.query(botBox);
+
+                    for (const wb of nearbyWalls) {
+                        if (wb.mesh.userData.isFloor) continue;
+                        if (this.mesh.position.y >= wb.box.max.y - 0.5) continue;
+
+                        if (botBox.intersectsBox(wb.box)) {
+                            const xOverlap = Math.min(botBox.max.x - wb.box.min.x, wb.box.max.x - botBox.min.x);
+                            const zOverlap = Math.min(botBox.max.z - wb.box.min.z, wb.box.max.z - botBox.min.z);
+
+                            const wallX = wb.mesh.matrixWorld.elements[12];
+                            const wallZ = wb.mesh.matrixWorld.elements[14];
+
+                            if (xOverlap < zOverlap) {
+                                const sign = (this.mesh.position.x < wallX) ? -1 : 1;
+                                this.mesh.position.x += xOverlap * sign;
+                            } else {
+                                const sign = (this.mesh.position.z < wallZ) ? -1 : 1;
+                                this.mesh.position.z += zOverlap * sign;
+                            }
+                        }
+                    }
+                }
+            }
+
+            onGroundSafe(groundY) {
+                return Math.abs(this.mesh.position.y - (groundY + this.type.scale)) < 0.5;
+            }
+
+            takeHit(amt) {
+                if (this.isDeadCorpse || this.state === 'CONFUSED') {
+                    if (this.state === 'CONFUSED') {
+                        amt *= 2;
+                        if (this.health < this.maxHealth * 0.3) {
+                            this.state = 'AGGRO';
+                            this.confusedTimer = 0;
+                            this.mesh.rotation.x = 0;
+                            this.isRetreating = true;
+                            this.performJump(0.75); // Stun recovery jump (approx 15 force)
+                            this.jumps = 1;
+                        }
+                    }
+                }
+                amt *= this.type.dmgRed;
+                this.health -= amt;
+                this.lastDamageTime = performance.now();
+                this.body.material.color.setHex(0xffffff);
+                setTimeout(() => {
+                    if (!this.isDeadCorpse && this.state !== 'CONFUSED') {
+                        if (currentTheme === 2) {
+                            this.body.material.color.setHex(0x000000);
+                        } else {
+                            if (this.state === 'SEARCH') this.body.material.color.setHex(0xffaa00);
+                            else if (this.state === 'AGGRO') this.body.material.color.setHex(0x8b0000);
+                            else this.body.material.color.setHex(this.type.color);
+                        }
+                    }
+                }, 100);
+                if (this.state !== 'AGGRO' && this.state !== 'CONFUSED') {
+                    this.state = 'AGGRO';
+                    this.reactionTimer = CONFIG.botAggroDelay;
+                    this.hasAggroed = true;
+                }
+                if (this.health <= 0) {
+                    addScore(1000 * this.type.scale);
+                    GameStats.botKills++;
+                    GameStats.checkKillMilestone();
+                    spawnParticles(this.mesh.position, 0x8b0000, 20 * this.type.scale);
+                    AudioSys.playHit(this.mesh.position);
+                    let shouldSplit = false;
+                    let nextType = BOT_TYPES.NORMAL;
+                    let roll = Math.random();
+                    if (this.type.name === "COLOSSUS") {
+                        if (roll < 0.90) {
+                            shouldSplit = true;
+                            nextType = BOT_TYPES.TITAN;
+                        }
+                    } else if (this.type.name === "TITAN") {
+                        if (roll < 0.70) {
+                            shouldSplit = true;
+                            nextType = BOT_TYPES.BRUTE;
+                        }
+                    } else if (this.type.name === "BRUTE") {
+                        if (roll < 0.40) {
+                            shouldSplit = true;
+                            nextType = BOT_TYPES.NORMAL;
+                        }
+                    }
+                    if (!shouldSplit) {
+                        this.isDeadCorpse = true;
+                        this.corpseTimer = 3.0;
+                        this.healthBarGroup.visible = false;
+                        this.outline.visible = false;
+                        showKillMessage("THREAT NEUTRALIZED");
+                    } else {
+                        const count = Math.random() > 0.5 ? 2 : 1;
+                        const delays = [0.2, 0.5];
+                        for (let i = 0; i < count; i++) {
+                            new Enemy(this.mesh.position, nextType, 'AGGRO', delays[i], WorldManager.current);
+                        }
+                        showKillMessage(this.type.name + " SPLIT!");
+                        this.remove();
+                    }
+                }
+            }
+
+            remove() {
+                if (this.mesh.parent) {
+                    this.mesh.parent.remove(this.mesh);
+                }
+                if (this.healthBarGroup.parent) {
+                    this.healthBarGroup.parent.remove(this.healthBarGroup);
+                }
+                const idx = enemies.indexOf(this);
+                if (idx > -1) enemies.splice(idx, 1);
+            }
         }
-        if (this.healthBarGroup.parent) {
-            this.healthBarGroup.parent.remove(this.healthBarGroup);
-        }
-        const idx = enemies.indexOf(this);
-        if(idx > -1) enemies.splice(idx, 1);
-    }
-}
         
         function damagePlayer(amt) {
             player.health -= amt;
@@ -6212,10 +6584,6 @@
             document.getElementById('score-display').innerText = "SCORE: 0";
             document.getElementById('health-fill').classList.remove('health-critical');
             document.getElementById('low-health-vignette').style.boxShadow = "inset 0 0 100px rgba(255, 0, 0, 0)";
-            
-            // Ensure we are in ARENA on reset? 
-            // The prompt says "Normal" is default, but maybe they want to restart on the current map.
-            // Let's keep current map for now.
         }
         
         function showKillMessage(text, type="", color=null) {
