@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v47.10.0</title>
+    <title>Neon Blade: Melee Arena v47.10.1</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -697,7 +697,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.10.0<br>- Complete Zero-Allocation Engine -</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.10.1<br>- Integer Spatial Partitioning -</div>
         </div>
     </div>
 
@@ -1925,14 +1925,17 @@
         class SpatialHashGrid {
             constructor(bounds, dimensions) {
                 const [x, z] = dimensions;
+                // Using a Map where keys are Numbers (Integers) is much faster for GC
                 this.cells = new Map();
                 this.cellSize = 50;
-                // MEMORY FIX: Create ONE re-usable set for the entire game session
                 this.querySet = new Set();
             }
 
+            // Zero-Allocation Key Gen: Pack X/Z into a single 32-bit integer
+            // Offset by 2000 to handle negative coordinates safely
             _getKey(x, z) {
-                return `${Math.floor(x / this.cellSize)}:${Math.floor(z / this.cellSize)}`;
+                return ((Math.floor(x / this.cellSize) + 2000) << 16) | 
+                       (Math.floor(z / this.cellSize) + 2000);
             }
 
             insert(mesh, box) {
@@ -1940,10 +1943,14 @@
                 const maxX = Math.floor(box.max.x / this.cellSize);
                 const minZ = Math.floor(box.min.z / this.cellSize);
                 const maxZ = Math.floor(box.max.z / this.cellSize);
+                
                 const entry = { mesh, box };
+                
                 for (let x = minX; x <= maxX; x++) {
                     for (let z = minZ; z <= maxZ; z++) {
-                        const key = `${x}:${z}`;
+                        // Create Number Key
+                        const key = ((x + 2000) << 16) | (z + 2000);
+                        
                         if (!this.cells.has(key)) this.cells.set(key, []);
                         this.cells.get(key).push(entry);
                     }
@@ -1951,7 +1958,6 @@
             }
 
             query(box, targetSet) {
-                // Use the passed set, or default to the class-wide set
                 const set = targetSet || this.querySet;
                 set.clear();
                 
@@ -1962,7 +1968,9 @@
                 
                 for (let x = minX; x <= maxX; x++) {
                     for (let z = minZ; z <= maxZ; z++) {
-                        const key = `${x}:${z}`;
+                        // Create Number Key
+                        const key = ((x + 2000) << 16) | (z + 2000);
+                        
                         const cell = this.cells.get(key);
                         if (cell) {
                             for (let i = 0; i < cell.length; i++) {
