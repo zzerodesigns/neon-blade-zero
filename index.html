@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v47.9.8</title>
+    <title>Neon Blade: Melee Arena v47.9.9</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -697,7 +697,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.9.8<br>- To the Moon -</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.9.9<br>- Zero-Allocation Physics -</div>
         </div>
     </div>
 
@@ -1882,6 +1882,21 @@
         const _groundVec2 = new THREE.Vector3();
         const _groundSet = new Set();
 
+        // --- ZERO-ALLOCATION MATH SCRATCHPAD ---
+        const _UP = new THREE.Vector3(0, 1, 0);
+        const _ZERO = new THREE.Vector3(0, 0, 0);
+        
+        // Player Physics Scratchpad
+        const _pFwd = new THREE.Vector3();
+        const _pRight = new THREE.Vector3();
+        const _pInput = new THREE.Vector3();
+        const _pTemp = new THREE.Vector3();
+
+        // AI Scratchpad
+        const _aiFwd = new THREE.Vector3();
+        const _aiDir = new THREE.Vector3();
+        const _aiTemp = new THREE.Vector3();
+
         const materials = {};
         const textures = {};
         
@@ -2860,24 +2875,31 @@
                 const isMoving = (keys.w || keys.a || keys.s || keys.d);
                 this.isSprinting = keys.shift && this.energy > 0 && isMoving && !this.isCrouching;
 
-                // --- 1. Calculate View Vectors for Tilt Logic ---
-                const forward = new THREE.Vector3();
-                camera.getWorldDirection(forward);
-                forward.y = 0; forward.normalize();
+                // --- 1. Zero-Allocation Direction Logic ---
+                // Reset scratch vectors
+                _pFwd.set(0, 0, 0);
+                _pRight.set(0, 0, 0);
+                _pInput.set(0, 0, 0);
+
+                // Calculate Forward (Flat Y)
+                camera.getWorldDirection(_pFwd);
+                _pFwd.y = 0; 
+                _pFwd.normalize();
                 
-                // Calculate Player's "Right" vector for wall side detection
-                const camRight = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0));
-                // -----------------------------------------------
+                // Calculate Right
+                _pRight.crossVectors(_pFwd, _UP).normalize();
+                
+                // Calculate Player's "Right" vector for wall side detection (Tilt Logic)
+                // We use _pTemp to store this so we don't mess up movement math
+                _pTemp.crossVectors(_pFwd, _UP); 
 
-                const right = new THREE.Vector3();
-                right.crossVectors(forward, new THREE.Vector3(0, 1, 0)).normalize();
-
-                const inputDir = new THREE.Vector3();
-                if (keys.w) inputDir.add(forward);
-                if (keys.s) inputDir.sub(forward);
-                if (keys.a) inputDir.sub(right);
-                if (keys.d) inputDir.add(right);
-                if (inputDir.length() > 0) inputDir.normalize();
+                // Accumulate Input
+                if (keys.w) _pInput.add(_pFwd);
+                if (keys.s) _pInput.sub(_pFwd);
+                if (keys.a) _pInput.sub(_pRight);
+                if (keys.d) _pInput.add(_pRight);
+                
+                if (_pInput.lengthSq() > 0) _pInput.normalize();
                 
                 let targetSpeed = CONFIG.baseSpeed;
                 if (this.isCrouching) targetSpeed = CONFIG.crouchSpeed;
@@ -2898,8 +2920,8 @@
                     }
                 }
 
-                if (inputDir.length() > 0) {
-                    this.velocity.addScaledVector(inputDir, targetSpeed * drive * dt);
+                if (_pInput.lengthSq() > 0) {
+                    this.velocity.addScaledVector(_pInput, targetSpeed * drive * dt);
                 }
 
                 const damping = Math.exp(-friction * dt);
@@ -2916,8 +2938,6 @@
                             const overlapX = Math.min(this.playerBox.max.x - wall.box.min.x, wall.box.max.x - this.playerBox.min.x);
                             const overlapZ = Math.min(this.playerBox.max.z - wall.box.min.z, wall.box.max.z - this.playerBox.min.z);
                             
-                            // FIX: Added (overlapY < overlapX && overlapY < overlapZ)
-                            // This prevents the Y-solver from "claiming" a collision if you are actually hitting the side of a tall object.
                             if (overlapX > 0 && overlapZ > 0 && overlapY < overlapX && overlapY < overlapZ) {
                                 if (this.velocity.y < 0) {
                                     if (this.playerBox.min.y < wall.box.max.y && this.playerBox.min.y > wall.box.min.y) {
@@ -2926,6 +2946,7 @@
                                         this.onGround = true; 
                                     }
                                 } else if (this.velocity.y > 0) {
+                                    // Hit Ceiling (with Epsilon Fix)
                                     if (this.playerBox.max.y > wall.box.min.y && this.playerBox.max.y < wall.box.max.y) {
                                         camera.position.y -= (overlapY + 0.001);
                                         this.velocity.y = -0.1;
@@ -2957,7 +2978,6 @@
                             const overlapY = Math.min(this.playerBox.max.y - wall.box.min.y, wall.box.max.y - this.playerBox.min.y);
                             const overlapZ = Math.min(this.playerBox.max.z - wall.box.min.z, wall.box.max.z - this.playerBox.min.z);
                             
-                            // FIX: Added (overlapX < overlapZ) to ensure we don't resolve X when hitting a Z-face
                             if (overlapY > 0.1 && overlapZ > 0 && overlapX < overlapZ) {
                                 const wallCenterX = (wall.box.min.x + wall.box.max.x) / 2;
                                 if (camera.position.x < wallCenterX) camera.position.x -= overlapX;
@@ -2969,7 +2989,8 @@
                                 if (!this.onGround && InputManager.keys.c) {
                                     this.isWallSliding = true;
                                     const normalX = (camera.position.x < wallCenterX) ? -1 : 1; 
-                                    const dot = camRight.x * normalX;
+                                    // Use stored _pTemp (camRight)
+                                    const dot = _pTemp.x * normalX;
                                     this.wallSlideTilt = (dot > 0) ? -wallTiltAmount : wallTiltAmount;
                                 }
                             }
@@ -2988,7 +3009,6 @@
                             const overlapY = Math.min(this.playerBox.max.y - wall.box.min.y, wall.box.max.y - this.playerBox.min.y);
                             const overlapZ = Math.min(this.playerBox.max.z - wall.box.min.z, wall.box.max.z - this.playerBox.min.z);
                             
-                            // FIX: Added (overlapZ < overlapX) to ensure we don't resolve Z when hitting an X-face
                             if (overlapY > 0.1 && overlapX > 0 && overlapZ < overlapX) {
                                 const wallCenterZ = (wall.box.min.z + wall.box.max.z) / 2;
                                 if (camera.position.z < wallCenterZ) camera.position.z -= overlapZ;
@@ -3000,7 +3020,8 @@
                                 if (!this.onGround && InputManager.keys.c) {
                                     this.isWallSliding = true;
                                     const normalZ = (camera.position.z < wallCenterZ) ? -1 : 1;
-                                    const dot = camRight.z * normalZ;
+                                    // Use stored _pTemp (camRight)
+                                    const dot = _pTemp.z * normalZ;
                                     this.wallSlideTilt = (dot > 0) ? -wallTiltAmount : wallTiltAmount;
                                 }
                             }
