@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v47.9.7</title>
+    <title>Neon Blade: Melee Arena v47.9.8</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -697,7 +697,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.9.7<br>- To the Moon -</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.9.8<br>- To the Moon -</div>
         </div>
     </div>
 
@@ -1977,6 +1977,7 @@
                 this.savedProjectiles = [];
                 this.savedLockState = { active: false, pos: null };
                 this.hasEntered = false;
+                this.moonBox = null;
             }
         }
 
@@ -2192,21 +2193,15 @@
                 // --- PHYSICS COLLIDER (Transparent Box) ---
                 const colliderSize = moonRadius; 
                 const colliderGeo = new THREE.BoxGeometry(colliderSize, colliderSize, colliderSize);
-                const colliderMat = new THREE.MeshBasicMaterial({ 
-                    color: 0xffffff, 
-                    transparent: true, 
-                    opacity: 0 
-                });
+                const colliderMat = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0 });
                 const collider = new THREE.Mesh(colliderGeo, colliderMat);
                 
-                collider.frustumCulled = false; 
-                collider.onBeforeRender = function(renderer, scene, camera) {
-                    const isNear = camera.position.distanceTo(this.position) < (moonRadius);
-                    this.material.opacity = isNear ? 0.3 : 0;
-                };
-
                 collider.position.copy(moonPos);
                 ws.group.add(collider);
+                ws.moonBox = collider; // NEW: Save reference to the WorldState
+                
+                // Register Collider with Physics
+                collider.updateMatrixWorld(true);
                 
                 // Register Collider with Physics
                 collider.updateMatrixWorld(true);
@@ -6712,6 +6707,15 @@
                 }
                 
                 player.update(dt);
+
+                // NEW: Smooth Moon Visibility Logic
+                const currentWorld = WorldManager.current;
+                if (currentWorld && currentWorld.moonBox) {
+                    const dist = camera.position.distanceTo(currentWorld.moonBox.position);
+                    // Radius is 60, check within 80.
+                    currentWorld.moonBox.material.opacity = (dist < 80) ? 0.3 : 0;
+                }
+
                 updateWeather(dt);
                 
                 for(let p of portals) p.update(dt);
