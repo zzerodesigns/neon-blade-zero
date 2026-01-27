@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v47.9.6</title>
+    <title>Neon Blade: Melee Arena v47.9.7</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -697,7 +697,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.9.6<br>- Optimization, Physics Stability & Dynamic Milestoness -</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.9.7<br>- To the Moon -</div>
         </div>
     </div>
 
@@ -2149,37 +2149,90 @@
             },
 
             buildBase: function(ws) {
-                const size = ws.config.size;
+                const cfg = ws.config;
+                const size = cfg.size;
                 const hSize = size / 2;
                 const wallThick = 10;
                 const offset = hSize + (wallThick / 2);
 
-                // Floor
+                // --- MOON CONFIG ---
+                const moonRadius = 60;
+                const moonDist = (size * 0.6) + 200; 
+                const moonDir = new THREE.Vector3(80, 120, 80).normalize();
+                const moonPos = moonDir.clone().multiplyScalar(moonDist);
+
+                // --- VISUAL MESH (No Physics) ---
+                const moonGeo = new THREE.SphereGeometry(moonRadius, 32, 32);
+                const moonMat = new THREE.MeshBasicMaterial({ 
+                    color: 0xffffff,
+                    fog: false,
+                    depthWrite: false 
+                });
+                const moon = new THREE.Mesh(moonGeo, moonMat);
+                moon.position.copy(moonPos);
+                moon.renderOrder = -1; 
+                ws.group.add(moon);
+
+                // --- GLOW ---
+                if (textures.glow) {
+                    const glowMat = new THREE.SpriteMaterial({ 
+                        map: textures.glow, 
+                        color: 0xffffee,
+                        fog: false, 
+                        transparent: true, 
+                        opacity: 0.25, 
+                        blending: THREE.AdditiveBlending, 
+                        depthWrite: false
+                    });
+                    const glow = new THREE.Sprite(glowMat);
+                    glow.scale.set(moonRadius * 6, moonRadius * 6, 1);
+                    moon.add(glow); 
+                }
+                
+                // --- PHYSICS COLLIDER (Transparent Box) ---
+                const colliderSize = moonRadius; 
+                const colliderGeo = new THREE.BoxGeometry(colliderSize, colliderSize, colliderSize);
+                const colliderMat = new THREE.MeshBasicMaterial({ 
+                    color: 0xffffff, 
+                    transparent: true, 
+                    opacity: 0 
+                });
+                const collider = new THREE.Mesh(colliderGeo, colliderMat);
+                
+                collider.frustumCulled = false; 
+                collider.onBeforeRender = function(renderer, scene, camera) {
+                    const isNear = camera.position.distanceTo(this.position) < (moonRadius);
+                    this.material.opacity = isNear ? 0.3 : 0;
+                };
+
+                collider.position.copy(moonPos);
+                ws.group.add(collider);
+                
+                // Register Collider with Physics
+                collider.updateMatrixWorld(true);
+                collider.geometry.computeBoundingBox();
+                const colliderBox = collider.geometry.boundingBox.clone().applyMatrix4(collider.matrixWorld);
+
+                ws.spatialGrid.insert(collider, colliderBox);
+                ws.worldObjects.push(collider);
+                ws.groundObjects.push(collider);
+                ws.walls.push(collider);
+
+                // --- FLOOR & PERIMETER ---
                 this.createBox(0, -1, 0, size, 2, size, materials.floor, true, false, ws, true, -1);
 
-                // --- Wall Generation ---
                 if (ws.name === 'TITAN') {
-                    // TITAN: 5-Stack Ring Structure with Gaps
-                    const baseHeight = 100; // Doubled from 50
-                    const gapHeight = 100;  // Gap equal to wall height
+                    const baseHeight = 100;
+                    const gapHeight = 100;
                     const layers = 5;
-
                     for (let i = 0; i < layers; i++) {
-                        // Calculate Y position for this ring
-                        // Layer 0: Y=50 (Center of 100-high block sitting on floor)
-                        // Layer 1: Y=50 + 100 + 100 = 250
                         const yPos = (baseHeight / 2) + (i * (baseHeight + gapHeight));
-                        
-                        // Create 4 walls for this ring
                         this.createBox(0, yPos, -offset, size, baseHeight, wallThick, materials.wall, false, true, ws, true, -1);
                         this.createBox(0, yPos, offset, size, baseHeight, wallThick, materials.wall, false, true, ws, true, -1);
                         this.createBox(-offset, yPos, 0, wallThick, baseHeight, size, materials.wall, false, true, ws, true, -1);
                         this.createBox(offset, yPos, 0, wallThick, baseHeight, size, materials.wall, false, true, ws, true, -1);
                     }
                 } else {
-                    // STANDARD (Arena / Maze): Single continuous wall
-                    // Original height 50, center 25 (sitting on floor) -> visual top 50
-                    // Actually, original code used center 50, height 100. Let's stick to that for standard maps.
                     this.createBox(0, 50, -offset, size, 100, wallThick, materials.wall, false, true, ws, true, -1);
                     this.createBox(0, 50, offset, size, 100, wallThick, materials.wall, false, true, ws, true, -1);
                     this.createBox(-offset, 50, 0, wallThick, 100, size, materials.wall, false, true, ws, true, -1);
