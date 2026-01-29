@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v47.10.1</title>
+    <title>Neon Blade: Melee Arena v47.10.2</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -697,7 +697,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.10.1<br>- Integer Spatial Partitioning -</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v47.10.2<br>- Hybrid Object Pooling -</div>
         </div>
     </div>
 
@@ -1903,6 +1903,44 @@
         const _tempA = new THREE.Vector3();
         const _tempB = new THREE.Vector3();
 
+        // --- HYBRID OBJECT POOLS ---
+        const _particlePool = [];
+        let _particleIdx = 0;
+        const _ripplePool = [];
+        let _rippleIdx = 0;
+        const _slashPool = [];
+        let _slashIdx = 0;
+
+        function initObjectPools() {
+            // Particle Pool: 800 sprites for sparks, smoke, and explosions
+            const baseSpriteMat = new THREE.SpriteMaterial({ map: textures.glow, transparent: true, depthWrite: false });
+            for(let i=0; i<800; i++) {
+                const mesh = new THREE.Sprite(baseSpriteMat.clone());
+                mesh.visible = false;
+                scene.add(mesh);
+                _particlePool.push({
+                    mesh: mesh, active: false, life: 0, maxLife: 1, targetOpacity: 1.0,
+                    velocity: new THREE.Vector3(), gravity: 0, scaleStart: 1, scaleEnd: 0, type: 'spark'
+                });
+            }
+            // Ripple Pool: 50 rings for ground impacts and jumps
+            const rippleGeo = new THREE.RingGeometry(0.5, 1.0, 32);
+            const baseRippleMat = new THREE.MeshBasicMaterial({ transparent: true, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending });
+            for(let i=0; i<50; i++) {
+                const mesh = new THREE.Mesh(rippleGeo, baseRippleMat.clone());
+                mesh.visible = false;
+                scene.add(mesh);
+                _ripplePool.push({ mesh: mesh, active: false, life: 0, maxLife: 1 });
+            }
+            // Slash Pool: 20 melee shapes
+            const baseSlashMat = materials.slash.clone();
+            for(let i=0; i<20; i++) {
+                const mesh = new THREE.Mesh(slashGeometry, baseSlashMat.clone());
+                mesh.visible = false;
+                _slashPool.push({ mesh: mesh, active: false, fadeSpeed: 0.15, isHit: false });
+            }
+        }
+
         const materials = {};
         const textures = {};
         
@@ -2852,7 +2890,7 @@
                 // Recalculate speed AFTER potential slide boost for Audio
                 speed = new THREE.Vector2(this.velocity.x, this.velocity.z).length();
 
-                if (this.isSliding && currentTheme === 0) {
+                if (this.isSliding) {
                     if (Math.random() < 0.3) spawnSnowTrail(camera.position);
                     if (Math.random() < 0.5) spawnSnowKickup(camera.position);
                 }
@@ -3407,190 +3445,80 @@
             update(dt) {
                 if (!this.active) return;
                 this.life -= dt;
-                
-                if (this.life < 1.0) {
-                     this.wire.material.opacity = Math.random() > 0.5 ? 0.8 : 0.2;
-                }
-
-                if (this.life <= 0) {
-                    this.explode();
-                    return;
-                }
-                
+                if (this.life < 1.0) this.wire.material.opacity = Math.random() > 0.5 ? 0.8 : 0.2;
+                if (this.life <= 0) { this.explode(); return; }
                 if (this.portalCooldown > 0) this.portalCooldown -= dt;
-
                 if (this.stuckTo) {
-                    if (this.stuckTo.isDeadCorpse || this.stuckTo.health <= 0) {
-                         this.stuckTo = null; 
-                    } else {
-                         if(this.stuckTo.mesh) {
-                            // Zero-Alloc: Use copy/add instead of new objects
-                            this.mesh.position.copy(this.stuckTo.mesh.position).add(this.stuckOffset);
-                         }
-                    }
+                    if (this.stuckTo.isDeadCorpse || this.stuckTo.health <= 0) this.stuckTo = null;
+                    else if(this.stuckTo.mesh) this.mesh.position.copy(this.stuckTo.mesh.position).add(this.stuckOffset);
                     return; 
                 }
-
                 this.velocity.y -= CONFIG.gravity * dt;
-                
-                // Zero-Alloc: Calculate next position without cloning
                 _projPos.copy(this.mesh.position).addScaledVector(this.velocity, dt);
-                
                 if (this.portalCooldown <= 0) {
-                     for(let p of portals) {
-                         if(_projPos.distanceTo(p.mesh.position) < 2.0) {
-                             p.teleportEntity(_projPos, this.velocity);
-                             this.mesh.position.copy(_projPos);
-                             this.portalCooldown = 0.5;
-                             return; 
-                         }
-                     }
+                    for(let p of portals) {
+                        if(_projPos.distanceTo(p.mesh.position) < 2.0) {
+                            p.teleportEntity(_projPos, this.velocity);
+                            this.mesh.position.copy(_projPos);
+                            this.portalCooldown = 0.5;
+                            return; 
+                        }
+                    }
                 }
-                
-                // Zero-Alloc: Raycast Direction
                 _projDir.subVectors(_projPos, this.mesh.position);
                 const dist = _projDir.length();
-                
                 if (dist > 0.001) {
                     _projDir.normalize();
                     globalRaycaster.set(this.mesh.position, _projDir);
                     globalRaycaster.far = dist;
-                    
                     const hits = globalRaycaster.intersectObjects(worldObjects);
-                    
                     let enemyHit = null;
                     for(let e of enemies) {
-                         if (!e.isDeadCorpse && e.mesh.position.distanceTo(_projPos) < e.type.scale + 0.5) {
-                             enemyHit = e;
-                             break;
-                         }
+                        if (!e.isDeadCorpse && e.mesh.position.distanceTo(_projPos) < e.type.scale + 0.5) {
+                            enemyHit = e; break;
+                        }
                     }
-
                     if (enemyHit) {
-                         if (this.type === 'IMPULSE') {
-                             this.active = false; this.explode(); return;
-                         }
-                         if (this.type === 'VOID') {
-                             this.stuckTo = enemyHit;
-                             this.stuckOffset = new THREE.Vector3(0, 1, 0); 
-                             return;
-                         }
-                         if (this.type === 'FRAG') {
-                             this.velocity.negate().multiplyScalar(0.4);
-                         }
+                        if (this.type === 'IMPULSE') { this.active = false; this.explode(); return; }
+                        if (this.type === 'VOID') { this.stuckTo = enemyHit; this.stuckOffset = new THREE.Vector3(0, 1, 0); return; }
+                        if (this.type === 'FRAG') this.velocity.negate().multiplyScalar(0.4);
                     }
-
                     if (hits.length > 0) {
-                         if (this.type === 'IMPULSE') {
-                             this.active = false; this.explode(); return;
-                         }
-                         if (this.type === 'VOID') {
-                             this.active = false; 
-                             this.mesh.position.copy(hits[0].point);
-                             this.velocity.set(0,0,0);
-                             this.active = true; 
-                             this.stuckTo = { mesh: { position: hits[0].point }, isDeadCorpse: false, health: 1 };
-                             this.stuckOffset = new THREE.Vector3(0,0,0);
-                             return;
-                         }
+                        if (this.type === 'IMPULSE') { this.active = false; this.explode(); return; }
+                        if (this.type === 'VOID') {
+                            this.active = false; this.mesh.position.copy(hits[0].point); this.velocity.set(0,0,0);
+                            this.active = true; this.stuckTo = { mesh: { position: hits[0].point }, isDeadCorpse: false, health: 1 };
+                            this.stuckOffset = new THREE.Vector3(0,0,0); return;
+                        }
                         if (this.type === 'FRAG') {
                             const n = hits[0].face.normal;
                             this.velocity.reflect(n).multiplyScalar(0.5); 
-                            if (n.y > 0.5) { 
-                                this.velocity.x *= 0.6; 
-                                this.velocity.z *= 0.6;
-                                if (this.velocity.y < 0.5) this.velocity.y = 0;
-                            }
+                            if (n.y > 0.5) { this.velocity.x *= 0.6; this.velocity.z *= 0.6; if (this.velocity.y < 0.5) this.velocity.y = 0; }
                             this.mesh.position.copy(hits[0].point).addScaledVector(n, 0.2);
                         }
-                    } else {
-                         this.mesh.position.copy(_projPos);
-                    }
-                } else {
-                     this.mesh.position.copy(_projPos);
-                }
+                    } else this.mesh.position.copy(_projPos);
+                } else this.mesh.position.copy(_projPos);
 
                 this.mesh.rotation.x += dt * 10;
                 this.mesh.rotation.z += dt * 10;
 
-                // [Particle logic remains here, omitted for brevity as it was unchanged]
-                // ... (Keep existing trail logic) ...
-                if (this.type === 'VOID') {
-                    if (Math.random() < 0.4) { 
-                        const mat = new THREE.SpriteMaterial({ 
-                            map: textures.glow, 
-                            color: 0x110022, 
-                            transparent: true, 
-                            opacity: 0.6,
-                            blending: THREE.NormalBlending, 
-                            depthWrite: false
-                        });
-                        const s = 0.5 + Math.random() * 0.3;
-                        const m = new THREE.Sprite(mat);
-                        m.scale.set(s, s, s);
-                        m.position.copy(this.mesh.position);
-                        scene.add(m);
-                        
-                        particles.push({
-                            mesh: m, 
-                            vel: new THREE.Vector3(0, 0.5, 0), 
-                            life: 0.5, 
-                            maxLife: 0.5, 
-                            type: 'static' 
-                        });
+                // Pooled trail updates
+                if (Math.random() < (this.type === 'VOID' ? 0.4 : this.type === 'FRAG' ? 0.3 : 0.2)) {
+                    const p = _particlePool[_particleIdx];
+                    _particleIdx = (_particleIdx + 1) % 800;
+                    p.active = true; p.type = 'static';
+                    p.mesh.visible = true; p.mesh.position.copy(this.mesh.position);
+                    if (this.type === 'VOID') {
+                        p.life = 0.5; p.maxLife = 0.5; p.targetOpacity = 0.6; p.velocity.set(0, 0.5, 0);
+                        p.mesh.material.color.setHex(0x110022); p.mesh.material.blending = THREE.NormalBlending;
+                    } else if (this.type === 'FRAG') {
+                        p.life = 0.4; p.maxLife = 0.4; p.targetOpacity = 0.4; p.velocity.set(0, 0.5, 0);
+                        p.mesh.material.color.setHex(0x664422); p.mesh.material.blending = THREE.NormalBlending;
+                    } else {
+                        p.life = 0.3; p.maxLife = 0.3; p.targetOpacity = 0.3; p.velocity.set(0, 0, 0);
+                        p.mesh.material.color.setHex(0x00ffff); p.mesh.material.blending = THREE.AdditiveBlending;
                     }
-                }
-
-                // FRAG: Smoke Trail
-                if (this.type === 'FRAG' && Math.random() < 0.3) {
-                    const mat = new THREE.SpriteMaterial({ 
-                        map: textures.glow, 
-                        color: 0x664422, 
-                        transparent: true, 
-                        opacity: 0.4,
-                        blending: THREE.NormalBlending,
-                        depthWrite: false
-                    });
-                    const s = 0.3 + Math.random() * 0.2;
-                    const m = new THREE.Sprite(mat);
-                    m.renderOrder = 0;
-                    m.scale.set(s, s, s);
-                    m.position.copy(this.mesh.position);
-                    scene.add(m);
-                    
-                    particles.push({
-                        mesh: m, 
-                        vel: new THREE.Vector3(0, 0.5, 0), 
-                        life: 0.4, 
-                        maxLife: 0.4, 
-                        type: 'static' 
-                    });
-                }
-
-                // IMPULSE: Clean Energy Trail
-                if (this.type === 'IMPULSE' && Math.random() < 0.2) {
-                    const mat = new THREE.SpriteMaterial({ 
-                        map: textures.glow, 
-                        color: 0x00ffff, 
-                        transparent: true, 
-                        opacity: 0.3,
-                        blending: THREE.AdditiveBlending,
-                        depthWrite: false
-                    });
-                    const s = 0.2 + Math.random() * 0.2;
-                    const m = new THREE.Sprite(mat);
-                    m.renderOrder = 0;
-                    m.scale.set(s, s, s);
-                    m.position.copy(this.mesh.position);
-                    scene.add(m);
-                    
-                    particles.push({
-                        mesh: m, 
-                        vel: new THREE.Vector3(0, 0, 0), 
-                        life: 0.3, 
-                        maxLife: 0.3, 
-                        type: 'static' 
-                    });
+                    p.mesh.scale.setScalar(0.2 + Math.random() * 0.3);
                 }
             }
             
@@ -3667,55 +3595,31 @@
             }
 
             spawnExplosion(pos, range) {
-                // 1. Initial Flash (Redder, Bigger)
                 spawnImpact(pos, 0xff4400, 5.0); 
+                for(let i=0; i<16; i++) {
+                    const p = _particlePool[_particleIdx];
+                    _particleIdx = (_particleIdx + 1) % 800;
+                    p.active = true; 
+                    p.type = 'static'; 
+                    p.life = 0.6 + Math.random() * 0.4; 
+                    p.maxLife = 1.0; 
+                    p.targetOpacity = 0.6; // Original value
 
-                // 2. Fire Clouds (Volumetric & Red)
-                // Increased count (12 -> 16), Opacity (0.4 -> 0.6), and Size
-                const cloudCount = 16;
-                for(let i=0; i<cloudCount; i++) {
-                    const mat = new THREE.SpriteMaterial({ 
-                        map: textures.glow, 
-                        // Shift colors to Deep Red / Bright Red-Orange
-                        color: Math.random() > 0.5 ? 0xff2200 : 0x880000, 
-                        transparent: true, 
-                        opacity: 0.6, 
-                        blending: THREE.AdditiveBlending,
-                        depthWrite: false 
-                    });
+                    p.mesh.visible = true;
+                    p.mesh.material.color.setHex(Math.random() > 0.5 ? 0xff2200 : 0x880000);
+                    p.mesh.material.blending = THREE.AdditiveBlending; 
+                    p.mesh.material.opacity = 0.6;
                     
-                    const sprite = new THREE.Sprite(mat);
-                    sprite.renderOrder = 0;
-                    
-                    // Massive scale up for volume
                     const s = range * (1.0 + Math.random() * 1.0);
-                    sprite.scale.set(s, s, s);
-                    
-                    const offset = new THREE.Vector3(
-                        (Math.random()-0.5), (Math.random()-0.5), (Math.random()-0.5)
-                    ).normalize().multiplyScalar(Math.random() * range * 0.6);
-                    sprite.position.copy(pos).add(offset);
-                    
-                    scene.add(sprite);
-                    
-                    particles.push({
-                        mesh: sprite,
-                        vel: offset.normalize().multiplyScalar(0.8).add(new THREE.Vector3(0, 3.0, 0)), 
-                        life: 0.6 + Math.random() * 0.4, 
-                        maxLife: 1.0,
-                        type: 'static'
-                    });
+                    p.mesh.scale.set(s, s, s);
+                    _tempA.set(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize().multiplyScalar(Math.random() * range * 0.6);
+                    p.mesh.position.copy(pos).add(_tempA);
+                    p.velocity.copy(_tempA).normalize().multiplyScalar(0.8).add(new THREE.Vector3(0, 3.0, 0));
                 }
-
-                // 3. Shrapnel (Heavier & Redder)
-                // Fast Orange-Red Sparks (Count 40, Size 4.0)
                 spawnParticles(pos, 0xff6600, 40, 4.0, 4.0); 
-                // Heavy Dark Red Chunks (Count 30, Size 6.0)
                 spawnParticles(pos, 0xaa0000, 30, 2.0, 6.0); 
-
-                // 4. Ground Char
-                spawnRipple(pos, new THREE.Vector3(0,1,0), 0x000000); 
-                spawnRipple(pos, new THREE.Vector3(0,1,0), 0xff2200); 
+                spawnRipple(pos, _UP, 0x000000); 
+                spawnRipple(pos, _UP, 0xff2200); 
             }
 
             spawnImplosion(pos, range, color) {
@@ -4403,6 +4307,7 @@
             
             createSlashEffect(); 
             createTeleportMarker();
+            initObjectPools(); // Pre-allocate memory pools
             InputManager.init();
             player.init();
             Minimap.init();
@@ -5003,37 +4908,6 @@
             }
         }
 
-        function spawnSnowTrail(pos) {
-            const mat = new THREE.SpriteMaterial({ map: textures.glow, color: 0xffffff, transparent: true, opacity: 0.8 }); // Prominent snow
-            const mesh = new THREE.Sprite(mat);
-            mesh.scale.set(0.8, 0.8, 0.8);
-            mesh.position.copy(pos);
-            mesh.position.y = getGroundHeight(pos.x, pos.z) + 0.1;
-            scene.add(mesh);
-            particles.push({
-                mesh: mesh,
-                vel: new THREE.Vector3(0,0,0),
-                life: 1.5, 
-                isStatic: true
-            });
-        }
-
-        function spawnSnowKickup(pos) {
-            for(let i=0; i<3; i++) {
-                const mat = new THREE.SpriteMaterial({ map: textures.glow, color: 0xffffff, transparent: true, opacity: 0.8 });
-                const mesh = new THREE.Sprite(mat);
-                mesh.scale.set(0.3, 0.3, 0.3);
-                mesh.position.copy(pos).add(new THREE.Vector3((Math.random()-0.5), 0.1, (Math.random()-0.5)));
-                const vel = new THREE.Vector3(
-                    (Math.random()-0.5) * 2, 
-                    1 + Math.random() * 3, 
-                    (Math.random()-0.5) * 2
-                );
-                scene.add(mesh);
-                particles.push({ mesh: mesh, vel: vel, life: 0.5, isStatic: false });
-            }
-        }
-
         function createSlashEffect() {
             const shape = new THREE.Shape();
             shape.moveTo(0, 1.2);
@@ -5044,153 +4918,124 @@
         }
 
         function spawnSlash(parent) {
-            const mat = materials.slash.clone();
-            mat.color.setHex(currentSlashColor);
-            
-            const mesh = new THREE.Mesh(slashGeometry, mat);
-            mesh.material.transparent = true;
-            mesh.material.opacity = 1;
-            mesh.material.depthTest = false; 
-            mesh.material.depthWrite = false;
-            mesh.renderOrder = 999; 
-            mesh.userData.fadeSpeed = 0.15; 
-            mesh.userData.isHit = false;
-
-            let mySlashID = -1;
-
+            const s = _slashPool[_slashIdx];
+            _slashIdx = (_slashIdx + 1) % 20;
+            s.active = true; s.isHit = false; s.fadeSpeed = 0.15;
+            s.mesh.material.color.setHex(currentSlashColor);
+            s.mesh.material.opacity = 1;
+            s.mesh.visible = true;
+            s.mesh.scale.set(1, 1, 1);
             if(parent === camera) {
-                mesh.position.set(0.05, 0.05, -2.0); 
-                mesh.rotation.z = -Math.PI / 8; 
-                camera.add(mesh);
-                
-                mySlashID = ++lastSlashID;
+                s.mesh.position.set(0.05, 0.05, -2.0);
+                s.mesh.rotation.set(0, 0, -Math.PI / 8);
+                camera.add(s.mesh);
                 slashActive = true;
                 document.getElementById('crosshair').style.opacity = 0;
             } else {
-                mesh.position.set(0, 1.5, 1.0);
-                mesh.lookAt(camera.position);
-                mesh.rotation.z = Math.PI / 2; 
-                parent.add(mesh);
+                s.mesh.position.set(0, 1.5, 1.0);
+                s.mesh.lookAt(camera.position);
+                parent.add(s.mesh);
             }
-            
-            let progress = 0;
-            function animateSlash() {
-                progress += mesh.userData.fadeSpeed;
-                if (progress < 1) {
-                    mesh.material.opacity = 1 - progress;
-                    requestAnimationFrame(animateSlash);
-                } else {
-                    mesh.visible = false;
-                    if(parent === camera) {
-                        camera.remove(mesh);
-                        if(mySlashID === lastSlashID) {
-                            slashActive = false;
-                        }
-                    }
-                    else parent.remove(mesh);
-                    mesh.geometry.dispose();
-                    mesh.material.dispose();
-                }
-            }
-            animateSlash();
-            return mesh;
+            return s.mesh;
         }
 
-        function spawnImpact(pos, color=0xffffff, scale=1.0) {
-            // Core White Flash
-            const matCore = new THREE.SpriteMaterial({ 
-                map: textures.glow, 
-                color: 0xffffff, 
-                transparent: true, 
-                blending: THREE.AdditiveBlending,
-                depthWrite: false
-            });
-            const core = new THREE.Sprite(matCore);
-            core.renderOrder = 0; 
-            core.position.copy(pos);
-            core.scale.setScalar(scale);
-            scene.add(core);
-            particles.push({ mesh: core, life: 0.1, maxLife: 0.1, type: 'flash', scaleStart: scale, scaleEnd: scale * 0.5 });
+        function spawnSnowTrail(pos) {
+            const p = _particlePool[_particleIdx];
+            _particleIdx = (_particleIdx + 1) % 800;
 
-            // Colored Outer Glow
-            const matGlow = new THREE.SpriteMaterial({ 
-                map: textures.glow, 
-                color: color, 
-                transparent: true, 
-                blending: THREE.AdditiveBlending, 
-                opacity: 0.8,
-                depthWrite: false
-            });
-            const glow = new THREE.Sprite(matGlow);
-            glow.renderOrder = 0;
-            glow.position.copy(pos);
-            glow.scale.setScalar(scale * 2);
-            scene.add(glow);
-            particles.push({ mesh: glow, life: 0.25, maxLife: 0.25, type: 'flash', scaleStart: scale * 2, scaleEnd: scale * 4 });
+            p.active = true; 
+            p.type = 'snow-trail'; 
+            p.life = 1.5;
+            p.maxLife = 1.5;
+            p.velocity.set(0,0,0);
+
+            p.mesh.visible = true;
+            // Relative Position: Camera height (~1.6) - 1.25 = 0.35 offset from feet
+            p.mesh.position.set(pos.x, pos.y - 1.25, pos.z);
+
+            // Apply movement delay (Match the kickup's lag)
+            p.mesh.position.addScaledVector(player.velocity, -0.05);
+            
+            p.mesh.material.color.setHex(0xffffff);
+            p.mesh.material.opacity = 0.8;
+            p.mesh.material.blending = THREE.NormalBlending;
+            p.mesh.scale.set(0.8, 0.8, 0.8);
+        }
+
+        function spawnSnowKickup(pos) {
+            for(let i=0; i<3; i++) {
+                const p = _particlePool[_particleIdx];
+                _particleIdx = (_particleIdx + 1) % 800;
+
+                p.active = true;
+                p.type = 'static'; 
+                p.life = 0.5;
+                p.maxLife = 0.5;
+                p.targetOpacity = 0.8;
+
+                p.mesh.visible = true;
+                p.mesh.material.color.setHex(0xffffff);
+                p.mesh.material.opacity = 0.8;
+                p.mesh.material.blending = THREE.NormalBlending;
+                
+                _tempA.set((Math.random()-0.5), -1.45, (Math.random()-0.5));
+                p.mesh.position.copy(pos).add(_tempA);
+                
+                // NATURAL TRAIL: Subtract 5% of velocity from the position
+                // This simulates a "delay" by spawning it slightly where you JUST were.
+                p.mesh.position.addScaledVector(player.velocity, -0.05);
+                
+                p.velocity.set((Math.random()-0.5)*2, 1+Math.random()*3, (Math.random()-0.5)*2);
+                p.mesh.scale.set(0.3, 0.3, 0.3);
+            }
         }
 
         function spawnParticles(pos, col, count, speed=1.0, sizeMod=1.0) {
             for(let i=0; i<count; i++) {
-                const mat = new THREE.SpriteMaterial({ 
-                    map: textures.glow, 
-                    color: col, 
-                    transparent: true, 
-                    blending: THREE.AdditiveBlending,
-                    depthWrite: false
-                });
-                const m = new THREE.Sprite(mat);
-                m.renderOrder = 0;
-                
-                // Apply sizeMod
+                const p = _particlePool[_particleIdx];
+                _particleIdx = (_particleIdx + 1) % 800;
+                p.active = true; p.type = 'spark'; p.gravity = 15;
+                p.life = 0.4 + Math.random() * 0.3; p.maxLife = p.life;
+                p.mesh.visible = true; p.mesh.position.copy(pos);
+                p.mesh.material.color.setHex(col);
+                p.mesh.material.opacity = 1.0;
+                p.mesh.material.blending = THREE.AdditiveBlending;
                 const s = (0.2 + Math.random() * 0.3) * sizeMod;
-                m.scale.set(s, s, s);
-                m.position.copy(pos);
-                scene.add(m);
-                
-                const vel = new THREE.Vector3(
-                    (Math.random()-0.5), 
-                    (Math.random()-0.5), 
-                    (Math.random()-0.5)
-                ).normalize().multiplyScalar((5 + Math.random() * 10) * speed);
-
-                particles.push({
-                    mesh: m, 
-                    vel: vel,
-                    life: 0.4 + Math.random() * 0.3,
-                    type: 'spark',
-                    gravity: 15
-                });
+                p.mesh.scale.set(s, s, s);
+                p.velocity.set(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize().multiplyScalar((5 + Math.random() * 10) * speed);
             }
         }
 
+        function spawnImpact(pos, color=0xffffff, scale=1.0) {
+            const configs = [{s: scale, l: 0.1, c: 0xffffff, e: scale * 0.5}, {s: scale * 2, l: 0.25, c: color, e: scale * 4}];
+            configs.forEach(conf => {
+                const p = _particlePool[_particleIdx];
+                _particleIdx = (_particleIdx + 1) % 800;
+                p.active = true; p.type = 'flash'; p.life = conf.l; p.maxLife = conf.l;
+                p.scaleStart = conf.s; p.scaleEnd = conf.e;
+                p.mesh.visible = true; p.mesh.position.copy(pos);
+                p.mesh.material.color.setHex(conf.c);
+                p.mesh.material.opacity = 1.0;
+                p.mesh.material.blending = THREE.AdditiveBlending;
+                p.mesh.scale.setScalar(conf.s);
+            });
+        }
+
         function spawnRipple(pos, normal, baseColor=0x00ffff) {
-            const layers = 3;
             const colorObj = new THREE.Color(baseColor);
-            
-            for(let i=0; i<layers; i++) {
-                let layerColor = colorObj.clone();
-                if(i===1) layerColor.lerp(new THREE.Color(0xffffff), 0.6); 
-                if(i===2) layerColor.lerp(new THREE.Color(0x000088), 0.4); 
-                
-                const geo = new THREE.RingGeometry(0.5, 0.8 + (i*0.1), 32); 
-                const mat = new THREE.MeshBasicMaterial({ 
-                    color: layerColor, 
-                    transparent: true, 
-                    opacity: 0.8, 
-                    side: THREE.DoubleSide, 
-                    depthWrite: false,
-                    blending: THREE.AdditiveBlending
-                });
-                
-                const mesh = new THREE.Mesh(geo, mat);
-                mesh.renderOrder = 2;
-                mesh.position.copy(pos).addScaledVector(normal, 0.05 + (i * 0.2)); 
-                mesh.lookAt(pos.clone().add(normal)); 
-                
-                scene.add(mesh);
-                particles.push({
-                    mesh: mesh, vel: new THREE.Vector3(0,0,0), life: 0.8, maxLife: 0.8, isStatic: false, type: 'ripple'
-                });
+            for(let i=0; i<3; i++) {
+                const r = _ripplePool[_rippleIdx];
+                _rippleIdx = (_rippleIdx + 1) % 50;
+                r.active = true; r.life = 0.8; r.maxLife = 0.8;
+                r.mesh.visible = true;
+                // RESTORE: Original geometry variance simulated via scale offset
+                r.scaleOffset = 0.8 + (i * 0.1); 
+                r.mesh.material.opacity = 0.8;
+                r.mesh.material.color.copy(colorObj);
+                if(i===1) r.mesh.material.color.lerp(new THREE.Color(0xffffff), 0.6);
+                if(i===2) r.mesh.material.color.lerp(new THREE.Color(0x000088), 0.4);
+                r.mesh.position.copy(pos).addScaledVector(normal, 0.05 + (i * 0.2));
+                r.mesh.lookAt(pos.clone().add(normal));
             }
         }
 
@@ -6730,78 +6575,113 @@
             }
             
             if (isLocked && !player.isDead) {
-                // Determine spawn cap based on world
                 const cap = WorldManager.current ? WorldManager.current.config.bots : 60;
                 
                 if (Math.random() < 0.05 && enemies.length < cap) {
                     new Enemy(null, null, 'ROAM', 0, WorldManager.current);
                 }
                 
+                // Logic Phase
                 player.update(dt);
 
-                // NEW: Smooth Moon Visibility Logic
                 const currentWorld = WorldManager.current;
                 if (currentWorld && currentWorld.moonBox) {
                     const dist = camera.position.distanceTo(currentWorld.moonBox.position);
-                    // Radius is 60, check within 80.
                     currentWorld.moonBox.material.opacity = (dist < 80) ? 0.3 : 0;
                 }
 
                 updateWeather(dt);
-                
                 for(let p of portals) p.update(dt);
                 
                 for (let i = projectiles.length - 1; i >= 0; i--) {
                     projectiles[i].update(dt);
-                    if (!projectiles[i].active) {
-                        projectiles.splice(i, 1);
-                    }
+                    if (!projectiles[i].active) projectiles.splice(i, 1);
                 }
                 
-                // Optimized Enemy Updates with Logic LOD (Level of Detail)
                 const playerPos = camera.position;
                 for (let i = enemies.length - 1; i >= 0; i--) {
-                    // Just call update. The class now handles skipping logic vs physics internally.
-                    // We pass the raw dt, not the multiplied version.
                     enemies[i].update(dt, playerPos);
                 }
 
-                for (let i = particles.length - 1; i >= 0; i--) {
-                    const p = particles[i];
+                // --- VISUAL POOL UPDATES ---
+                // 1. Particles (Sparks, Smoke, Clouds)
+                for (let i = 0; i < 800; i++) {
+                    const p = _particlePool[i];
+                    if (!p.active) continue;
+
                     p.life -= dt;
+                    if (p.life <= 0) {
+                        p.active = false;
+                        p.mesh.visible = false;
+                        continue;
+                    }
+
                     if (p.type === 'flash') {
                         const progress = 1.0 - (p.life / p.maxLife); 
                         p.mesh.material.opacity = 1.0 - progress;
-                        const s = THREE.MathUtils.lerp(p.scaleStart, p.scaleEnd, progress);
-                        p.mesh.scale.setScalar(s);
+                        p.mesh.scale.setScalar(THREE.MathUtils.lerp(p.scaleStart, p.scaleEnd, progress));
                     } 
                     else if (p.type === 'spark') {
-                        p.vel.y -= p.gravity * dt; 
-                        p.mesh.position.addScaledVector(p.vel, dt);
-                        p.mesh.scale.setScalar(p.life * 1.5); 
+                        p.velocity.y -= p.gravity * dt; 
+                        p.mesh.position.addScaledVector(p.velocity, dt);
+                        // RESTORE: Original v47.10.1 scaling
+                        p.mesh.scale.setScalar(p.life * 2.0); 
                     }
-                    else if (p.isStatic) {
+                    else if (p.type === 'static') {
+                         p.mesh.position.addScaledVector(p.velocity, dt);
+                         p.mesh.scale.setScalar(p.life * 2); 
+                         p.mesh.material.opacity = p.targetOpacity || 1.0; 
+                    } 
+                    else if (p.type === 'snow-trail') {
                          p.mesh.material.opacity = p.life * 0.4; 
                     } 
-                    else if (p.type === 'ripple') {
-                        const progress = 1.0 - (p.life / p.maxLife);
-                        const ease = 1 - Math.pow(1 - progress, 3); 
-                        const scale = 1 + (ease * 1);
-                        p.mesh.scale.setScalar(scale);
-                        p.mesh.material.opacity = (1.0 - ease) * 0.1;
-                    } 
-                    else {
-                         p.mesh.position.addScaledVector(p.vel, dt);
-                         p.mesh.scale.setScalar(p.life * 2); 
+                }
+
+                // 2. Ripples (Impact Rings)
+                for (let i = 0; i < 50; i++) {
+                    const r = _ripplePool[i];
+                    if (!r.active) continue;
+
+                    r.life -= dt;
+                    if (r.life <= 0) {
+                        r.active = false;
+                        r.mesh.visible = false;
+                        continue;
                     }
-                    if (p.life <= 0) {
-                        scene.remove(p.mesh);
-                        p.mesh.geometry.dispose();
-                        p.mesh.material.dispose();
-                        particles.splice(i, 1);
+
+                    const progress = 1.0 - (r.life / r.maxLife);
+                    const ease = 1 - Math.pow(1 - progress, 3); 
+                    // RESTORE: Original layered scale math
+                    const finalScale = (1 + ease) * (r.scaleOffset || 1.0);
+                    r.mesh.scale.setScalar(finalScale);
+                    r.mesh.material.opacity = (1.0 - ease) * 0.1;
+                }
+
+                // 3. Slashes (Melee FX)
+                let isSlashActive = false;
+                for (let i = 0; i < 20; i++) {
+                    const s = _slashPool[i];
+                    if (!s.active) continue;
+
+                    // FIX: Scale fade by dt to make it frame-rate independent and slower
+                    // 2.5 is the tuned multiplier to match the original 'feel'
+                    s.mesh.material.opacity -= s.fadeSpeed * dt * 30;
+                    
+                    if (s.isHit) s.mesh.scale.multiplyScalar(1.05);
+
+                    if (s.mesh.material.opacity <= 0) {
+                        s.active = false;
+                        s.mesh.visible = false;
+                        if (s.mesh.parent) s.mesh.parent.remove(s.mesh);
+                    } else {
+                        if (s.mesh.parent === camera) isSlashActive = true;
                     }
                 }
+                slashActive = isSlashActive;
+
                 
+
+                // UI & State Phase
                 if (comboCount > 0) {
                     comboTimer -= dt;
                     if (comboTimer <= 0) {
