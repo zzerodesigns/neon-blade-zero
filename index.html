@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v48.0.0</title>
+    <title>Neon Blade: Melee Arena v48.0.1</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -714,7 +714,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.0.0<br>- Experimental Hybrid Physics & Narrative UI -</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.0.1<br>- Fix Render Order Regression -</div>
         </div>
     </div>
 
@@ -2443,7 +2443,9 @@
                 ws.walls.push(collider);
 
                 // --- FLOOR & PERIMETER ---
-                this.createBox(0, -1, 0, size, 2, size, materials.floor, true, false, ws, true, -1);
+                // FIX: Added 'null' for rotation argument to restore correct argument alignment
+                // Signature: createBox(x, y, z, w, h, d, mat, isFloor, isWall, ws, rotation, disableCull, customOrder)
+                this.createBox(0, -1, 0, size, 2, size, materials.floor, true, false, ws, null, true, -1);
 
                 if (ws.name === 'TITAN') {
                     const baseHeight = 100;
@@ -2451,16 +2453,16 @@
                     const layers = 5;
                     for (let i = 0; i < layers; i++) {
                         const yPos = (baseHeight / 2) + (i * (baseHeight + gapHeight));
-                        this.createBox(0, yPos, -offset, size, baseHeight, wallThick, materials.wall, false, true, ws, true, -1);
-                        this.createBox(0, yPos, offset, size, baseHeight, wallThick, materials.wall, false, true, ws, true, -1);
-                        this.createBox(-offset, yPos, 0, wallThick, baseHeight, size, materials.wall, false, true, ws, true, -1);
-                        this.createBox(offset, yPos, 0, wallThick, baseHeight, size, materials.wall, false, true, ws, true, -1);
+                        this.createBox(0, yPos, -offset, size, baseHeight, wallThick, materials.wall, false, true, ws, null, true, -1);
+                        this.createBox(0, yPos, offset, size, baseHeight, wallThick, materials.wall, false, true, ws, null, true, -1);
+                        this.createBox(-offset, yPos, 0, wallThick, baseHeight, size, materials.wall, false, true, ws, null, true, -1);
+                        this.createBox(offset, yPos, 0, wallThick, baseHeight, size, materials.wall, false, true, ws, null, true, -1);
                     }
                 } else {
-                    this.createBox(0, 50, -offset, size, 100, wallThick, materials.wall, false, true, ws, true, -1);
-                    this.createBox(0, 50, offset, size, 100, wallThick, materials.wall, false, true, ws, true, -1);
-                    this.createBox(-offset, 50, 0, wallThick, 100, size, materials.wall, false, true, ws, true, -1);
-                    this.createBox(offset, 50, 0, wallThick, 100, size, materials.wall, false, true, ws, true, -1);
+                    this.createBox(0, 50, -offset, size, 100, wallThick, materials.wall, false, true, ws, null, true, -1);
+                    this.createBox(0, 50, offset, size, 100, wallThick, materials.wall, false, true, ws, null, true, -1);
+                    this.createBox(-offset, 50, 0, wallThick, 100, size, materials.wall, false, true, ws, null, true, -1);
+                    this.createBox(offset, 50, 0, wallThick, 100, size, materials.wall, false, true, ws, null, true, -1);
                 }
             },
 
