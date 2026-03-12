@@ -1,10 +1,28 @@
 
+<!--
+    ===========================================================================
+    ==                  NEON BLADE: SINGLE-FILE ARCHITECTURE                   ==
+    ===========================================================================
+    
+    ATTENTION FUTURE DEVELOPERS: 
+    This project is intentionally designed as a SINGLE-FILE application. 
+    Everything (HTML, CSS, JS, Shaders, Game Logic) lives inside this `index.html` file. 
+    It has NO external dependencies other than Three.js (loaded via CDN) and Google Fonts.
+    It is designed to be able to run completely offline if those assets are cached.
+    
+    DO NOT create separate .js, .css, or .tsx files.
+    DO NOT add npm packages or modify the build system unless absolutely necessary for the environment.
+    
+    For a detailed breakdown of the engine's core systems and how they interact, 
+    please refer to the `architecture.md` file located in the root directory.
+    ===========================================================================
+-->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v48.0.1</title>
+    <title>Neon Blade: Melee Arena v48.1.0</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -92,7 +110,7 @@
             border: 1px solid rgba(0, 0, 0, 0.3); /* Dark Border */
             padding: 2px 10px;
             transform: skewX(-15deg);
-            display: none;
+            display: block;
             backdrop-filter: blur(2px);
             box-shadow: 0 0 5px rgba(255,255,255,0.1);
         }
@@ -249,9 +267,23 @@
             padding: 12px 24px; font-size: 1rem; background: transparent; 
             border: 1px solid #555; color: #888; pointer-events: auto;
             font-family: 'Segoe UI', sans-serif; font-weight: bold; text-transform: uppercase;
-            transition: 0.2s; cursor: pointer;
+            transition: all 0.3s ease; cursor: pointer;
+            border-radius: 12px;
+            position: relative; overflow: hidden;
+            z-index: 1;
         }
-        .btn-secondary:hover { border-color: #fff; color: #fff; background: rgba(255,255,255,0.1); }
+        .btn-secondary::before {
+            content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            transition: left 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+            z-index: -1;
+        }
+        .btn-secondary:hover::before { left: 0; }
+        .btn-secondary:hover { 
+            border-color: rgba(255, 255, 255, 0.5); 
+            color: #fff; 
+            box-shadow: 0 0 15px rgba(255, 255, 255, 0.2); 
+        }
 
         #stats-container {
             margin-top: 10px; width: 100%; display: flex;
@@ -400,41 +432,44 @@
         }
 
         /* --- SETTINGS & UI SPARKS (Refined v5) --- */
-        #settings-btn { padding: 15px; min-width: 60px; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; }
+        #settings-btn { padding: 15px; min-width: 60px; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
         
         #settings-modal {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 600px; /* Wider */
-            background: rgba(5, 10, 15, 0.98); 
-            border: 1px solid #334455;
+            width: 560px; /* Square-ish */
+            background: rgba(5, 10, 15, 0.6); 
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 16px;
             padding: 50px; 
             display: none; 
             flex-direction: column; 
             z-index: 20; 
-            box-shadow: 0 0 100px rgba(0,0,0,1);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6);
         }
         
         #settings-modal h2 { 
-            margin: 0 0 50px 0; 
+            margin: 0 0 40px 0; 
             color: #33ccff; 
-            font-family: 'Segoe UI', sans-serif; 
+            font-family: 'Arial Black', sans-serif; 
             font-weight: 800;
             text-transform: uppercase; 
-            letter-spacing: 4px; 
-            font-size: 1.8rem;
+            letter-spacing: -1px; 
+            font-size: 2.2rem;
             text-align: center; 
-            border-bottom: 2px solid #334455; 
-            padding-bottom: 20px; 
-            text-shadow: 0 0 20px rgba(51, 204, 255, 0.2);
+            padding-bottom: 0; 
+            text-shadow: 0 0 20px rgba(0,255,255,0.4);
         }
         
         /* Sliders - More Breathing Room */
-        .slider-group { display: flex; flex-direction: column; gap: 40px; margin-bottom: 50px; }
+        .slider-group { display: flex; flex-direction: column; gap: 35px; margin-bottom: 45px; }
         .slider-row { display: flex; flex-direction: column; gap: 15px; }
         
         .setting-label { 
-            color: #8899aa; font-weight: 700; font-family: 'Segoe UI', sans-serif; 
-            text-transform: uppercase; letter-spacing: 1px; font-size: 0.85rem; 
+            color: #8899aa; font-weight: 600; font-family: 'Segoe UI', sans-serif; 
+            text-transform: uppercase; letter-spacing: 1.5px; font-size: 0.75rem; 
+            text-shadow: 0 2px 4px rgba(0,0,0,0.8);
         }
 
         /* Range Slider */
@@ -455,21 +490,18 @@
         .switch-container {
             display: grid; 
             grid-template-columns: 1fr 1fr 1fr 1fr; 
-            gap: 20px;
-            border-top: 1px solid #334455; 
-            padding-top: 40px;
+            gap: 15px;
+            padding-top: 10px;
             justify-items: center; /* Horizontally center grid items */
         }
 
         /* Tilt Slider */
         #tilt-slider-row {
-            display: none; /* Hidden by default */
+            display: flex;
             flex-direction: column;
             gap: 15px;
-            border-top: 1px solid #334455; /* Separator line */
-            padding-top: 40px;
+            padding-top: 0;
             margin-top: 40px; 
-            align-items: center;
         }
         
         /* Centered Switch Wrapper */
@@ -479,6 +511,12 @@
             align-items: center; /* Center content */
             gap: 15px; 
             width: 100%;
+        }
+        .switch-wrapper .setting-label {
+            font-family: 'Arial Black', sans-serif;
+            font-weight: 800;
+            font-size: 0.8rem;
+            letter-spacing: 1px;
         }
         
         /* Refined Pill Switch */
@@ -502,10 +540,11 @@
 
         /* Close Button */
         .close-btn { 
-            align-self: center; cursor: pointer; color: #556677; 
+            align-self: center; cursor: pointer; color: #8899aa; 
             font-weight: 700; font-size: 0.9rem; letter-spacing: 2px;
             transition: 0.3s; margin-top: 40px; padding: 12px 50px;
             border: 1px solid transparent; text-transform: uppercase;
+            border-radius: 12px;
         }
         .close-btn:hover { color: #fff; border-color: #33ccff; background: rgba(51, 204, 255, 0.1); box-shadow: 0 0 20px rgba(51,204,255,0.2); }
 
@@ -515,11 +554,12 @@
             background: rgba(255, 255, 255, 0.1);
             backdrop-filter: blur(20px) saturate(180%);
             -webkit-backdrop-filter: blur(20px) saturate(180%);
-            border: 1px solid rgba(255, 255, 255, 0.18);
+            border: 1px solid rgba(255, 255, 255, 0.15);
             border-radius: 4px; padding: 15px 40px;
             color: #fff; font-family: 'Segoe UI', sans-serif; font-weight: 400; font-size: 1.2rem;
             letter-spacing: 1px; line-height: 1.4; text-align: center;
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            text-shadow: 0 0 20px rgba(0,0,0,0.15), 0 0 40px rgba(0,0,0,0.1);
             pointer-events: none; opacity: 0; transition: opacity 0.5s;
             z-index: 8;
         }
@@ -647,7 +687,7 @@
             <div class="btn-row" style="margin-top: 10px; gap: 15px;">
                 <button class="btn-secondary" id="tp-mode-btn">TP MODE: AIM</button>
                 <button class="btn-secondary" id="theme-btn">THEME: LIGHT</button>
-                <button class="btn-secondary" id="world-btn">WORLD: ARENA</button>
+                <button class="btn-secondary" id="map-btn">MAP: ARENA</button>
                 <button class="btn-secondary" id="settings-btn" title="Settings">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.43-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
@@ -675,7 +715,7 @@
                     <div class="switch-wrapper">
                         <span class="setting-label">Show FPS</span>
                         <label class="cyber-switch">
-                            <input type="checkbox" id="set-fps">
+                            <input type="checkbox" id="set-fps" checked>
                             <span class="slider-track"></span>
                         </label>
                     </div>
@@ -683,7 +723,7 @@
                     <div class="switch-wrapper">
                         <span class="setting-label">Wall Tilt</span>
                         <label class="cyber-switch">
-                            <input type="checkbox" id="set-tilt">
+                            <input type="checkbox" id="set-tilt" checked>
                             <span class="slider-track"></span>
                         </label>
                     </div>
@@ -714,7 +754,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.0.1<br>- Fix Render Order Regression -</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.1.0<br>- Map Refactor & Gym Polish -</div>
         </div>
     </div>
 
@@ -1008,6 +1048,11 @@
                             if(isLocked && !player.isDead) player.beginAim('IMPULSE'); 
                         }
                         break;
+                    case 'g':
+                        if (MapManager.current && MapManager.current.name !== 'GYM') {
+                            MapManager.switch('GYM');
+                        }
+                        break;
                     case 't': if(!e.repeat) toggleTheme(); break;
                     case 'm': Minimap.toggle(); break;
                 }
@@ -1050,7 +1095,7 @@
                 { time: 3.0, text: "PHYSICS ENGINE: <b style='color:#00ffff'>OBB HYBRID</b>", duration: 3.0 },
                 { time: 7.0, text: "TESTING <i>ROTATED</i> GEOMETRY", duration: 4.0 },
                 { time: 13.0, text: "Current map: <b>GYM</b><br><i>(Experimental)</i>", duration: 4.0 },
-                { time: 18.0, text: "Press 'ESC'<br>then click <b>WORLD</b><br><br><span style='font-size:0.8em; opacity:0.7'>to switch to <b>ARENA</b></span>", duration: 7.0 }
+                { time: 18.0, text: "Press 'ESC'<br>then click <b>MAP</b><br><br><span style='font-size:0.8em; opacity:0.7'>to switch to <b>ARENA</b></span>", duration: 7.0 }
             ],
             'ARENA': [
                 { time: 3.0, text: "WELCOME TO THE <b>ARENA</b>" }
@@ -1933,10 +1978,10 @@
         const windTarget = new THREE.Vector3();
         const currentWind = new THREE.Vector3();
         
-        let showFPS = false;
+        let showFPS = true;
         let fpsFrames = 0;
         let lastFpsTime = 0;
-        let enableWallTilt = false;
+        let enableWallTilt = true;
         let wallTiltAmount = 0.45;
         let sharedSnowGeo = null;
         let sharedLeafGeo = null;
@@ -2021,14 +2066,14 @@
         
         // --- MULTI-WORLD ARCHITECTURE (v47.0) ---
         // Entities are now pointers to active world arrays
-        let worldObjects = []; 
+        let mapObjects = []; 
         let groundObjects = []; 
         let walls = [];        
         let enemies = [];
         let decorations = [];
         let portals = [];
         let spatialGrid = null;
-        let currentWorldGroup = null;
+        let currentMapGroup = null;
 
         // Transient effects (Projectiles, Particles) remain global but are cleared on swap
         const particles = [];
@@ -2177,13 +2222,13 @@
             }
         }
         
-        class WorldState {
+        class MapState {
             constructor(name, config) {
                 this.name = name;
                 this.config = config;
                 this.initialized = false;
                 
-                this.worldObjects = [];
+                this.mapObjects = [];
                 this.groundObjects = [];
                 this.walls = [];
                 this.enemies = [];
@@ -2204,41 +2249,41 @@
             }
         }
 
-        const WorldManager = {
-            worlds: {},
+        const MapManager = {
+            maps: {},
             current: null,
             
             init: function() {
                 // --- 1. Standard Arenas ---
-                this.worlds['ARENA'] = new WorldState('ARENA', { 
+                this.maps['ARENA'] = new MapState('ARENA', { 
                     type: 'OPEN', size: 400, bots: 60, scale: 1, fog: 0.004, far: 1000, useShadows: true 
                 });
-                this.worlds['TITAN'] = new WorldState('TITAN', { 
+                this.maps['TITAN'] = new MapState('TITAN', { 
                     type: 'OPEN', size: 2000, bots: 300, scale: 3, fog: 0.001, far: 4000, useShadows: false 
                 });
-                this.worlds['GYM'] = new WorldState('GYM', {
+                this.maps['GYM'] = new MapState('GYM', {
                     type: 'GYM', size: 400, bots: 0, scale: 1, fog: 0.004, far: 1000, useShadows: true
                 });
 
                 // --- 2. New Maze Worlds ---
                 // MAZE: Tight, claustrophobic, smaller map
-                this.worlds['MAZE'] = new WorldState('MAZE', { 
+                this.maps['MAZE'] = new MapState('MAZE', { 
                     type: 'MAZE', size: 400, bots: 50, scale: 1, fog: 0.0125, far: 800, useShadows: true,
                     mazeCellSize: 30, mazeWallHeight: 18 
                 });
                 
                 // LABYRINTH: Massive scale, slightly wider corridors
-                this.worlds['LABYRINTH'] = new WorldState('LABYRINTH', { 
+                this.maps['LABYRINTH'] = new MapState('LABYRINTH', { 
                     type: 'MAZE', size: 1200, bots: 150, scale: 2, fog: 0.005, far: 2000, useShadows: false,
                     mazeCellSize: 60, mazeWallHeight: 40
                 });
 
                 // Add all groups to scene
-                for (let key in this.worlds) scene.add(this.worlds[key].group);
+                for (let key in this.maps) scene.add(this.maps[key].group);
             },
             
             switch: function(name) {
-                const next = this.worlds[name];
+                const next = this.maps[name];
                 if (!next || next === this.current) return;
                 
                 // 1. Save State of Current World
@@ -2278,10 +2323,10 @@
                 this.current = next;
                 NarrativeSys.loadLevel(name);
                 dirLight.castShadow = next.config.useShadows;
-                currentWorldGroup = next.group;
+                currentMapGroup = next.group;
                 
                 // Update Global Pointers
-                worldObjects = next.worldObjects;
+                mapObjects = next.mapObjects;
                 groundObjects = next.groundObjects;
                 walls = next.walls;
                 enemies = next.enemies;
@@ -2299,8 +2344,14 @@
                 next.group.visible = true;
                 
                 // Restore Player Physics
-                if (!next.hasEntered && next.config.type === 'MAZE') {
-                    camera.position.set(0, 60, 0);
+                if (!next.hasEntered) {
+                    if (next.config.type === 'MAZE') {
+                        camera.position.set(0, 60, 0);
+                    } else if (next.config.type === 'GYM') {
+                        camera.position.set(0, 30, 0);
+                    } else {
+                        camera.position.set(0, 2, 0);
+                    }
                     camera.rotation.set(0, 0, 0);
                     player.velocity.set(0, 0, 0);
                 } else {
@@ -2353,33 +2404,33 @@
                 
                 applyTheme(); 
                 
-                document.getElementById('world-btn').innerText = "WORLD: " + name;
+                document.getElementById('map-btn').innerText = "MAP: " + name;
             }
         };
 
         const LevelBuilder = {
-            build: function(worldState) {
-                const cfg = worldState.config;
+            build: function(mapState) {
+                const cfg = mapState.config;
                 
-                this.buildBase(worldState);
+                this.buildBase(mapState);
 
                 if (cfg.type === 'MAZE') {
-                    this.buildMaze(worldState);
+                    this.buildMaze(mapState);
                 } else if (cfg.type === 'GYM') {
-                    this.buildGym(worldState);
+                    this.buildGym(mapState);
                 } else {
-                    this.buildOpenArena(worldState);
+                    this.buildOpenArena(mapState);
                 }
 
-                this.createPortals(worldState, cfg.size * 0.75);
+                this.createPortals(mapState, cfg.size * 0.75);
                 
                 for(let i=0; i<cfg.bots; i++) {
-                     new Enemy(null, null, 'ROAM', 0, worldState);
+                     new Enemy(null, null, 'ROAM', 0, mapState);
                 }
             },
 
-            buildBase: function(ws) {
-                const cfg = ws.config;
+            buildBase: function(ms) {
+                const cfg = ms.config;
                 const size = cfg.size;
                 const hSize = size / 2;
                 const wallThick = 10;
@@ -2401,7 +2452,7 @@
                 const moon = new THREE.Mesh(moonGeo, moonMat);
                 moon.position.copy(moonPos);
                 moon.renderOrder = -1; 
-                ws.group.add(moon);
+                ms.group.add(moon);
 
                 // --- GLOW ---
                 if (textures.glow) {
@@ -2426,8 +2477,8 @@
                 const collider = new THREE.Mesh(colliderGeo, colliderMat);
                 
                 collider.position.copy(moonPos);
-                ws.group.add(collider);
-                ws.moonBox = collider; // NEW: Save reference to the WorldState
+                ms.group.add(collider);
+                ms.moonBox = collider; // NEW: Save reference to the MapState
                 
                 // Register Collider with Physics
                 collider.updateMatrixWorld(true);
@@ -2437,37 +2488,37 @@
                 collider.geometry.computeBoundingBox();
                 const colliderBox = collider.geometry.boundingBox.clone().applyMatrix4(collider.matrixWorld);
 
-                ws.spatialGrid.insert(collider, colliderBox);
-                ws.worldObjects.push(collider);
-                ws.groundObjects.push(collider);
-                ws.walls.push(collider);
+                ms.spatialGrid.insert(collider, colliderBox);
+                ms.mapObjects.push(collider);
+                ms.groundObjects.push(collider);
+                ms.walls.push(collider);
 
                 // --- FLOOR & PERIMETER ---
                 // FIX: Added 'null' for rotation argument to restore correct argument alignment
-                // Signature: createBox(x, y, z, w, h, d, mat, isFloor, isWall, ws, rotation, disableCull, customOrder)
-                this.createBox(0, -1, 0, size, 2, size, materials.floor, true, false, ws, null, true, -1);
+                // Signature: createBox(x, y, z, w, h, d, mat, isFloor, isWall, ms, rotation, disableCull, customOrder)
+                this.createBox(0, -1, 0, size, 2, size, materials.floor, true, false, ms, null, true, -1);
 
-                if (ws.name === 'TITAN') {
+                if (ms.name === 'TITAN') {
                     const baseHeight = 100;
                     const gapHeight = 100;
                     const layers = 5;
                     for (let i = 0; i < layers; i++) {
                         const yPos = (baseHeight / 2) + (i * (baseHeight + gapHeight));
-                        this.createBox(0, yPos, -offset, size, baseHeight, wallThick, materials.wall, false, true, ws, null, true, -1);
-                        this.createBox(0, yPos, offset, size, baseHeight, wallThick, materials.wall, false, true, ws, null, true, -1);
-                        this.createBox(-offset, yPos, 0, wallThick, baseHeight, size, materials.wall, false, true, ws, null, true, -1);
-                        this.createBox(offset, yPos, 0, wallThick, baseHeight, size, materials.wall, false, true, ws, null, true, -1);
+                        this.createBox(0, yPos, -offset, size, baseHeight, wallThick, materials.wall, false, true, ms, null, true, -1);
+                        this.createBox(0, yPos, offset, size, baseHeight, wallThick, materials.wall, false, true, ms, null, true, -1);
+                        this.createBox(-offset, yPos, 0, wallThick, baseHeight, size, materials.wall, false, true, ms, null, true, -1);
+                        this.createBox(offset, yPos, 0, wallThick, baseHeight, size, materials.wall, false, true, ms, null, true, -1);
                     }
                 } else {
-                    this.createBox(0, 50, -offset, size, 100, wallThick, materials.wall, false, true, ws, null, true, -1);
-                    this.createBox(0, 50, offset, size, 100, wallThick, materials.wall, false, true, ws, null, true, -1);
-                    this.createBox(-offset, 50, 0, wallThick, 100, size, materials.wall, false, true, ws, null, true, -1);
-                    this.createBox(offset, 50, 0, wallThick, 100, size, materials.wall, false, true, ws, null, true, -1);
+                    this.createBox(0, 50, -offset, size, 100, wallThick, materials.wall, false, true, ms, null, true, -1);
+                    this.createBox(0, 50, offset, size, 100, wallThick, materials.wall, false, true, ms, null, true, -1);
+                    this.createBox(-offset, 50, 0, wallThick, 100, size, materials.wall, false, true, ms, null, true, -1);
+                    this.createBox(offset, 50, 0, wallThick, 100, size, materials.wall, false, true, ms, null, true, -1);
                 }
             },
 
-            buildOpenArena: function(ws) {
-                const cfg = ws.config;
+            buildOpenArena: function(ms) {
+                const cfg = ms.config;
                 const size = cfg.size;
                 const scaleMod = cfg.scale;
 
@@ -2477,7 +2528,7 @@
                     12*scaleMod, 22*scaleMod, 
                     size*0.4, size*0.4, 
                     20 * scaleMod, 120 * scaleMod, 
-                    ws
+                    ms
                 );
 
                 // 2. Mid-Field Verticality
@@ -2486,7 +2537,7 @@
                     6*scaleMod, 12*scaleMod, 
                     size*0.7, size*0.7, 
                     30 * scaleMod, 200 * scaleMod, 
-                    ws
+                    ms
                 );
 
                 // 3. Outer Perimeter Scatter
@@ -2495,11 +2546,11 @@
                     3*scaleMod, 8*scaleMod, 
                     size*0.9, size*0.9, 
                     40 * scaleMod, 300 * scaleMod, 
-                    ws
+                    ms
                 );
                 
                 // 4. Original Ground Anchors (Small)
-                this.spawnDecorations(Math.floor(15 * scaleMod), 2*scaleMod, 4*scaleMod, size*0.85, size*0.85, null, null, ws);
+                this.spawnDecorations(Math.floor(15 * scaleMod), 2*scaleMod, 4*scaleMod, size*0.85, size*0.85, null, null, ms);
 
                 // 5. Large Ground Blocks
                 this.spawnDecorations(
@@ -2507,77 +2558,95 @@
                     8 * scaleMod, 15 * scaleMod,
                     size * 0.8, size * 0.8,
                     null, null, // Force Ground
-                    ws
+                    ms
                 );
             },
 
-            buildGym: function(ws) {
+            buildGym: function(ms) {
                 // 1. Clone the Basic Arena (Floor, Walls, Lighting, Random Decor)
-                this.buildOpenArena(ws);
+                this.buildOpenArena(ms);
 
-                const scaleMod = ws.config.scale;
+                const scaleMod = ms.config.scale;
                 const matSolid = materials.obstacle; // Use solid material, not glass
 
                 // --- A. PERIMETER BANKING (Velodrome Walls) ---
                 // Connects floor to the outer walls with a 45-degree slope
-                const arenaSize = ws.config.size;
-                const bankWidth = 20 * scaleMod; // Horizontal depth of slope
-                const bankHeight = 20 * scaleMod; // Vertical height
-                // Distance from center to start of bank
-                const bankDist = (arenaSize / 2) - (bankWidth / 2) - 5; 
-                const bankLen = arenaSize - 20; // Slightly shorter than full wall to avoid corner z-fighting
+                const arenaSize = ms.config.size;
+                const bankWidth = 60 * scaleMod; // Increased width to reach walls and floor
+                const bankDist = (arenaSize / 2) - 18 * scaleMod; // Push closer to walls
+                const bankLen = arenaSize; // Full length
+                const bankY = 18 * scaleMod; // Lowered so bottom edge is underground
 
                 // 45 degrees (0.785 rad)
                 const bankAng = Math.PI / 4;
                 
-                // North Bank (Pitch -)
-                this.createBox(0, bankHeight/2, -bankDist, bankLen, 2, bankWidth * 1.5, matSolid, false, true, ws, new THREE.Euler(-bankAng, 0, 0));
-                // South Bank (Pitch +)
-                this.createBox(0, bankHeight/2, bankDist, bankLen, 2, bankWidth * 1.5, matSolid, false, true, ws, new THREE.Euler(bankAng, 0, 0));
+                // North Bank (Pitch +)
+                this.createBox(0, bankY, -bankDist, bankLen, 2, bankWidth, matSolid, false, true, ms, new THREE.Euler(bankAng, 0, 0));
+                // South Bank (Pitch -)
+                this.createBox(0, bankY, bankDist, bankLen, 2, bankWidth, matSolid, false, true, ms, new THREE.Euler(-bankAng, 0, 0));
                 // East Bank (Roll +)
-                this.createBox(bankDist, bankHeight/2, 0, bankWidth * 1.5, 2, bankLen, matSolid, false, true, ws, new THREE.Euler(0, 0, bankAng));
+                this.createBox(bankDist, bankY, 0, bankWidth, 2, bankLen, matSolid, false, true, ms, new THREE.Euler(0, 0, bankAng));
                 // West Bank (Roll -)
-                this.createBox(-bankDist, bankHeight/2, 0, bankWidth * 1.5, 2, bankLen, matSolid, false, true, ws, new THREE.Euler(0, 0, -bankAng));
+                this.createBox(-bankDist, bankY, 0, bankWidth, 2, bankLen, matSolid, false, true, ms, new THREE.Euler(0, 0, -bankAng));
+
+                // Corner Banks
+                // By placing the corner banks at bankDist * 0.7071, they form a perfect octagonal bevel.
+                // Using the same pitch (bankAng) and depth (bankWidth) ensures they are perfectly flush
+                // with the straight banks and don't stick out below the floor.
+                const cornerDist = bankDist * 0.7071; 
+                const cW = bankDist * 1.5; // Width of the ramp (wide enough to overlap straight banks)
+                const cLen = bankWidth; // Length/Depth of the ramp (same as straight banks to limit vertical depth)
+                const cY = bankY; // Same as bankY to ensure perfect intersection
+                
+                // Note: The Yaw angles (Y-axis rotation) combined with Pitch (X-axis) point the normal away from the corner.
+                this.createBox(cornerDist, cY, -cornerDist, cW, 2, cLen, matSolid, false, true, ms, new THREE.Euler(bankAng, -Math.PI/4, 0, 'YXZ')); // NE
+                this.createBox(-cornerDist, cY, -cornerDist, cW, 2, cLen, matSolid, false, true, ms, new THREE.Euler(bankAng, Math.PI/4, 0, 'YXZ')); // NW
+                this.createBox(cornerDist, cY, cornerDist, cW, 2, cLen, matSolid, false, true, ms, new THREE.Euler(bankAng, -3*Math.PI/4, 0, 'YXZ')); // SE
+                this.createBox(-cornerDist, cY, cornerDist, cW, 2, cLen, matSolid, false, true, ms, new THREE.Euler(bankAng, 3*Math.PI/4, 0, 'YXZ')); // SW
 
 
                 // --- B. 8-WAY SLOPE HUB (Center) ---
-                const rLen = 40 * scaleMod;
-                const rW = 15 * scaleMod;
+                const rLen = 60 * scaleMod;
+                const rW = 30 * scaleMod;
                 const rH = 2 * scaleMod;
                 const rAng = 0.45; // ~26 deg
-                const rDist = 50 * scaleMod; 
+                const rDist = 60 * scaleMod; 
                 // Calculate flush Y so bottom lip is underground and ramp rises from floor
                 const rY = (rLen/2 * Math.sin(rAng)) - (rH/2 * Math.cos(rAng));
 
                 // Cardinal
-                this.createBox(0, rY, rDist, rW, rH, rLen, matSolid, false, true, ws, new THREE.Euler(rAng, 0, 0)); // S
-                this.createBox(0, rY, -rDist, rW, rH, rLen, matSolid, false, true, ws, new THREE.Euler(-rAng, 0, 0)); // N
-                this.createBox(rDist, rY, 0, rLen, rH, rW, matSolid, false, true, ws, new THREE.Euler(0, 0, rAng)); // E
-                this.createBox(-rDist, rY, 0, rLen, rH, rW, matSolid, false, true, ws, new THREE.Euler(0, 0, -rAng)); // W
+                this.createBox(0, rY, rDist, rW, rH, rLen, matSolid, false, true, ms, new THREE.Euler(rAng, 0, 0)); // S
+                this.createBox(0, rY, -rDist, rW, rH, rLen, matSolid, false, true, ms, new THREE.Euler(-rAng, 0, 0)); // N
+                this.createBox(rDist, rY, 0, rLen, rH, rW, matSolid, false, true, ms, new THREE.Euler(0, 0, -rAng)); // E
+                this.createBox(-rDist, rY, 0, rLen, rH, rW, matSolid, false, true, ms, new THREE.Euler(0, 0, rAng)); // W
 
                 // Diagonal
-                const dOff = rDist * 0.7;
+                const dOff = rDist * 0.7071;
                 // Rotations must combine Y-yaw and X/Z-pitch
-                this.createBox(dOff, rY, dOff, rW, rH, rLen, matSolid, false, true, ws, new THREE.Euler(rAng, -Math.PI/4, 0, 'YXZ')); // SE
-                this.createBox(-dOff, rY, dOff, rW, rH, rLen, matSolid, false, true, ws, new THREE.Euler(rAng, Math.PI/4, 0, 'YXZ')); // SW
-                this.createBox(dOff, rY, -dOff, rW, rH, rLen, matSolid, false, true, ws, new THREE.Euler(-rAng, Math.PI/4, 0, 'YXZ')); // NE
-                this.createBox(-dOff, rY, -dOff, rW, rH, rLen, matSolid, false, true, ws, new THREE.Euler(-rAng, -Math.PI/4, 0, 'YXZ')); // NW
+                this.createBox(dOff, rY, dOff, rW, rH, rLen, matSolid, false, true, ms, new THREE.Euler(rAng, -Math.PI/4, 0, 'YXZ')); // SE
+                this.createBox(-dOff, rY, dOff, rW, rH, rLen, matSolid, false, true, ms, new THREE.Euler(rAng, Math.PI/4, 0, 'YXZ')); // SW
+                this.createBox(dOff, rY, -dOff, rW, rH, rLen, matSolid, false, true, ms, new THREE.Euler(-rAng, Math.PI/4, 0, 'YXZ')); // NE
+                this.createBox(-dOff, rY, -dOff, rW, rH, rLen, matSolid, false, true, ms, new THREE.Euler(-rAng, -Math.PI/4, 0, 'YXZ')); // NW
 
 
-                // --- C. ROTATED OBSTACLES ---
-                const bSize = 12 * scaleMod;
-                const bDist = 30 * scaleMod;
-                const bY = bSize / 2;
-                
-                // Place these in the gaps between the ramps
-                this.createBox(bDist/2, bY, bDist/2, bSize, bSize, bSize, matSolid, false, true, ws, new THREE.Euler(0, Math.PI/4, 0));
-                this.createBox(-bDist/2, bY, bDist/2, bSize, bSize, bSize, matSolid, false, true, ws, new THREE.Euler(0, Math.PI/3, 0));
-                this.createBox(bDist/2, bY, -bDist/2, bSize, bSize, bSize, matSolid, false, true, ws, new THREE.Euler(0, -Math.PI/6, 0));
-                this.createBox(-bDist/2, bY, -bDist/2, bSize, bSize, bSize, matSolid, false, true, ws, new THREE.Euler(0, 0.5, 0));
+                // --- C. CENTRAL HUB CUBE ---
+                // Replace the 4 rotated obstacles with one big flat cube
+                const hubSize = 48 * scaleMod;
+                const hubHeight = 26.1 * scaleMod; // Matches the inner height of the ramps
+                this.createBox(0, hubHeight/2, 0, hubSize, hubHeight, hubSize, matSolid, false, true, ms, new THREE.Euler(0, Math.PI/4, 0));
+
+                // --- D. FLOATING CUBES ---
+                for(let i=0; i<15; i++) {
+                    const fSize = (10 + Math.random() * 20) * scaleMod;
+                    const fX = (Math.random() - 0.5) * 150 * scaleMod;
+                    const fZ = (Math.random() - 0.5) * 150 * scaleMod;
+                    const fY = 60 + Math.random() * 100 * scaleMod;
+                    this.createBox(fX, fY, fZ, fSize, fSize, fSize, matSolid, false, true, ms, new THREE.Euler(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI));
+                }
             },
 
-            buildMaze: function(ws) {
-                const cfg = ws.config;
+            buildMaze: function(ms) {
+                const cfg = ms.config;
                 const cellSize = cfg.mazeCellSize || 30;
                 const wallH = cfg.mazeWallHeight || 18;
                 
@@ -2608,7 +2677,7 @@
                         if (hasConnection) {
                             const px = startX + (x * cellSize);
                             const pz = startZ + (y * cellSize);
-                            this.createBox(px, wallH/2, pz, wallThickness, wallH, wallThickness, materials.wall, false, true, ws);
+                            this.createBox(px, wallH/2, pz, wallThickness, wallH, wallThickness, materials.wall, false, true, ms);
                         }
                     }
                 }
@@ -2622,7 +2691,7 @@
                         if (mazeData.vertical[x][y]) {
                             const wx = startX + (x * cellSize);
                             const wz = startZ + (y * cellSize) + (cellSize / 2);
-                            this.createBox(wx, wallH/2, wz, wallThickness, wallH, cellSize - wallThickness, materials.wall, false, true, ws);
+                            this.createBox(wx, wallH/2, wz, wallThickness, wallH, cellSize - wallThickness, materials.wall, false, true, ms);
                         }
                     }
                 }
@@ -2635,7 +2704,7 @@
                         if (mazeData.horizontal[y][x]) {
                             const wx = startX + (x * cellSize) + (cellSize / 2);
                             const wz = startZ + (y * cellSize);
-                            this.createBox(wx, wallH/2, wz, cellSize - wallThickness, wallH, wallThickness, materials.wall, false, true, ws);
+                            this.createBox(wx, wallH/2, wz, cellSize - wallThickness, wallH, wallThickness, materials.wall, false, true, ms);
                         }
                     }
                 }
@@ -2656,7 +2725,7 @@
                             const scale = minScale + Math.random() * (maxScale - minScale);
                             
                             // scale passed as Y to keep it on floor
-                            new Decoration(cx + jx, scale, cz + jz, scale, ws);
+                            new Decoration(cx + jx, scale, cz + jz, scale, ms);
                         }
                     }
                 }
@@ -2705,7 +2774,7 @@
                 return { vertical, horizontal };
             },
             
-            createBox: function(x, y, z, w, h, d, mat, isFloor, isWall, ws, rotation = null, disableCull = false, customOrder = null) {
+            createBox: function(x, y, z, w, h, d, mat, isFloor, isWall, ms, rotation = null, disableCull = false, customOrder = null) {
                 const geo = new THREE.BoxGeometry(w, h, d);
                 const mesh = new THREE.Mesh(geo, mat);
                 mesh.position.set(x, y, z);
@@ -2726,13 +2795,13 @@
                      mesh.add(line);
                 }
 
-                ws.group.add(mesh);
+                ms.group.add(mesh);
                 mesh.geometry.computeBoundingBox();
                 mesh.updateMatrixWorld(true);
                 
                 // Broadphase: AABB (Always exists)
-                const worldAABB = mesh.geometry.boundingBox.clone();
-                worldAABB.applyMatrix4(mesh.matrixWorld);
+                const mapAABB = mesh.geometry.boundingBox.clone();
+                mapAABB.applyMatrix4(mesh.matrixWorld);
                 
                 // Narrowphase: OBB (Only if rotated)
                 if (rotation) {
@@ -2742,13 +2811,13 @@
                     mesh.userData.obb = obb;
                 }
                 
-                ws.spatialGrid.insert(mesh, worldAABB);
-                ws.worldObjects.push(mesh);
-                if (isFloor || !isWall) ws.groundObjects.push(mesh);
-                if (!isFloor) ws.walls.push(mesh);
+                ms.spatialGrid.insert(mesh, mapAABB);
+                ms.mapObjects.push(mesh);
+                if (isFloor || !isWall) ms.groundObjects.push(mesh);
+                if (!isFloor) ms.walls.push(mesh);
             },
             
-            spawnDecorations: function(count, minScale, maxScale, rangeX, rangeZ, minY, maxY, ws) {
+            spawnDecorations: function(count, minScale, maxScale, rangeX, rangeZ, minY, maxY, ms) {
                 const obstacleBounds = [];
                 for(let i=0; i<count; i++) {
                     let attempts = 0;
@@ -2777,14 +2846,14 @@
                             if(Math.hypot(x - b.x, z - b.z) < (radius + b.r) + 4) { valid = false; break; }
                         }
                         if(valid) {
-                            new Decoration(x, y, z, scale, ws);
+                            new Decoration(x, y, z, scale, ms);
                             obstacleBounds.push({x: x, z: z, r: radius});
                         }
                     }
                 }
             },
             
-            createPortals: function(ws, range) {
+            createPortals: function(ms, range) {
                 const colors = [0x00ffff, 0xffaa00, 0xaa00ff, 0x00ff00];
                 const portalLocs = [];
                 const pairCount = Math.max(4, Math.floor(range / 50)); 
@@ -2803,8 +2872,8 @@
                 
                 for(let i=0; i<pairCount; i++) {
                     const c = colors[i % colors.length];
-                    const p1 = new Portal(portalLocs[i*2].x, portalLocs[i*2].y, portalLocs[i*2].z, c, null, ws);
-                    const p2 = new Portal(portalLocs[i*2+1].x, portalLocs[i*2+1].y, portalLocs[i*2+1].z, c, null, ws);
+                    const p1 = new Portal(portalLocs[i*2].x, portalLocs[i*2].y, portalLocs[i*2].z, c, null, ms);
+                    const p2 = new Portal(portalLocs[i*2+1].x, portalLocs[i*2+1].y, portalLocs[i*2+1].z, c, null, ms);
                     p1.target = p2; p2.target = p1;
                 }
             },
@@ -3159,7 +3228,13 @@
                 if (camera.position.y < -100) {
                     GameStats.addAchievement("DOWN THE RABBIT HOLE", "#ff00ff", "PERSISTENT");
                     damagePlayer(20);
-                    camera.position.set(0, 2, 0);
+                    if (MapManager.current && MapManager.current.config.type === 'MAZE') {
+                        camera.position.set(0, 60, 0);
+                    } else if (MapManager.current && MapManager.current.config.type === 'GYM') {
+                        camera.position.set(0, 30, 0);
+                    } else {
+                        camera.position.set(0, 2, 0);
+                    }
                     this.velocity.set(0,0,0);
                 }
             }
@@ -3521,7 +3596,7 @@
         let currentSlashColor = 0x0088ff;
         
         class Portal {
-            constructor(x, y, z, color, targetPortal = null, ws = null) {
+            constructor(x, y, z, color, targetPortal = null, ms = null) {
                 this.mesh = new THREE.Group();
                 this.mesh.position.set(x, y + 2.5, z); 
                 
@@ -3549,9 +3624,9 @@
                      this.particles.push({ mesh: p, offset: Math.random() * 10, speed: 0.5 + Math.random() });
                 }
 
-                if (ws) {
-                    ws.group.add(this.mesh);
-                    ws.portals.push(this);
+                if (ms) {
+                    ms.group.add(this.mesh);
+                    ms.portals.push(this);
                 } else {
                     scene.add(this.mesh);
                     portals.push(this);
@@ -3609,7 +3684,7 @@
                     const dirToSpawn = pos.clone().sub(eyePos).normalize();
                     globalRaycaster.set(eyePos, dirToSpawn);
                     globalRaycaster.far = distToSpawn;
-                    const hits = globalRaycaster.intersectObjects(worldObjects);
+                    const hits = globalRaycaster.intersectObjects(mapObjects);
                     
                     if (hits.length > 0) {
                         this.meshPos = hits[0].point.sub(dirToSpawn.multiplyScalar(0.1));
@@ -3709,7 +3784,7 @@
                     _projDir.normalize();
                     globalRaycaster.set(this.mesh.position, _projDir);
                     globalRaycaster.far = dist;
-                    const hits = globalRaycaster.intersectObjects(worldObjects);
+                    const hits = globalRaycaster.intersectObjects(mapObjects);
                     let enemyHit = null;
                     for(let e of enemies) {
                         if (!e.isDeadCorpse && e.mesh.position.distanceTo(_projPos) < e.type.scale + 0.5) {
@@ -4414,7 +4489,8 @@
             const tiltRow = document.getElementById('tilt-slider-row');
             document.getElementById('set-tilt').addEventListener('change', (e) => {
                 enableWallTilt = e.target.checked;
-                tiltRow.style.display = enableWallTilt ? 'flex' : 'none';
+                tiltRow.style.opacity = enableWallTilt ? '1' : '0.3';
+                tiltRow.style.pointerEvents = enableWallTilt ? 'auto' : 'none';
                 AudioSys.playUI(true);
             });
 
@@ -4472,13 +4548,13 @@
             document.getElementById('trap-god').addEventListener('click', triggerTrap);
             document.getElementById('trap-music').addEventListener('click', triggerTrap);
 
-            document.getElementById('world-btn').addEventListener('click', () => {
+            document.getElementById('map-btn').addEventListener('click', () => {
                 const order = ['GYM', 'ARENA', 'TITAN', 'MAZE', 'LABYRINTH'];
-                const currentName = WorldManager.current ? WorldManager.current.name : 'ARENA';
+                const currentName = MapManager.current ? MapManager.current.name : 'ARENA';
                 let idx = order.indexOf(currentName);
                 if (idx === -1) idx = 0;
                 const next = order[(idx + 1) % order.length];
-                WorldManager.switch(next);
+                MapManager.switch(next);
             });
 
             scene = new THREE.Scene();
@@ -4540,8 +4616,8 @@
             setupLighting();
             
             // Build Worlds & Load Normal Map
-            WorldManager.init();
-            WorldManager.switch('GYM');
+            MapManager.init();
+            MapManager.switch('ARENA');
             
             createSlashEffect(); 
             createTeleportMarker();
@@ -4793,7 +4869,7 @@
                 const bgCol = 0x667788; 
                 scene.background = new THREE.Color(bgCol);
                 // Respect World Fog Density
-                scene.fog = new THREE.FogExp2(bgCol, WorldManager.current ? WorldManager.current.config.fog : 0.004); 
+                scene.fog = new THREE.FogExp2(bgCol, MapManager.current ? MapManager.current.config.fog : 0.004); 
                 body.style.backgroundColor = "#667788";
                 ui.classList.add('light-theme');
                 
@@ -4821,7 +4897,7 @@
                 if (currentTheme === 1) { // DARK
                     const bgCol = 0x20242a; 
                     scene.background = new THREE.Color(bgCol);
-                    scene.fog = new THREE.FogExp2(bgCol, WorldManager.current ? WorldManager.current.config.fog : 0.007);
+                    scene.fog = new THREE.FogExp2(bgCol, MapManager.current ? MapManager.current.config.fog : 0.007);
                     body.style.backgroundColor = "#20242a";
                     
                     materials.floor.map = textures.solid;
@@ -4845,7 +4921,7 @@
                 } else if (currentTheme === 2) { // NEON
                     const bgCol = 0x050505;
                     scene.background = new THREE.Color(bgCol);
-                    scene.fog = new THREE.FogExp2(bgCol, WorldManager.current ? WorldManager.current.config.fog : 0.007);
+                    scene.fog = new THREE.FogExp2(bgCol, MapManager.current ? MapManager.current.config.fog : 0.007);
                     body.style.backgroundColor = "#050505";
                     
                     materials.floor.map = textures.gridDefault;
@@ -4867,7 +4943,7 @@
                 } else { // HALLOWEEN
                     const bgCol = 0x663311;
                     scene.background = new THREE.Color(bgCol); 
-                    scene.fog = new THREE.FogExp2(bgCol, WorldManager.current ? WorldManager.current.config.fog : 0.004);
+                    scene.fog = new THREE.FogExp2(bgCol, MapManager.current ? MapManager.current.config.fog : 0.004);
                     body.style.backgroundColor = "#663311";
                     
                     materials.floor.map = textures.solid;
@@ -4905,7 +4981,7 @@
         const WARM_PALETTES = [0x8B4513, 0xA0522D, 0xCD853F, 0xD2691E, 0xBC8F8F];
 
         class Decoration {
-            constructor(x, y, z, scale, ws = null) {
+            constructor(x, y, z, scale, ms = null) {
                 this.scale = scale;
                 const size = 2;
                 this.palette = GIFT_PALETTES[Math.floor(Math.random() * GIFT_PALETTES.length)];
@@ -4922,9 +4998,9 @@
                 this.colliderMesh.scale.setScalar(scale);
                 this.colliderMesh.geometry.computeBoundingBox();
                 
-                if (ws) {
-                    ws.walls.push(this.colliderMesh);
-                    ws.group.add(this.colliderMesh);
+                if (ms) {
+                    ms.walls.push(this.colliderMesh);
+                    ms.group.add(this.colliderMesh);
                 } else {
                     walls.push(this.colliderMesh);
                     scene.add(this.colliderMesh);
@@ -4933,7 +5009,7 @@
                 this.colliderMesh.updateMatrixWorld(true);
                 const box = this.colliderMesh.geometry.boundingBox.clone();
                 box.applyMatrix4(this.colliderMesh.matrixWorld);
-                if (ws) ws.spatialGrid.insert(this.colliderMesh, box);
+                if (ms) ms.spatialGrid.insert(this.colliderMesh, box);
                 else spatialGrid.insert(this.colliderMesh, box);
 
                 const visualGeo = new THREE.BoxGeometry(size, size, size);
@@ -4941,7 +5017,7 @@
                 this.visualMesh = new THREE.Mesh(visualGeo, this.mat);
                 
                 // Shadow Optimization
-                if (ws && ws.config.bots > 100) {
+                if (ms && ms.config.bots > 100) {
                     this.visualMesh.castShadow = false;
                 } else {
                     this.visualMesh.castShadow = true;
@@ -4952,13 +5028,13 @@
                 this.visualMesh.scale.setScalar(scale);
                 
                 this.visualMesh.updateMatrixWorld();
-                if (ws) {
-                    ws.worldObjects.push(this.visualMesh);
-                    ws.groundObjects.push(this.visualMesh);
-                    ws.decorations.push(this);
-                    ws.group.add(this.visualMesh);
+                if (ms) {
+                    ms.mapObjects.push(this.visualMesh);
+                    ms.groundObjects.push(this.visualMesh);
+                    ms.decorations.push(this);
+                    ms.group.add(this.visualMesh);
                 } else {
-                    worldObjects.push(this.visualMesh);
+                    mapObjects.push(this.visualMesh);
                     groundObjects.push(this.visualMesh);
                     decorations.push(this);
                     scene.add(this.visualMesh);
@@ -5427,7 +5503,7 @@
         function getTeleportTarget(maxDist = CONFIG.teleportRange) {
             globalRaycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
             globalRaycaster.far = maxDist;
-            const intersects = globalRaycaster.intersectObjects(worldObjects);
+            const intersects = globalRaycaster.intersectObjects(mapObjects);
             if (intersects.length > 0) {
                 return { point: intersects[0].point, hit: true, normal: intersects[0].face.normal };
             } else {
@@ -5759,7 +5835,7 @@
         }
 
         class Enemy {
-            constructor(posOverride = null, typeOverride = null, initialState = 'ROAM', aggroDelay = 0, ws = null) {
+            constructor(posOverride = null, typeOverride = null, initialState = 'ROAM', aggroDelay = 0, ms = null) {
                 this.mesh = new THREE.Group();
                 this.id = Math.random();
 
@@ -5776,8 +5852,8 @@
                     else this.type = BOT_TYPES.NORMAL;
                 } else {
                     let x, z;
-                    const usedDecorations = ws ? ws.decorations : decorations;
-                    const spawnRange = ws ? ws.config.size * 0.4 : 175;
+                    const usedDecorations = ms ? ms.decorations : decorations;
+                    const spawnRange = ms ? ms.config.size * 0.4 : 175;
                     let validSpawn = false;
 
                     // Try spawning near decoration
@@ -5833,7 +5909,7 @@
                 });
                 this.body = new THREE.Mesh(sharedEnemyGeo, bodyMat);
 
-                if (ws && ws.config.bots > 100) this.body.castShadow = false;
+                if (ms && ms.config.bots > 100) this.body.castShadow = false;
                 else this.body.castShadow = true;
 
                 this.body.receiveShadow = true;
@@ -5872,14 +5948,14 @@
                 this.healthBarGroup.scale.setScalar(uiScale);
                 this.healthBarGroup.visible = false;
 
-                if (ws) {
-                    ws.enemies.push(this);
-                    ws.group.add(this.mesh);
-                    ws.group.add(this.healthBarGroup);
+                if (ms) {
+                    ms.enemies.push(this);
+                    ms.group.add(this.mesh);
+                    ms.group.add(this.healthBarGroup);
                 } else {
                     enemies.push(this);
-                    (currentWorldGroup || scene).add(this.mesh);
-                    (currentWorldGroup || scene).add(this.healthBarGroup);
+                    (currentMapGroup || scene).add(this.mesh);
+                    (currentMapGroup || scene).add(this.healthBarGroup);
                 }
 
                 // --- Stats & State ---
@@ -5981,7 +6057,7 @@
                     }
                 }
 
-                const roamRange = WorldManager.current ? WorldManager.current.config.size * 0.3 : 150;
+                const roamRange = MapManager.current ? MapManager.current.config.size * 0.3 : 150;
                 this.targetPos.set(
                     (Math.random() - 0.5) * roamRange,
                     this.mesh.position.y,
@@ -6124,7 +6200,7 @@
 
                     if (this.mesh.position.y < 20) {
                         if (Math.random() < 0.002 * intervalMultiplier) {
-                            const range = WorldManager.current ? WorldManager.current.config.size * 0.4 : 150;
+                            const range = MapManager.current ? MapManager.current.config.size * 0.4 : 150;
                             const tx = (Math.random() - 0.5) * 2 * range;
                             const tz = (Math.random() - 0.5) * 2 * range;
                             const ty = getRandomSpawnY(tx, tz);
@@ -6654,7 +6730,7 @@
                         const count = Math.random() > 0.5 ? 2 : 1;
                         const delays = [0.2, 0.5];
                         for (let i = 0; i < count; i++) {
-                            new Enemy(this.mesh.position, nextType, 'AGGRO', delays[i], WorldManager.current);
+                            new Enemy(this.mesh.position, nextType, 'AGGRO', delays[i], MapManager.current);
                         }
                         showKillMessage(this.type.name + " SPLIT!");
                         this.remove();
@@ -6736,7 +6812,13 @@
             player.isCrouching = false;
             player.velocity.set(0,0,0);
             player.totalHits = 0; 
-            camera.position.set(0, 2, 0);
+            if (MapManager.current && MapManager.current.config.type === 'MAZE') {
+                camera.position.set(0, 60, 0);
+            } else if (MapManager.current && MapManager.current.config.type === 'GYM') {
+                camera.position.set(0, 30, 0);
+            } else {
+                camera.position.set(0, 2, 0);
+            }
             
             lastCenturyMarked = 0;
             bankedActiveTime = 0;
@@ -6814,20 +6896,20 @@
             }
             
             if (isLocked && !player.isDead) {
-                const cap = WorldManager.current ? WorldManager.current.config.bots : 60;
+                const cap = MapManager.current ? MapManager.current.config.bots : 60;
                 
                 if (Math.random() < 0.05 && enemies.length < cap) {
-                    new Enemy(null, null, 'ROAM', 0, WorldManager.current);
+                    new Enemy(null, null, 'ROAM', 0, MapManager.current);
                 }
                 
                 // Logic Phase
                 player.update(dt);
                 NarrativeSys.update(dt);
 
-                const currentWorld = WorldManager.current;
-                if (currentWorld && currentWorld.moonBox) {
-                    const dist = camera.position.distanceTo(currentWorld.moonBox.position);
-                    currentWorld.moonBox.material.opacity = (dist < 80) ? 0.3 : 0;
+                const currentMap = MapManager.current;
+                if (currentMap && currentMap.moonBox) {
+                    const dist = camera.position.distanceTo(currentMap.moonBox.position);
+                    currentMap.moonBox.material.opacity = (dist < 80) ? 0.3 : 0;
                 }
 
                 updateWeather(dt);
