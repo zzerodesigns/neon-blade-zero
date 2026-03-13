@@ -12,8 +12,8 @@
 *   **Collision Edge Cases:** The recent slope sliding bug revealed that SAT collision with OBBs can return downward-pointing normals if the player hits the underground flat faces of a ramp. Ground-checks (`_obbNormal.y < -0.1`) are necessary to force the physics engine to resolve upward along the slope.
 
 ## 🚀 planned features / to-dos
-*   [ ] **Light Theme Overhaul:** Fix the awkward color schemes and make the 3D ribbons significantly thinner.
-*   [ ] **Weather Optimization:** Update weather to spawn near/follow the player and remove the height ceiling.
+*   [x] **Light Theme Overhaul:** Fix the awkward color schemes and make the 3D ribbons significantly thinner.
+*   [x] **Weather Optimization:** Update weather to spawn near/follow the player and remove the height ceiling.
 *   [ ] **Void Grenade Outline:** Implement the "Raven magic" inverted hull shader effect.
 *   [ ] **OBB Raycasting:** Update the teleport marker math to accurately project onto rotated surfaces.
 

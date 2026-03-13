@@ -22,7 +22,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v48.1.0</title>
+    <title>Neon Blade: Melee Arena v48.1.1</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -754,7 +754,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.1.0<br>- Map Refactor & Gym Polish -</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.1.1<br>- Gift Box Polish -</div>
         </div>
     </div>
 
@@ -4976,7 +4976,17 @@
             { box: 0x006400, ribbon: 0xcc0000 }, 
             { box: 0x0044aa, ribbon: 0xc0c0c0 }, 
             { box: 0xffffff, ribbon: 0xcc0000 }, 
-            { box: 0x663399, ribbon: 0xffd700 }  
+            { box: 0x663399, ribbon: 0xffd700 },
+            { box: 0xffff00, ribbon: 0xff0000 }, 
+            { box: 0xff0000, ribbon: 0xffff00 }, 
+            { box: 0x0088ff, ribbon: 0xffffff }, 
+            { box: 0x00ff00, ribbon: 0x8800ff },
+            { box: 0xff8800, ribbon: 0x000000 },
+            { box: 0xff00ff, ribbon: 0x00ffff },
+            { box: 0x00ffff, ribbon: 0xff00ff },
+            { box: 0x222222, ribbon: 0xffaa00 },
+            { box: 0xffffff, ribbon: 0x00aa00 },
+            { box: 0xaa00ff, ribbon: 0xffff00 }
         ];
         const WARM_PALETTES = [0x8B4513, 0xA0522D, 0xCD853F, 0xD2691E, 0xBC8F8F];
 
@@ -5065,14 +5075,28 @@
                 this.visualMesh.add(this.faceGroup);
 
                 this.ribbonGroup = new THREE.Group();
-                this.ribbonMat = new THREE.MeshBasicMaterial({ color: this.palette.ribbon });
-                const r1Geo = new THREE.BoxGeometry(2.05, 2.05, 0.4); 
+                this.ribbonMat = new THREE.MeshStandardMaterial({ 
+                    color: this.palette.ribbon,
+                    roughness: 0.3,
+                    metalness: 0.2,
+                    transparent: true,
+                    opacity: 0.95
+                });
+                this.knotMat = new THREE.MeshStandardMaterial({
+                    color: this.palette.ribbon,
+                    roughness: 0.8,
+                    metalness: 0.05,
+                    transparent: true,
+                    opacity: 0.95
+                });
+                const r1Geo = new THREE.BoxGeometry(2.015, 2.015, 0.4); 
                 const r1 = new THREE.Mesh(r1Geo, this.ribbonMat);
-                const r2Geo = new THREE.BoxGeometry(0.4, 2.05, 2.05); 
+                const r2Geo = new THREE.BoxGeometry(0.4, 2.015, 2.015); 
                 const r2 = new THREE.Mesh(r2Geo, this.ribbonMat);
-                const bowGeo = new THREE.SphereGeometry(0.4, 8, 8);
-                const bow = new THREE.Mesh(bowGeo, this.ribbonMat);
-                bow.position.y = 1.025; 
+                const bowGeo = new THREE.SphereGeometry(0.4, 16, 16);
+                const bow = new THREE.Mesh(bowGeo, this.knotMat);
+                bow.scale.set(1, 0.2, 1);
+                bow.position.y = 1.015; 
                 this.ribbonGroup.add(r1); this.ribbonGroup.add(r2); this.ribbonGroup.add(bow);
                 this.ribbonGroup.visible = false;
                 this.visualMesh.add(this.ribbonGroup);
