@@ -754,7 +754,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.1.1<br>- Gift Box Polish -</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.2.0<br>- Visuals & Void Polish -</div>
         </div>
     </div>
 
@@ -3982,6 +3982,14 @@
                     
                     group.scale.set(s, s, s);
                     
+                    if (camera.position.distanceTo(pos) < range * s) {
+                        coreMat.side = THREE.BackSide;
+                        coreMat.depthTest = false;
+                    } else {
+                        coreMat.side = THREE.FrontSide;
+                        coreMat.depthTest = true;
+                    }
+                    
                     // Spin
                     wire.rotation.y += 0.08;
                     wire.rotation.z -= 0.03;
@@ -5079,15 +5087,20 @@
                     color: this.palette.ribbon,
                     roughness: 0.3,
                     metalness: 0.2,
-                    transparent: true,
-                    opacity: 0.95
+                    polygonOffset: true,
+                    polygonOffsetFactor: -1,
+                    polygonOffsetUnits: -1
                 });
                 this.knotMat = new THREE.MeshStandardMaterial({
                     color: this.palette.ribbon,
                     roughness: 0.8,
                     metalness: 0.05,
                     transparent: true,
-                    opacity: 0.95
+                    opacity: 0.9,
+                    side: THREE.DoubleSide,
+                    polygonOffset: true,
+                    polygonOffsetFactor: -1,
+                    polygonOffsetUnits: -1
                 });
                 const r1Geo = new THREE.BoxGeometry(2.015, 2.015, 0.4); 
                 const r1 = new THREE.Mesh(r1Geo, this.ribbonMat);
