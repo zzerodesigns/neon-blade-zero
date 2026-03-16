@@ -22,7 +22,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v48.1.1</title>
+    <title>Neon Blade: Melee Arena v48.3.0</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -754,7 +754,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.2.0<br>- Visuals & Void Polish -</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.3.0<br>- Systems Polish & Gadget Physics -</div>
         </div>
     </div>
 
@@ -776,17 +776,23 @@
             frictionSlide: 0.8, 
             frictionWall: 0.5, 
             slideBoost: 15, 
-            energyMax: 1000, 
-            energyDrain: 25, 
-            energyRegen: 50, 
-            teleportCost: 10,
-            gadgetCost: { frag: 35, void: 30, impulse: 25 },
-            gadgetCooldown: 200, 
+            slideControl: 3.0,
+            energyMax: 100, 
+            energyDrain: 5, 
+            energyRegen: 10, 
+            teleportCost: 2,
+            gadgetCost: { frag: 7, void: 6, impulse: 5 },
+            gadgetCooldown: 0, 
             attackRange: 8,
             attackCooldown: 250,
             playerDamage: 40, 
             teleportRange: 20,
             playerMaxHP: 250, 
+            gadgetPhysics: {
+                frag: { throwSpeed: 70, life: 5.0, bounciness: 0.5, friction: 0.5 },
+                void: { throwSpeed: 60, life: 1.5 },
+                impulse: { throwSpeed: 50, life: 10.0 }
+            },
             botBaseHP: 200, 
             botDamage: 2,   
             botAttackCooldown: 1500,
@@ -796,7 +802,9 @@
             botAggroDuration: 10000, 
             botAggroDelay: 1000, 
             regenDelay: 3000, 
-            regenRate: 25
+            regenRate: 25,
+            botStaminaMax: 10,
+            botStaminaRegen: 2
         };
 
         const SCORE_TITLES = [
@@ -3061,7 +3069,6 @@
 
             throwGadget(type) {
                 const now = performance.now();
-                if (now - this.lastGadgetTime < CONFIG.gadgetCooldown) return;
                 
                 let cost = 0;
                 if (type === 'FRAG') cost = CONFIG.gadgetCost.frag;
@@ -3079,7 +3086,9 @@
                 const dir = new THREE.Vector3();
                 camera.getWorldDirection(dir);
                 const spawnPos = camera.position.clone().addScaledVector(dir, 1.0);
-                const vel = dir.multiplyScalar(50).add(this.velocity);
+                
+                const phys = CONFIG.gadgetPhysics[type.toLowerCase()];
+                const vel = dir.multiplyScalar(phys.throwSpeed).add(this.velocity);
                 projectiles.push(new Projectile(type, spawnPos, vel));
                 AudioSys.playThrow();
             }
@@ -3119,8 +3128,10 @@
                     this.aimLine.visible = true;
                     const posAttr = this.aimLine.geometry.attributes.position;
                     const positions = posAttr.array;
+                    
+                    const phys = CONFIG.gadgetPhysics[this.aimingGadget.toLowerCase()];
                     let p = new THREE.Vector3(1.25, -1, -8); 
-                    let v = new THREE.Vector3(0, 0, -50);
+                    let v = new THREE.Vector3(0, 0, -phys.throwSpeed);
                     const invRot = camera.quaternion.clone().invert();
                     const localGravity = new THREE.Vector3(0, -CONFIG.gravity, 0).applyQuaternion(invRot);
                     let idx = 0;
@@ -3274,7 +3285,7 @@
 
                 if (this.isSliding) { 
                     if (this.onGround || this.isWallSliding) {
-                        friction = CONFIG.frictionSlide; drive = 1; 
+                        friction = CONFIG.frictionSlide; drive = CONFIG.slideControl; 
                         if (this.onGround) targetSpeed = CONFIG.sprintSpeed; 
                     } else {
                         friction = CONFIG.frictionAir; drive = CONFIG.airControl * 0.5; 
@@ -3676,8 +3687,14 @@
                 this.velocity = vel.clone();
                 this.radius = 0.2;
                 this.stuckTo = null;
-                this.life = type === 'VOID' ? 1.5 : (type === 'IMPULSE' ? 10.0 : 3.5);
+                
+                const phys = CONFIG.gadgetPhysics;
+                this.life = type === 'VOID' ? phys.void.life : (type === 'IMPULSE' ? phys.impulse.life : phys.frag.life);
 
+                // Initialize rotation axis for "baseball" spin
+                this.spinAxis = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize();
+                this.spinSpeed = 10 + Math.random() * 10;
+                
                 const eyePos = camera.position.clone();
                 const distToSpawn = eyePos.distanceTo(pos);
                 if (distToSpawn > 0.1) {
@@ -3805,15 +3822,22 @@
                         }
                         if (this.type === 'FRAG') {
                             const n = hits[0].face.normal;
-                            this.velocity.reflect(n).multiplyScalar(0.5); 
-                            if (n.y > 0.5) { this.velocity.x *= 0.6; this.velocity.z *= 0.6; if (this.velocity.y < 0.5) this.velocity.y = 0; }
+                            const fragPhys = CONFIG.gadgetPhysics.frag;
+                            this.velocity.reflect(n).multiplyScalar(fragPhys.bounciness); 
+                            if (n.y > 0.5) { 
+                                this.velocity.x *= fragPhys.friction; 
+                                this.velocity.z *= fragPhys.friction; 
+                                if (this.velocity.y < 0.5) this.velocity.y = 0; 
+                            }
                             this.mesh.position.copy(hits[0].point).addScaledVector(n, 0.2);
+                            
+                            // Change spin on bounce
+                            this.spinAxis.set(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize();
                         }
                     } else this.mesh.position.copy(_projPos);
                 } else this.mesh.position.copy(_projPos);
 
-                this.mesh.rotation.x += dt * 10;
-                this.mesh.rotation.z += dt * 10;
+                this.mesh.rotateOnAxis(this.spinAxis, this.spinSpeed * dt);
 
                 // Pooled trail updates
                 if (Math.random() < (this.type === 'VOID' ? 0.4 : this.type === 'FRAG' ? 0.3 : 0.2)) {
@@ -5185,20 +5209,21 @@
 
             if(weatherParticles.length < limit && Math.random() < spawnRate) {
                 let mesh, vel, type;
-                const px = camera.position.x + (Math.random()-0.5)*50;
-                const pz = camera.position.z + (Math.random()-0.5)*50;
+                const px = camera.position.x + (Math.random()-0.5)*80;
+                const pz = camera.position.z + (Math.random()-0.5)*80;
+                const py = camera.position.y + 25 + Math.random()*10;
 
                 if (isSnow) {
                     const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0.8 });
                     mesh = new THREE.Mesh(sharedSnowGeo, mat);
-                    mesh.position.set(px, 30, pz);
+                    mesh.position.set(px, py, pz);
                     mesh.lookAt(camera.position); 
                     vel = new THREE.Vector3((Math.random()-0.5)*2, -4 - Math.random()*4, (Math.random()-0.5)*2);
                     type = 'snow';
                 } else {
                     const mat = new THREE.MeshBasicMaterial({ color: Math.random() > 0.5 ? 0xffaa00 : 0x884400, side: THREE.DoubleSide });
                     mesh = new THREE.Mesh(sharedLeafGeo, mat);
-                    mesh.position.set(px, 30, pz);
+                    mesh.position.set(px, py, pz);
                     mesh.rotation.set(Math.random(), Math.random(), Math.random());
                     vel = new THREE.Vector3((Math.random()-0.5)*3, -3 - Math.random()*3, (Math.random()-0.5)*3);
                     type = 'leaf';
@@ -5210,6 +5235,15 @@
 
             for(let i=weatherParticles.length-1; i>=0; i--) {
                 const l = weatherParticles[i];
+
+                // Optimization: Recycle distant particles
+                const distSq = l.mesh.position.distanceToSquared(camera.position);
+                if (distSq > 6400) { // 80 units radius
+                    scene.remove(l.mesh);
+                    if (l.mesh.material.dispose) l.mesh.material.dispose();
+                    weatherParticles.splice(i, 1);
+                    continue;
+                }
 
                 if (l.landed) {
                     l.landTimer -= dt;
@@ -5245,10 +5279,11 @@
                     l.mesh.rotation.z += dt; 
                 }
 
-                if(l.mesh.position.y <= 0) {
+                const groundY = getGroundHeight(l.mesh.position.x, l.mesh.position.z, l.mesh.position.y);
+                if(l.mesh.position.y <= groundY) {
                     if (l.type === 'snow') {
                         l.landed = true;
-                        l.mesh.position.y = 0.05; 
+                        l.mesh.position.y = groundY + 0.05; 
                         l.mesh.rotation.x = -Math.PI / 2;
                         l.vel.set(0,0,0);
                     } else {
@@ -5291,7 +5326,7 @@
             return s.mesh;
         }
 
-        function spawnSnowTrail(pos) {
+        function spawnSnowTrail(pos, velocity = player.velocity, yOffset = -1.25) {
             const p = _particlePool[_particleIdx];
             _particleIdx = (_particleIdx + 1) % 800;
 
@@ -5302,11 +5337,10 @@
             p.velocity.set(0,0,0);
 
             p.mesh.visible = true;
-            // Relative Position: Camera height (~1.6) - 1.25 = 0.35 offset from feet
-            p.mesh.position.set(pos.x, pos.y - 1.25, pos.z);
+            p.mesh.position.set(pos.x, pos.y + yOffset, pos.z);
 
-            // Apply movement delay (Match the kickup's lag)
-            p.mesh.position.addScaledVector(player.velocity, -0.05);
+            // Apply movement delay
+            p.mesh.position.addScaledVector(velocity, -0.05);
             
             p.mesh.material.color.setHex(0xffffff);
             p.mesh.material.opacity = 0.8;
@@ -5314,7 +5348,7 @@
             p.mesh.scale.set(0.8, 0.8, 0.8);
         }
 
-        function spawnSnowKickup(pos) {
+        function spawnSnowKickup(pos, velocity = player.velocity, yOffset = -1.45) {
             for(let i=0; i<3; i++) {
                 const p = _particlePool[_particleIdx];
                 _particleIdx = (_particleIdx + 1) % 800;
@@ -5330,12 +5364,10 @@
                 p.mesh.material.opacity = 0.8;
                 p.mesh.material.blending = THREE.NormalBlending;
                 
-                _tempA.set((Math.random()-0.5), -1.45, (Math.random()-0.5));
+                _tempA.set((Math.random()-0.5), yOffset, (Math.random()-0.5));
                 p.mesh.position.copy(pos).add(_tempA);
                 
-                // NATURAL TRAIL: Subtract 5% of velocity from the position
-                // This simulates a "delay" by spawning it slightly where you JUST were.
-                p.mesh.position.addScaledVector(player.velocity, -0.05);
+                p.mesh.position.addScaledVector(velocity, -0.05);
                 
                 p.velocity.set((Math.random()-0.5)*2, 1+Math.random()*3, (Math.random()-0.5)*2);
                 p.mesh.scale.set(0.3, 0.3, 0.3);
@@ -5570,7 +5602,7 @@
         }
         
         function performWallJump() {
-            if (performance.now() - player.lastWallJumpTime < 300) return false;
+            if (performance.now() - player.lastWallJumpTime < 500) return false;
             globalRaycaster.far = 1.5;
             const dirs = [
                 new THREE.Vector3(1,0,0), new THREE.Vector3(-1,0,0),
@@ -6033,9 +6065,9 @@
                 this.dodgeReactionTimer = 0;
                 this.ledgeTimer = 0;
                 this.lastPos = new THREE.Vector2(this.mesh.position.x, this.mesh.position.z);
-                this.stamina = 10;
-                this.maxStamina = 10;
-                this.staminaRegen = 3;
+                this.stamina = CONFIG.botStaminaMax;
+                this.maxStamina = CONFIG.botStaminaMax;
+                this.staminaRegen = CONFIG.botStaminaRegen;
                 this.visionTimer = Math.random() * 0.5;
                 this.canSeePlayerCached = false;
 
@@ -6254,7 +6286,7 @@
                     }
 
                     if (this.onGroundSafe(groundY)) {
-                        // Zero-Alloc LookAhead
+                        // Zero-Allocation LookAhead
                         _aiFwd.set(0,0,1).applyAxisAngle(_UP, this.mesh.rotation.y);
                         _aiTemp.copy(this.mesh.position).addScaledVector(_aiFwd, 2.0);
                         
@@ -6293,7 +6325,7 @@
                             const slideBase = (hpPct < 0.25) ? 0.4 : 0.05;
                             if (!this.isSliding && Math.random() < slideBase * intervalMultiplier) this.isSliding = true;
 
-                            // Zero-Alloc Retreat Dir
+                            // Zero-Allocation Retreat Dir
                             _aiDir.subVectors(this.mesh.position, playerPos).normalize();
                             
                             globalRaycaster.set(this.mesh.position, _aiDir);
@@ -6399,7 +6431,7 @@
                                 this.lastAttack = now;
                                 spawnSlash(this.mesh);
                                 AudioSys.playSlash(this.mesh.position);
-                                // Zero-Alloc Lunge
+                                // Zero-Allocation Lunge
                                 _aiDir.subVectors(playerPos, this.mesh.position).normalize();
                                 _aiDir.y = 0; _aiDir.normalize();
                                 
@@ -6550,8 +6582,11 @@
                     this.lastPos.set(this.mesh.position.x, this.mesh.position.z);
                 }
 
-                if (this.isSliding) {
-                    if (currentTheme === 0 && Math.random() < 0.3 * intervalMultiplier) spawnSnowTrail(this.mesh.position);
+                if (this.isSliding && this.state !== 'CONFUSED' && !this.isDeadCorpse) {
+                    const yOffTrail = -(this.type.scale - 0.35);
+                    const yOffKick = -(this.type.scale - 0.15);
+                    if (Math.random() < 0.3 * intervalMultiplier) spawnSnowTrail(this.mesh.position, this.velocity, yOffTrail);
+                    if (Math.random() < 0.5 * intervalMultiplier) spawnSnowKickup(this.mesh.position, this.velocity, yOffKick);
                 }
             }
 
