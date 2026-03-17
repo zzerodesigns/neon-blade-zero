@@ -22,7 +22,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v48.3.0</title>
+    <title>Neon Blade: Melee Arena v48.4.0</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -754,7 +754,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.3.0<br>- Systems Polish & Gadget Physics -</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.4.0<br>- Raven Magic & Ethereal Visuals -</div>
         </div>
     </div>
 
@@ -805,6 +805,37 @@
             regenRate: 25,
             botStaminaMax: 10,
             botStaminaRegen: 2
+        };
+
+        const SHADERS = {
+            ravenMagic: {
+                vertex: `
+                    uniform float time;
+                    void main() {
+                        vec3 pos = position;
+                        // Chaotic spiking/warping logic
+                        float noise = sin(pos.x * 12.0 + time * 10.0) * cos(pos.y * 12.0 + time * 10.0) * sin(pos.z * 12.0 + time * 10.0);
+                        noise += 0.5 * sin(pos.x * 25.0 - time * 15.0) * cos(pos.y * 25.0 + time * 18.0);
+                        noise += 0.25 * sin(pos.z * 40.0 + time * 25.0) * sin(pos.y * 35.0 - time * 20.0);
+                        
+                        // Add some "glitchy" jaggedness
+                        float jagged = step(0.8, sin(time * 20.0 + pos.x * 5.0)) * 0.2;
+                        noise += jagged;
+
+                        noise *= (0.5 + 0.5 * sin(time * 5.0)); // Pulsing intensity
+                        
+                        pos += normal * noise * 0.6; // Push outward along normal
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+                    }
+                `,
+                fragment: `
+                    uniform vec3 color;
+                    uniform float opacity;
+                    void main() {
+                        gl_FragColor = vec4(color, opacity);
+                    }
+                `
+            }
         };
 
         const SCORE_TITLES = [
@@ -2504,7 +2535,7 @@
                 // --- FLOOR & PERIMETER ---
                 // FIX: Added 'null' for rotation argument to restore correct argument alignment
                 // Signature: createBox(x, y, z, w, h, d, mat, isFloor, isWall, ms, rotation, disableCull, customOrder)
-                this.createBox(0, -1, 0, size, 2, size, materials.floor, true, false, ms, null, true, -1);
+                this.createBox(0, -2, 0, size, 4, size, materials.floor, true, false, ms, null, true, -1);
 
                 if (ms.name === 'TITAN') {
                     const baseHeight = 100;
@@ -3571,6 +3602,13 @@
                     teleportMarker.userData.diamond.position.y = 1.5 + pulse * 0.2;
                     teleportMarker.userData.ring.scale.setScalar(1 + pulse * 0.05);
                     
+                    // Sync ring rotation with diamond (half speed)
+                    teleportMarker.userData.ring.rotation.y = teleportMarker.userData.diamond.rotation.y * 0.5;
+
+                    if (teleportMarker.userData.ravenMat) {
+                        teleportMarker.userData.ravenMat.uniforms.time.value = t * 0.001;
+                    }
+                    
                     document.getElementById('icon-q').classList.add('active');
 
                 } else {
@@ -3611,22 +3649,65 @@
                 this.mesh = new THREE.Group();
                 this.mesh.position.set(x, y + 2.5, z); 
                 
-                const geo = new THREE.IcosahedronGeometry(1.5, 0);
-                const mat = materials.marker.clone();
-                mat.color.setHex(color);
-                mat.emissive.setHex(color);
-                mat.transparent = true;
-                mat.opacity = 0.5;
-                mat.wireframe = true;
+                const invertMat = new THREE.MeshBasicMaterial({ 
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: 1.0,
+                    blending: THREE.CustomBlending,
+                    blendEquation: THREE.AddEquation,
+                    blendSrc: THREE.OneMinusDstColorFactor,
+                    blendDst: THREE.OneMinusSrcColorFactor
+                });
                 
-                this.inner = new THREE.Mesh(geo, mat);
+                this.inner = new THREE.Mesh(new THREE.IcosahedronGeometry(1.5, 0), invertMat);
                 this.mesh.add(this.inner);
+
+                // 5x Ethereal Wireframes for Inner Shape
+                this.innerWires = [];
+                for (let i = 1; i <= 5; i++) {
+                    const wireMat = new THREE.MeshBasicMaterial({ 
+                        color: color, 
+                        wireframe: true, 
+                        transparent: true, 
+                        opacity: 0.15 / i 
+                    });
+                    const wire = new THREE.Mesh(new THREE.IcosahedronGeometry(1.5 + (i * 0.01), 0), wireMat);
+                    this.inner.add(wire);
+                    this.innerWires.push(wire);
+                }
                 
-                const outerGeo = new THREE.IcosahedronGeometry(2.0, 0);
-                const outerMat = mat.clone();
-                outerMat.opacity = 0.2;
-                this.outer = new THREE.Mesh(outerGeo, outerMat);
+                this.outer = new THREE.Mesh(new THREE.IcosahedronGeometry(2.0, 0), invertMat);
                 this.mesh.add(this.outer);
+
+                // 5x Ethereal Wireframes for Outer Shape
+                this.outerWires = [];
+                for (let i = 1; i <= 5; i++) {
+                    const wireMat = new THREE.MeshBasicMaterial({ 
+                        color: color, 
+                        wireframe: true, 
+                        transparent: true, 
+                        opacity: 0.15 / i 
+                    });
+                    const wire = new THREE.Mesh(new THREE.IcosahedronGeometry(2.0 + (i * 0.01), 0), wireMat);
+                    this.outer.add(wire);
+                    this.outerWires.push(wire);
+                }
+
+                // Universal Raven Magic Hull for Portal (Thinner, 30% Opacity)
+                this.ravenMat = new THREE.ShaderMaterial({
+                    uniforms: {
+                        time: { value: 0 },
+                        color: { value: new THREE.Color(color) }, // Match portal color
+                        opacity: { value: 0.3 } // Lowered to 30%
+                    },
+                    vertexShader: SHADERS.ravenMagic.vertex,
+                    fragmentShader: SHADERS.ravenMagic.fragment,
+                    side: THREE.BackSide,
+                    transparent: true
+                });
+                const ravenGeo = new THREE.IcosahedronGeometry(2.06, 2); // Thinner shell
+                this.ravenHull = new THREE.Mesh(ravenGeo, this.ravenMat);
+                this.outer.add(this.ravenHull);
 
                 this.particles = [];
                 for(let i=0; i<5; i++) {
@@ -3656,6 +3737,10 @@
                 
                 const scale = 1 + Math.sin(t * 3) * 0.1;
                 this.inner.scale.setScalar(scale);
+
+                if (this.ravenMat) {
+                    this.ravenMat.uniforms.time.value = t;
+                }
                 
                 this.particles.forEach(p => {
                     const time = t * p.speed + p.offset;
@@ -3980,18 +4065,41 @@
                 const core = new THREE.Mesh(coreGeo, coreMat);
                 group.add(core);
 
-                // 2. The Raven Wireframe (Solid, single layer, glowing)
-                const wireMat = materials.marker.clone();
-                wireMat.color.setHex(color);
-                wireMat.emissive.setHex(color);
-                wireMat.emissiveIntensity = 2.0;
-                wireMat.wireframe = true;
-                wireMat.transparent = true;
-                wireMat.opacity = 1.0;
+                // 2. The Raven Magic Hull (Inverted Hull Method)
+                const ravenMat = new THREE.ShaderMaterial({
+                    uniforms: {
+                        time: { value: 0 },
+                        color: { value: new THREE.Color(0x050010) }, // Deep dark purple/black
+                        opacity: { value: 0.80 } // 80% Opacity
+                    },
+                    vertexShader: SHADERS.ravenMagic.vertex,
+                    fragmentShader: SHADERS.ravenMagic.fragment,
+                    side: THREE.BackSide, // Render inside faces
+                    transparent: true
+                });
 
-                const wireGeo = new THREE.IcosahedronGeometry(range * 1.02, 2);
-                const wire = new THREE.Mesh(wireGeo, wireMat);
-                group.add(wire);
+                const ravenGeo = new THREE.IcosahedronGeometry(range * 1.05, 3); // Slightly larger shell
+                const ravenHull = new THREE.Mesh(ravenGeo, ravenMat);
+                group.add(ravenHull);
+
+                // 5x Ethereal Wireframes for Implosion
+                const wires = [];
+                const wireGeos = [];
+                const wireMats = [];
+                for (let i = 1; i <= 5; i++) {
+                    const wireMat = new THREE.MeshBasicMaterial({ 
+                        color: color, 
+                        wireframe: true, 
+                        transparent: true, 
+                        opacity: 0.15 / i 
+                    });
+                    const wireGeo = new THREE.IcosahedronGeometry(range * (1.0 + (i * 0.01)), 2);
+                    const wire = new THREE.Mesh(wireGeo, wireMat);
+                    group.add(wire);
+                    wires.push(wire);
+                    wireGeos.push(wireGeo);
+                    wireMats.push(wireMat);
+                }
 
                 // 3. Animation (Restored Original Speed: 0.05)
                 let s = 1.0;
@@ -4000,13 +4108,17 @@
                     if (s <= 0) { 
                         scene.remove(group); 
                         coreGeo.dispose(); coreMat.dispose(); 
-                        wireGeo.dispose(); wireMat.dispose();
+                        ravenGeo.dispose(); ravenMat.dispose();
+                        wireGeos.forEach(g => g.dispose());
+                        wireMats.forEach(m => m.dispose());
                         return; 
                     }
                     
                     group.scale.set(s, s, s);
+                    ravenMat.uniforms.time.value = performance.now() * 0.001;
                     
-                    if (camera.position.distanceTo(pos) < range * s) {
+                    const isInside = camera.position.distanceTo(pos) < range * s;
+                    if (isInside) {
                         coreMat.side = THREE.BackSide;
                         coreMat.depthTest = false;
                     } else {
@@ -4015,8 +4127,14 @@
                     }
                     
                     // Spin
-                    wire.rotation.y += 0.08;
-                    wire.rotation.z -= 0.03;
+                    ravenHull.rotation.y += 0.08;
+                    ravenHull.rotation.z -= 0.03;
+                    
+                    wires.forEach((w, i) => {
+                        w.visible = !isInside; // Hide wireframes when player is inside
+                        w.rotation.y += 0.05 + (i * 0.01);
+                        w.rotation.z -= 0.02 + (i * 0.01);
+                    });
                     
                     requestAnimationFrame(anim);
                 };
@@ -5204,13 +5322,14 @@
             }
             currentWind.lerp(windTarget, dt * 1.0); 
 
-            const limit = isSnow ? 600 : 80;
-            const spawnRate = isSnow ? 0.8 : 0.1;
+            const limit = isSnow ? 1000 : 150;
+            const spawnRate = isSnow ? 1.0 : 0.2;
+            const spawnRange = 120;
 
             if(weatherParticles.length < limit && Math.random() < spawnRate) {
                 let mesh, vel, type;
-                const px = camera.position.x + (Math.random()-0.5)*80;
-                const pz = camera.position.z + (Math.random()-0.5)*80;
+                const px = camera.position.x + (Math.random()-0.5)*spawnRange;
+                const pz = camera.position.z + (Math.random()-0.5)*spawnRange;
                 const py = camera.position.y + 25 + Math.random()*10;
 
                 if (isSnow) {
@@ -5435,30 +5554,80 @@
                 scene.remove(teleportMarker);
             }
             teleportMarker = new THREE.Group();
-            materials.marker.transparent = true;
+            
+            // 1. The Inversion Material (Guarantees Visibility)
+            const invertMat = new THREE.MeshBasicMaterial({ 
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.8,
+                blending: THREE.CustomBlending,
+                blendEquation: THREE.AddEquation,
+                blendSrc: THREE.OneMinusDstColorFactor,
+                blendDst: THREE.OneMinusSrcColorFactor
+            });
+
             const diamondGroup = new THREE.Group();
             diamondGroup.position.y = 1.5;
             teleportMarker.add(diamondGroup);
+            
+            // Base Inverted Diamond
             const geo = new THREE.OctahedronGeometry(0.8, 0);
-            const diamond = new THREE.Mesh(geo, materials.marker);
+            const diamond = new THREE.Mesh(geo, invertMat);
             diamondGroup.add(diamond);
-            const thickGeo = new THREE.OctahedronGeometry(0.805, 0);
-            const thickDiamond = new THREE.Mesh(thickGeo, materials.marker);
-            diamondGroup.add(thickDiamond);
+
+            // 5x Ethereal Wireframes for Teleport Diamond (Aura)
+            for (let i = 1; i <= 5; i++) {
+                const wireMat = new THREE.MeshBasicMaterial({ 
+                    color: 0x00ffff, 
+                    wireframe: true, 
+                    transparent: true, 
+                    opacity: 0.15 / i 
+                });
+                const wire = new THREE.Mesh(new THREE.OctahedronGeometry(0.8 + (i * 0.01), 0), wireMat);
+                diamondGroup.add(wire);
+            }
+
+            // Raven Magic Hull for Diamond (Subtle)
+            const ravenMat = new THREE.ShaderMaterial({
+                uniforms: {
+                    time: { value: 0 },
+                    color: { value: new THREE.Color(0x00ffff) },
+                    opacity: { value: 0.2 }
+                },
+                vertexShader: SHADERS.ravenMagic.vertex,
+                fragmentShader: SHADERS.ravenMagic.fragment,
+                side: THREE.BackSide,
+                transparent: true
+            });
+            const ravenHull = new THREE.Mesh(new THREE.OctahedronGeometry(0.85, 1), ravenMat);
+            diamondGroup.add(ravenHull);
+
             const ringGroup = new THREE.Group();
             ringGroup.position.y = 0.1;
             teleportMarker.add(ringGroup);
+
+            // Inverted Floor Ring
             const ringBaseGeo = new THREE.RingGeometry(0.8, 1.0, 32); 
-            const ringMat = materials.marker.clone();
-            ringMat.side = THREE.DoubleSide;
-            const ring = new THREE.Mesh(ringBaseGeo, ringMat);
+            const ring = new THREE.Mesh(ringBaseGeo, invertMat);
             ring.rotation.x = -Math.PI / 2;
             ringGroup.add(ring);
+
+            // Colored Aura Ring
+            const ringMat = materials.marker.clone();
+            ringMat.side = THREE.DoubleSide;
+            ringMat.transparent = true;
             const ring2 = new THREE.Mesh(ringBaseGeo, ringMat);
             ring2.rotation.x = -Math.PI / 2;
+            ring2.position.y = 0.001; // Tiny offset to prevent Z-fighting/clipping
             ring2.scale.setScalar(1.01); 
             ringGroup.add(ring2);
-            teleportMarker.userData = { diamond: diamondGroup, ring: ringGroup, ringMat: ringMat };
+
+            teleportMarker.userData = { 
+                diamond: diamondGroup, 
+                ring: ringGroup, 
+                ringMat: ringMat,
+                ravenMat: ravenMat 
+            };
             teleportMarker.visible = false;
             scene.add(teleportMarker);
         }

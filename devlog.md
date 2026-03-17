@@ -6,7 +6,6 @@
 *   **Floating Teleport Marker:** The teleport marker floats in mid-air when aimed at the new OBB (rotated) objects. The current raycaster only tests against AABB bounds or passes through. Needs an OBB intersection test added to the teleport raycast logic.
 
 ## 📝 playtest observations & implementation notes
-*   **Void Grenade "Raven Magic" VFX:** To achieve the jagged, dark-energy outline, we will use the "Inverted Hull" (Backface Culling Outline) method. Plan: Duplicate the explosion sphere mesh, flip the faces (render backfaces only), push vertices outward, color it solid black/deep purple, and apply a custom vertex shader to make the hull vibrate/warp chaotically.
 *   **UI Aesthetic Standard:** The "liquid glass" style (backdrop-filter blur, semi-transparent backgrounds, rounded corners, subtle drop shadows) is now the established standard for all UI elements (settings, messages, buttons) to ensure readability against bright backgrounds without visual clutter.
 *   **Collision Edge Cases:** The recent slope sliding bug revealed that SAT collision with OBBs can return downward-pointing normals if the player hits the underground flat faces of a ramp. Ground-checks (`_obbNormal.y < -0.1`) are necessary to force the physics engine to resolve upward along the slope.
 *   **OBB Sliding Friction & Slopes:** Sliding against any rotated surface (OBB walls, slopes) feels rough, like sliding on sandpaper. Slopes specifically suffer from a very obvious micro-bounce, and sliding downwards on them currently doesn't work at all.
@@ -15,7 +14,6 @@
 *   [ ] **Sandpaper Physics & OBB Sliding:** Resolve friction issues against rotated objects (walls and slopes) and implement ground-sticking logic to prevent micro-bouncing on downward slopes.
 *   [ ] **OBB Raycasting & Physics Compatibility:** Update teleport marker projection math for rotated surfaces and audit legacy AABB physics interactions for full OBB compatibility.
 *   [ ] **Theme Visuals & Visibility Polish:** Overhaul visual clarity across all themes, improving contrast, adding solid interaction textures, and ensuring distinct object visibility.
-*   [ ] **Void Grenade "Raven Magic" Shader:** Implement the inverted hull shader effect to finalize the void implosion visuals.
 *   [ ] **Single Slash System (SSS):** Introduce deliberate, 1-damage single slashes with a hidden, non-decaying streak counter. Differentiate from auto-slashes via unique animations and audio feedback to encourage precision playstyles.
 
 ## 💡 future ideas & roadmap
@@ -31,7 +29,6 @@
 
 ### Visuals & Interface
 *   **Floating Damage Numbers:** Implement an optional MMO-style damage counter overlay above enemy HP bars.
-*   **Stylized Outlines:** Apply the thick-border aesthetic from UI elements to in-game object outlines for cohesive visibility.
 *   **Procedural Texturing:** Develop a system to generate consistent, math-based textures without external image assets.
 *   **Math-Driven 3D Pipeline:** Investigate rendering pipelines for importing simple 3D geometry as pure mathematical functions.
 *   **Combat Typography & FX:** Redesign the strike font and slash particle graphics for greater impact.
@@ -57,12 +54,24 @@
 *   **Synthesized Melodies:** Integrate procedural Web Audio API melodies as easter eggs or ambient tracks.
 
 ## ✅ recently completed concepts
-*   ~~**Dynamic Audio Variance:** Implemented pitch and tone shifting across synthetic sound effects to prevent auditory fatigue.~~
-*   ~~**Ceiling Bounce Fix:** Resolved physics anomalies causing unintended ceiling bounces.~~
-*   ~~**Hybrid Object Pooling:** Finalized core engine optimizations for memory management.~~
-*   ~~**Grenade Trajectory & Tuning:** Centralized and perfected grenade physics, rendering additional explosion spin mechanics unnecessary.~~
+- [x] **Floor Collision Fix:** Doubled floor thickness (to 4 units) to prevent high-velocity fall-throughs.
+- [x] **Universal Raven Magic:** Applied the "Inverted Hull" effect to Portals, Void Implosion, and the Teleport Marker.
+- [x] **Ethereal Wireframe Stacking:** Implemented a 5-layer wireframe stack with decaying opacity for all ethereal objects.
+- [x] **Portal Visuals:** Added dual color inversion to inner/outer shapes and a 30% opacity color-matched raven hull.
+- [x] **Void Implosion Polish:** Adjusted hull opacity to 80%, restored asynchronous wireframe rotation, and hid wireframes when the player is inside.
+- [x] **Teleport Marker Visibility:** Upgraded with difference blending for perfect contrast, a 20% raven hull, Z-fighting fixes (0.001 Y-offset), and half-speed synchronized aura ring rotation.
+- [x] **Weather Enhancements:** Increased snow/leaf particle density and expanded the spawn distance radius.
 
 ## 📖 version history / patch notes
+
+### v48.4.0 - Raven Magic & Ethereal Visuals
+*   **Floor Collision:** Doubled the thickness of the floor object (to 4 units) to prevent players from falling into the void during high-velocity impacts.
+*   **Universal Raven Magic:** Implemented the "Inverted Hull" method (Backface Culling Outline) across Portals, Void Implosions, and the Teleport Marker. Features a custom chaotic vertex shader for a jagged, dark-energy aesthetic.
+*   **Ethereal Stacking:** Created a dense, shimmering technical ghosting effect by stacking 5 layers of wireframes with decaying opacity on all ethereal objects.
+*   **Portal Overhaul:** Applied mathematical difference blending (color inversion) to both inner and outer portal geometry, complemented by a 30% opacity, color-matched raven hull.
+*   **Void Implosion Refinement:** Tuned hull opacity to 80% for better background bleed, restored chaotic multi-layered wireframe rotation, and added a camera check to hide wireframes when the player is caught inside the blast.
+*   **Teleport Marker Upgrade:** Ensured perfect visibility against any background using difference blending on the core diamond and floor ring. Fixed Z-fighting with a precise 0.001 Y-offset and synchronized the aura ring to rotate at half the diamond's speed.
+*   **Weather Tuning:** Increased environmental immersion by bumping snow density to 1000, leaf density to 150, and expanding the spawn radius to 120 units.
 
 ### v48.3.0 - Systems Polish & Gadget Physics
 *   **Weather System:** Refactored to spawn dynamically around the player's camera with distance-based recycling, supporting vertical maps.
