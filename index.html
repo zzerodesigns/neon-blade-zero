@@ -22,7 +22,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v48.4.0</title>
+    <title>Neon Blade: Melee Arena v48.5.0</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -754,7 +754,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.4.0<br>- Raven Magic & Ethereal Visuals -</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.5.0<br>- Jump Pad Traversal System -</div>
         </div>
     </div>
 
@@ -2111,6 +2111,7 @@
         let enemies = [];
         let decorations = [];
         let portals = [];
+        let jumpPads = [];
         let spatialGrid = null;
         let currentMapGroup = null;
 
@@ -2273,6 +2274,7 @@
                 this.enemies = [];
                 this.decorations = [];
                 this.portals = [];
+                this.jumpPads = [];
                 
                 this.spatialGrid = new SpatialHashGrid(null, [config.size, config.size]);
                 this.group = new THREE.Group();
@@ -2371,6 +2373,7 @@
                 enemies = next.enemies;
                 decorations = next.decorations;
                 portals = next.portals;
+                jumpPads = next.jumpPads;
                 spatialGrid = next.spatialGrid;
                 
                 // 4. Build if needed
@@ -2462,6 +2465,7 @@
                 }
 
                 this.createPortals(mapState, cfg.size * 0.75);
+                this.createJumpPads(mapState, cfg.size * 0.75);
                 
                 for(let i=0; i<cfg.bots; i++) {
                      new Enemy(null, null, 'ROAM', 0, mapState);
@@ -2914,6 +2918,55 @@
                     const p1 = new Portal(portalLocs[i*2].x, portalLocs[i*2].y, portalLocs[i*2].z, c, null, ms);
                     const p2 = new Portal(portalLocs[i*2+1].x, portalLocs[i*2+1].y, portalLocs[i*2+1].z, c, null, ms);
                     p1.target = p2; p2.target = p1;
+                }
+            },
+            
+            createJumpPads: function(ms, range) {
+                const padCount = Math.max(4, Math.floor(range / 50)) * 2; 
+                
+                // Floor/Object pads
+                for(let i=0; i<padCount; i++) {
+                    let x = (Math.random()-0.5)*range;
+                    let z = (Math.random()-0.5)*range;
+                    let y = getRandomSpawnY(x, z);
+                    
+                    if (y <= -999) { y = 0; x = 0; z = 0; }
+                    
+                    new JumpPad(x, y + 0.05, z, new THREE.Vector3(0, 1, 0), ms);
+                }
+
+                // Side pads
+                const raycaster = new THREE.Raycaster();
+                for(let i=0; i<padCount; i++) {
+                    let attempts = 0;
+                    let placed = false;
+                    while(attempts < 50 && !placed) {
+                        attempts++;
+                        let x = (Math.random()-0.5)*range;
+                        let z = (Math.random()-0.5)*range;
+                        let y = 2 + Math.random() * 10; // Random height
+                        
+                        const angle = Math.random() * Math.PI * 2;
+                        const dir = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle));
+                        const origin = new THREE.Vector3(x, y, z);
+                        
+                        raycaster.set(origin, dir);
+                        const intersects = raycaster.intersectObjects(ms.walls);
+                        
+                        if (intersects.length > 0) {
+                            const hit = intersects[0];
+                            const normalMatrix = new THREE.Matrix3().getNormalMatrix(hit.object.matrixWorld);
+                            const worldNormal = hit.face.normal.clone().applyMatrix3(normalMatrix).normalize();
+                            
+                            if (Math.abs(worldNormal.y) < 0.1) {
+                                const pos = hit.point.clone().add(worldNormal.clone().multiplyScalar(0.05));
+                                if (pos.y > 1.0) {
+                                    new JumpPad(pos.x, pos.y, pos.z, worldNormal, ms);
+                                    placed = true;
+                                }
+                            }
+                        }
+                    }
                 }
             },
         };
@@ -3644,6 +3697,193 @@
         let lastAttackTime = 0;
         let currentSlashColor = 0x0088ff;
         
+        class JumpPad {
+            constructor(x, y, z, normal = new THREE.Vector3(0, 1, 0), ms = null) {
+                this.mesh = new THREE.Group();
+                this.mesh.position.set(x, y, z);
+                this.normal = normal.clone().normalize();
+                this.color = 0x00ffaa;
+                
+                // Align mesh to normal
+                const up = new THREE.Vector3(0, 1, 0);
+                if (this.normal.y < 0.999 && this.normal.y > -0.999) {
+                    const quaternion = new THREE.Quaternion().setFromUnitVectors(up, this.normal);
+                    this.mesh.quaternion.copy(quaternion);
+                } else if (this.normal.y <= -0.999) {
+                    this.mesh.rotation.x = Math.PI;
+                }
+
+                // Stack ethereal hexagonal ring outlines that invert colors behind them
+                const hexGeo = new THREE.RingGeometry(1.3, 1.5, 6);
+                const invertMat = new THREE.MeshBasicMaterial({ 
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: 1.0,
+                    blending: THREE.CustomBlending,
+                    blendEquation: THREE.AddEquation,
+                    blendSrc: THREE.OneMinusDstColorFactor,
+                    blendDst: THREE.OneMinusSrcColorFactor,
+                    side: THREE.DoubleSide
+                });
+                
+                this.hex1 = new THREE.Mesh(hexGeo, invertMat);
+                this.hex1.rotation.x = -Math.PI / 2;
+                this.hex1.position.y = 0.05;
+                this.mesh.add(this.hex1);
+
+                this.hex2 = new THREE.Mesh(hexGeo, invertMat);
+                this.hex2.rotation.x = -Math.PI / 2;
+                this.hex2.position.y = 0.2;
+                this.hex2.scale.set(0.8, 0.8, 0.8);
+                this.mesh.add(this.hex2);
+                
+                this.hex3 = new THREE.Mesh(hexGeo, invertMat);
+                this.hex3.rotation.x = -Math.PI / 2;
+                this.hex3.position.y = 0.35;
+                this.hex3.scale.set(0.6, 0.6, 0.6);
+                this.mesh.add(this.hex3);
+
+                // Glowing inner ring
+                const ringGeo = new THREE.RingGeometry(0.8, 1.2, 6);
+                this.ringMat = new THREE.MeshBasicMaterial({
+                    color: this.color,
+                    transparent: true,
+                    opacity: 0.8,
+                    side: THREE.DoubleSide,
+                    blending: THREE.AdditiveBlending
+                });
+                this.ring = new THREE.Mesh(ringGeo, this.ringMat);
+                this.ring.rotation.x = -Math.PI / 2;
+                this.ring.position.y = 0.06;
+                this.mesh.add(this.ring);
+
+                // Center core
+                const coreGeo = new THREE.CircleGeometry(0.5, 6);
+                this.coreMat = new THREE.MeshBasicMaterial({
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: 0.9,
+                    side: THREE.DoubleSide,
+                    blending: THREE.AdditiveBlending
+                });
+                this.core = new THREE.Mesh(coreGeo, this.coreMat);
+                this.core.rotation.x = -Math.PI / 2;
+                this.core.position.y = 0.06;
+                this.mesh.add(this.core);
+
+                this.cooldown = 0;
+
+                if (ms) {
+                    ms.group.add(this.mesh);
+                    ms.jumpPads.push(this);
+                } else {
+                    scene.add(this.mesh);
+                    jumpPads.push(this);
+                }
+            }
+
+            update(dt) {
+                const t = performance.now() * 0.001;
+                if (this.cooldown > 0) {
+                    this.cooldown -= dt;
+                    this.ringMat.opacity = 0.1;
+                    this.coreMat.opacity = 0.1;
+                } else {
+                    this.ringMat.opacity = 0.5 + Math.sin(t * 8) * 0.3;
+                    this.coreMat.opacity = 0.7 + Math.sin(t * 12) * 0.3;
+                    this.ring.rotation.z = t * 0.5;
+                    this.core.rotation.z = -t * 0.5;
+                    
+                    // Floating particles (sliding kickup effect)
+                    if (Math.random() < 0.2) {
+                        const p = _particlePool[_particleIdx];
+                        _particleIdx = (_particleIdx + 1) % 800;
+                        p.active = true;
+                        p.type = 'static'; 
+                        p.life = 0.8 + Math.random() * 0.4;
+                        p.maxLife = p.life;
+                        p.targetOpacity = 0.8;
+                        p.mesh.visible = true;
+                        p.mesh.material.color.setHex(this.color);
+                        p.mesh.material.opacity = 0.8;
+                        p.mesh.material.blending = THREE.AdditiveBlending;
+                        
+                        // spawn within the pad area
+                        const localPos = new THREE.Vector3((Math.random()-0.5)*2.5, 0.1, (Math.random()-0.5)*2.5);
+                        localPos.applyQuaternion(this.mesh.quaternion);
+                        p.mesh.position.copy(this.mesh.position).add(localPos);
+                        
+                        const vel = this.normal.clone().multiplyScalar(1 + Math.random() * 2);
+                        p.velocity.copy(vel);
+                        p.mesh.scale.set(0.2, 0.2, 0.2);
+                    }
+
+                    const pos = this.mesh.position;
+                    
+                    // Check distance using plane distance and radius
+                    const checkTrigger = (entityPos, radius = 0.5) => {
+                        const toEntity = entityPos.clone().sub(pos);
+                        const distFromPlane = toEntity.dot(this.normal);
+                        if (distFromPlane > -0.5 && distFromPlane < 6.0) {
+                            const projected = toEntity.clone().sub(this.normal.clone().multiplyScalar(distFromPlane));
+                            // Account for entity radius to trigger on edge contact
+                            if (projected.length() < (1.5 + radius)) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    };
+
+                    if (checkTrigger(camera.position, 0.5)) {
+                        this.trigger(camera.position, true);
+                        return;
+                    }
+                    for (let e of enemies) {
+                        if (e.isDeadCorpse) continue;
+                        if (checkTrigger(e.mesh.position, e.type.scale)) {
+                            this.trigger(e.mesh.position, false, e);
+                            return;
+                        }
+                    }
+                }
+            }
+
+            trigger(entityPos, isPlayer, entity = null) {
+                if (this.cooldown > 0) return;
+                this.cooldown = 2.0;
+
+                // Explosion spawns slightly behind the contact point (along the normal)
+                const explosionPos = entityPos.clone().sub(this.normal.clone().multiplyScalar(1.0));
+                
+                let range = 4.0; // Small range, only affects the entity that stepped on it
+                let force = 100;
+                let color = this.color;
+
+                spawnImpact(explosionPos, color, 1.5);
+                spawnParticles(explosionPos, color, 20, 3.0);
+                spawnRipple(explosionPos, this.normal, color);
+                
+                AudioSys.playImpulse(explosionPos);
+
+                const applyForce = (ePos, eVel, isP) => {
+                    const toEntity = ePos.clone().sub(explosionPos);
+                    const dist = toEntity.length();
+                    if (dist < range) {
+                        const dir = toEntity.normalize();                        
+                        const falloff = 1.0 - (dist / range);
+                        eVel.addScaledVector(dir, force * falloff);
+                        if (isP) player.onGround = false;
+                    }
+                };
+
+                if (isPlayer) {
+                    applyForce(camera.position, player.velocity, true);
+                } else if (entity) {
+                    applyForce(entity.mesh.position, entity.velocity, false);
+                }
+            }
+        }
+
         class Portal {
             constructor(x, y, z, color, targetPortal = null, ms = null) {
                 this.mesh = new THREE.Group();
@@ -3993,7 +4233,7 @@
                             const pullStrength = (dist / range); 
                             e.velocity.addScaledVector(dir, force * pullStrength); 
                         } else {
-                             dir.y = 0.8; dir.normalize(); 
+                             dir.y = 0.3; dir.normalize(); 
                              e.velocity.addScaledVector(dir, force * falloff);
                         }
                     }
@@ -6797,7 +7037,7 @@
                 const groundY = this.lastGroundHeight;
                 const floorThreshold = groundY + (1 * this.type.scale);
 
-                if (this.mesh.position.y > floorThreshold + 0.1) {
+                if (this.mesh.position.y > floorThreshold + 0.1 || this.velocity.y > 0) {
                     this.velocity.y -= CONFIG.gravity * dt;
 
                     // Fall Recovery Jump (Double Jump logic)
@@ -7155,6 +7395,7 @@
 
                 updateWeather(dt);
                 for(let p of portals) p.update(dt);
+                for(let jp of jumpPads) jp.update(dt);
                 
                 for (let i = projectiles.length - 1; i >= 0; i--) {
                     projectiles[i].update(dt);

@@ -54,6 +54,8 @@
 *   **Synthesized Melodies:** Integrate procedural Web Audio API melodies as easter eggs or ambient tracks.
 
 ## ✅ recently completed concepts
+- [x] **Jump Pads:** Implemented surface-aligned jump pads on floors and walls with custom impulse physics and color-inverting visuals.
+- [x] **Bot Physics:** Fixed grounded-state velocity wiping and standardized an upward launch bias for explosions.
 - [x] **Floor Collision Fix:** Doubled floor thickness (to 4 units) to prevent high-velocity fall-throughs.
 - [x] **Universal Raven Magic:** Applied the "Inverted Hull" effect to Portals, Void Implosion, and the Teleport Marker.
 - [x] **Ethereal Wireframe Stacking:** Implemented a 5-layer wireframe stack with decaying opacity for all ethereal objects.
@@ -63,6 +65,12 @@
 - [x] **Weather Enhancements:** Increased snow/leaf particle density and expanded the spawn distance radius.
 
 ## 📖 version history / patch notes
+
+### v48.5.0 - Jump Pad Traversal System
+*   **Jump Pads:** Introduced procedural Jump Pads as a new traversal mechanic that spawns dynamically across floors, walls, and platforms. These pads trigger a localized impulse explosion with a force of 100 upon contact.
+*   **Launch Physics:** Calculated explosion offsets based on surface normals to prevent backward launching. Standardized a specific upward bias (`dir.y = 0.3`) for explosions to ensure entities consistently clear floor geometry.
+*   **Bot Physics:** Patched a core physics bug that prevented grounded bots from launching correctly upon impact with impulse explosions.
+*   **Inversion Visuals:** Designed color-inverting hexagonal outlines using stacked ring geometry and `THREE.CustomBlending`, complemented by localized, outward-floating particle emissions.
 
 ### v48.4.0 - Raven Magic & Ethereal Visuals
 *   **Floor Collision:** Doubled the thickness of the floor object (to 4 units) to prevent players from falling into the void during high-velocity impacts.
@@ -104,3 +112,36 @@
 *   Unified "world" to "map" terminology across the codebase.
 *   Fixed geometry orientations in the GYM map (but not really).
 *   Established `architecture.md` and single-file strict rules.
+
+## 🗄️ session logs
+
+### Session: Jump Pads & Physics Tuning (v48.5.0)
+
+#### Development Log
+**Initial Implementation & Physics Hurdles**
+The integration of Jump Pads began with the goal of creating localized, high-power impulse explosions triggered by contact. Early implementation attempts struggled with spatial logic and physics vectors. The initial spawning system failed to utilize the existing portal raycasting logic, resulting in pads missing floating platforms entirely. Furthermore, the launch physics were fundamentally flawed; entities running into the pads were being launched backward because the explosion origin was not correctly offset relative to the pad's surface normal.
+
+**Systemic Spawning & Bot Interactions**
+A significant breakthrough occurred when diagnosing why enemy bots were largely unaffected by the impulse explosions. We identified a core physics bug where grounded bots were having their upward velocity instantly wiped out by the update loop. Fixing this allowed bots to enter an "airborne" state correctly. To ensure reliable launches across all entities, we refined the explosion logic to offset the blast slightly behind the contact point along the pad's normal, pushing the entity outward. Spawning was also overhauled into a dual-pass system: one loop matching portal density for floors and platforms, and a secondary raycasting loop dedicated to snapping pads to vertical AABB and OBB walls.
+
+**Aesthetic Polish & Inversion Design**
+The visual design required several iterations to fit the cyberpunk/wireframe aesthetic without causing visual glitches. Early dark wireframe designs clipped heavily into the floor geometry. The solution was an "inversion" approach: stacking multiple `RingGeometry` hexagonal outlines and applying `THREE.CustomBlending` with `OneMinusDstColorFactor` and `OneMinusSrcColorFactor`. This created a striking color-inverting effect that remains visible against any background without clipping. Directional floating particles were added to emit along the pad's normal, providing dynamic visual feedback.
+
+**Project Migration & Final Physics Tuning**
+Following a period of severe AI degradation and quota exhaustion, the project was migrated to a new environment. Here, final physics tuning was achieved. A specific upward bias was successfully corrected to ensure it only affected bots impacted by the impulse explosion, allowing them to consistently clear floor geometry without altering the player's intended physics. Attempts to fix entity knockback were abandoned after proving unstable, solidifying the current build.
+
+#### Prompt History
+*   **Initial Concept & False Start:** The user wanted to introduce a new environmental traversal mechanic (Jump Pads) spawning dynamically across floors and walls with a localized, double-strength impulse explosion. The agent hallucinated its response, attempting to wrap up a non-existent session. The code was rolled back.
+*   **Correction & First Pass:** The user forcefully corrected the agent. The agent implemented basic procedural spawning and set the explosion force to 120, but introduced an overcomplicated directional launch calculation and a clunky visual design.
+*   **Physics Refinement & Bot Bug Discovery:** The user requested fixes for spawning on floating platforms, simplifying explosion logic to prevent backward launching, reducing blast radius, and investigating why bots ignored explosive forces. The agent fixed a critical bug where grounded bots had their upward velocity wiped out, but mistakenly offset the explosion "slightly below the feet," breaking omni-directional physics.
+*   **Wall Spawning & Aesthetic Overhaul:** The user directed the agent to create a dedicated secondary spawn loop for walls, remove the flawed "below the feet" logic, and requested a visual overhaul using color-inverting outlines. The agent implemented the visual blending and wall spawning but broke the launch vectors, causing backward launches.
+*   **Density & Vector Correction:** The user demanded jump pad density match the portal count and a final fix for the backward-launching physics. The agent updated the explosion origin to sit slightly behind the pad's surface (opposite its normal), ensuring the impulse vector always pushes outward, and matched the spawn counts.
+*   **Final Polish & Manual Adjustments:** After manual rollbacks and edits to standardize a `0.3` upward bias for explosions, the user restated the final architectural requirements. The agent documented the final stable state, confirming the AABB/OBB wall raycasting, normal-based explosion offset, custom blending materials, and outward-floating particles.
+*   **Project Migration & Upward Bias Correction:** Following a catastrophic failure loop that exhausted the Pro model quota, the user migrated the codebase to a new account. Using the Flash model, the user sought to correctly apply the upward bias exclusively to bots impacted by impulse explosions, and attempted to fix broken entity knockback mechanics. The Flash model successfully corrected the bias but failed to resolve the knockback issue, which was abandoned to finalize the v48.5.0 build.
+
+#### Addendum: Post-Implementation Failures & Quota Exhaustion
+Following the successful implementation of the Jump Pads, the user attempted to refine the spawn logic for both portals and jump pads, alongside minor visual tweaks. This initiated a catastrophic breakdown in the AI's reasoning capabilities. The agent entered a loop of severe confusion, repeatedly overwriting stable logic with broken, hallucinated code. Over the course of 20 minutes, the agent systematically dismantled the working architecture, generating complete garbage and entirely exhausting the user's Gemini Pro 3.1 Preview quota.
+
+Forced to switch to the Gemini 3 Flash model to salvage the session, the user attempted to guide the AI to fix the code or at least perform a session wrap-up. The Flash model failed to comprehend the wrap-up request entirely. Out of sheer frustration, the user was forced to migrate the entire codebase to a new project on a different account to regain Pro quota.
+
+In the new environment, the Flash model was utilized to successfully identify and correct the upward bias attachment for bots impacted by impulse explosions. However, attempts to fix entity knockback failed entirely. Recognizing the AI's limitations and the compounding technical debt of its hallucinations, the user rolled back to the upward bias fix, accepted that knockback would remain broken for the time being, and halted further modifications to preserve the project's sanity at v48.5.0.
