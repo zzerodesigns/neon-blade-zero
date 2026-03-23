@@ -22,7 +22,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v48.6.0</title>
+    <title>Neon Blade: Melee Arena v48.6.1</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -570,6 +570,34 @@
         @keyframes shake { 10%, 90% { transform: translate3d(-1px, 0, 0); } 20%, 80% { transform: translate3d(2px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-4px, 0, 0); } 40%, 60% { transform: translate3d(4px, 0, 0); } }
         .ui-spark { position: fixed; width: 3px; height: 12px; background: #fff; pointer-events: none; z-index: 100; animation: spark-anim 0.4s ease-out forwards; }
         @keyframes spark-anim { 0% { opacity: 1; transform: translate(-50%, -50%) rotate(var(--r)) scale(1); } 100% { opacity: 0; transform: translate(var(--tx), var(--ty)) rotate(var(--r)) scale(0); } }
+
+        /* NEURAL OVERRIDE FX */
+        @keyframes neuralWipe {
+            0% { background-position: 200% center; }
+            100% { background-position: -200% center; }
+        }
+        .neural-text-enabled {
+            background: linear-gradient(90deg, #60a5fa 0%, #bfdbfe 30%, #ffffff 50%, #bfdbfe 70%, #60a5fa 100%);
+            background-size: 200% auto;
+            color: transparent;
+            -webkit-background-clip: text;
+            background-clip: text;
+            animation: neuralWipe 2.5s linear infinite;
+            font-weight: 600;
+            letter-spacing: 1px;
+            filter: drop-shadow(0 0 6px rgba(96, 165, 250, 0.5));
+        }
+        .neural-text-disabled {
+            background: linear-gradient(90deg, #f87171 0%, #fecaca 30%, #ffffff 50%, #fecaca 70%, #f87171 100%);
+            background-size: 200% auto;
+            color: transparent;
+            -webkit-background-clip: text;
+            background-clip: text;
+            animation: neuralWipe 2.5s linear infinite;
+            font-weight: 600;
+            letter-spacing: 1px;
+            filter: drop-shadow(0 0 6px rgba(248, 113, 113, 0.5));
+        }
     </style>
     <link rel="stylesheet" href="/index.css">
 </head>
@@ -754,7 +782,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.6.0<br>- Neural Override (AutopplaySystem) -</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.6.1<br>- Neural Override 1.1 (Spatial Awareness)-</div>
         </div>
     </div>
 
@@ -1050,6 +1078,7 @@
                 this.sprintTimer = 0;
                 this.lastPos = new THREE.Vector3();
                 this.stuckTimer = 0;
+                this.pitchOverride = null;
             }
 
             handleKey(key) {
@@ -1067,12 +1096,13 @@
             cancel() {
                 if (this.active) {
                     this.active = false;
-                    NarrativeSys.show("<span style='color:#ff3333'>Neural Override Disabled</span>", 3);
+                    NarrativeSys.show("<span class='neural-text-disabled'>Neural Override Disabled</span>", 3);
                     if (player.aimingGadget) player.endAim();
                     if (player.teleportActive) player.onTeleportInput();
                     if (this.savedTeleportMode) teleportMode = this.savedTeleportMode;
                     for (let k in InputManager.keys) InputManager.keys[k] = false;
                     player.wantsToJump = false;
+                    this.pitchOverride = null;
                 }
             }
 
@@ -1080,8 +1110,71 @@
                 this.active = true;
                 this.savedTeleportMode = teleportMode;
                 teleportMode = 'AIM';
-                NarrativeSys.show("<span style='color:#33ff33'>Neural Override Enabled</span>", 3);
+                NarrativeSys.show("<span class='neural-text-enabled'>Neural Override Enabled</span>", 3);
                 this.pickNewState();
+            }
+
+            checkLineOfSight(targetPos) {
+                const dir = new THREE.Vector3().subVectors(targetPos, camera.position);
+                const dist = dir.length();
+                dir.normalize();
+                globalRaycaster.set(camera.position, dir);
+                globalRaycaster.far = dist;
+                const hits = globalRaycaster.intersectObjects([...walls, ...groundObjects]);
+                return hits.length === 0;
+            }
+
+            findBestTarget() {
+                let best = null;
+                let bestScore = -Infinity;
+                for (let b of enemies) {
+                    if (b.isDeadCorpse) continue;
+                    const dist = b.mesh.position.distanceTo(camera.position);
+                    const los = this.checkLineOfSight(b.mesh.position);
+                    let score = -dist;
+                    if (los) score += 100; // Heavily weight visible targets
+                    if (score > bestScore) {
+                        bestScore = score;
+                        best = b;
+                    }
+                }
+                return best;
+            }
+
+            // Phase 1: Spatial Awareness Raycasts
+            findValidFloor(origin, radius) {
+                for (let i = 0; i < 8; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const r = Math.random() * radius;
+                    const testPos = origin.clone().add(new THREE.Vector3(Math.cos(angle) * r, 20, Math.sin(angle) * r));
+                    globalRaycaster.set(testPos, new THREE.Vector3(0, -1, 0));
+                    globalRaycaster.far = 40;
+                    const hits = globalRaycaster.intersectObjects(groundObjects);
+                    if (hits.length > 0) {
+                        // Check if we have line of sight to this floor point from slightly above it
+                        const hitPoint = hits[0].point;
+                        const checkPos = hitPoint.clone().add(new THREE.Vector3(0, 1, 0));
+                        if (this.checkLineOfSight(checkPos)) {
+                            return hitPoint;
+                        }
+                    }
+                }
+                return null;
+            }
+
+            checkGapForward(dir, distance) {
+                const testPos = camera.position.clone().add(dir.clone().multiplyScalar(distance));
+                globalRaycaster.set(testPos, new THREE.Vector3(0, -1, 0));
+                globalRaycaster.far = 5; // Look down 5 units
+                const hits = globalRaycaster.intersectObjects(groundObjects);
+                return hits.length === 0; // True if gap
+            }
+
+            checkWallForward(dir, distance) {
+                globalRaycaster.set(camera.position, dir);
+                globalRaycaster.far = distance;
+                const hits = globalRaycaster.intersectObjects(walls);
+                return hits.length > 0;
             }
 
             update(dt) {
@@ -1122,11 +1215,12 @@
                 const dz = this.targetPos.z - camera.position.z;
                 const distXZ = Math.sqrt(dx*dx + dz*dz);
                 
-                if (distXZ > 0.1 || Math.abs(dy) > 0.1) {
+                if (distXZ > 0.1 || Math.abs(dy) > 0.1 || this.pitchOverride !== null) {
                     const targetYaw = Math.atan2(-dx, -dz);
-                    const targetPitch = Math.atan2(dy, distXZ);
+                    const targetPitch = this.pitchOverride !== null ? this.pitchOverride : Math.atan2(dy, distXZ);
 
                     let diffYaw = targetYaw - camera.rotation.y;
+                    if (!isFinite(diffYaw)) diffYaw = 0;
                     while (diffYaw > Math.PI) diffYaw -= Math.PI * 2;
                     while (diffYaw < -Math.PI) diffYaw += Math.PI * 2;
                     
@@ -1137,74 +1231,68 @@
             }
 
             evaluateIntention() {
-                let closestBot = this.findClosestBot();
+                this.targetBot = this.findBestTarget();
+                const distToBot = this.targetBot ? camera.position.distanceTo(this.targetBot.mesh.position) : Infinity;
+                const hasLOS = this.targetBot ? this.checkLineOfSight(this.targetBot.mesh.position) : false;
                 
-                if (this.targetBot && !this.targetBot.isDeadCorpse) {
-                    const distToCurrent = camera.position.distanceTo(this.targetBot.mesh.position);
-                    if (distToCurrent < 100 && player.health >= 40) {
-                        closestBot = this.targetBot;
-                    }
-                }
-
-                const distToBot = closestBot ? camera.position.distanceTo(closestBot.mesh.position) : Infinity;
-                
-                if (player.health < 40 && distToBot < 30) {
+                if (player.health < 50) {
                     this.intention = 'ESCAPE';
                     this.idleTime = 0;
-                } else if (distToBot < 15) {
+                } else if (this.targetBot && distToBot < 20 && hasLOS) {
                     this.intention = 'ENGAGE';
                     this.idleTime = 0;
-                } else if (distToBot < 60) {
+                } else if (this.targetBot && distToBot < 80) {
                     this.intention = 'HUNT';
                     this.idleTime = 0;
                 } else {
                     this.idleTime += 1;
-                    if (this.idleTime > 5 && closestBot) {
+                    if (this.idleTime > 5 && this.targetBot) {
                         this.intention = 'HUNT';
                     } else {
                         this.intention = 'EXPLORE';
                     }
                 }
-                this.targetBot = closestBot;
             }
 
             pickNewState() {
                 if (player.aimingGadget) player.endAim();
                 if (player.teleportActive) player.onTeleportInput();
+                this.pitchOverride = null;
 
                 let possibleStates = [];
-                const highEnergy = player.energy > 80;
+                const highEnergy = player.energy > 50;
                 
                 switch (this.intention) {
                     case 'ESCAPE':
                         possibleStates = [
-                            { state: 'TRAVERSAL', weight: 50 },
-                            { state: 'GADGET', weight: highEnergy ? 60 : 30 },
+                            { state: 'TRAVERSAL', weight: 40 },
+                            { state: 'GADGET', weight: highEnergy ? 40 : 0 },
                             { state: 'ENVIRONMENT', weight: 20 },
-                            { state: 'TELEPORTING', weight: 20 }
+                            { state: 'TELEPORTING', weight: 40 }
                         ];
                         break;
                     case 'ENGAGE':
                         possibleStates = [
                             { state: 'COMBAT', weight: 60 },
-                            { state: 'GADGET', weight: highEnergy ? 50 : 20 },
+                            { state: 'GADGET', weight: highEnergy ? 40 : 0 },
                             { state: 'TRAVERSAL', weight: 20 }
                         ];
                         break;
                     case 'HUNT':
                         possibleStates = [
-                            { state: 'TRAVERSAL', weight: 60 },
+                            { state: 'TRAVERSAL', weight: 50 },
                             { state: 'TELEPORTING', weight: 30 },
-                            { state: 'ENVIRONMENT', weight: 10 },
-                            { state: 'GADGET', weight: highEnergy ? 30 : 5 }
+                            { state: 'GADGET', weight: highEnergy ? 30 : 0 },
+                            { state: 'ENVIRONMENT', weight: 20 }
                         ];
                         break;
                     case 'EXPLORE':
                     default:
                         possibleStates = [
-                            { state: 'TRAVERSAL', weight: 50 },
-                            { state: 'ENVIRONMENT', weight: 30 },
-                            { state: 'IDLE', weight: 20 }
+                            { state: 'TRAVERSAL', weight: 60 },
+                            { state: 'ENVIRONMENT', weight: 40 },
+                            { state: 'TELEPORTING', weight: 20 },
+                            { state: 'IDLE', weight: 10 }
                         ];
                         break;
                 }
@@ -1219,13 +1307,10 @@
                     }
                 }
 
-                if (this.state === 'COMBAT' || this.state === 'HUNT') {
-                    this.stateTimer = 4.0 + Math.random() * 4.0;
-                } else if (this.state === 'GADGET') {
-                    this.stateTimer = 1.5 + Math.random() * 1.5;
-                } else {
-                    this.stateTimer = 2.0 + Math.random() * 3.0;
-                }
+                if (this.state === 'COMBAT') this.stateTimer = 2.0 + Math.random() * 3.0;
+                else if (this.state === 'GADGET') this.stateTimer = 1.5 + Math.random();
+                else if (this.state === 'TELEPORTING') this.stateTimer = 1.5 + Math.random();
+                else this.stateTimer = 2.0 + Math.random() * 2.0;
                 
                 this.subTimer = 0;
                 this.gadgetPhase = 0;
@@ -1235,17 +1320,6 @@
                 if (this.state === 'ENVIRONMENT') this.startEnvironment();
                 if (this.state === 'GADGET') this.startGadget();
                 if (this.state === 'TELEPORTING') this.startTeleporting();
-            }
-
-            findClosestBot() {
-                let closest = null;
-                let minDist = Infinity;
-                for (let b of enemies) {
-                    if (b.isDeadCorpse) continue;
-                    const d = b.mesh.position.distanceTo(camera.position);
-                    if (d < minDist) { minDist = d; closest = b; }
-                }
-                return closest;
             }
 
             updateTraversal(dt) {
@@ -1260,69 +1334,95 @@
                     this.stuckTimer = 0;
                 }
 
-                if (this.slideTimer > 0) {
-                    this.slideTimer -= dt;
-                    InputManager.keys.c = true;
+                let moveDir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+                moveDir.y = 0;
+                if (moveDir.lengthSq() < 0.001) moveDir.set(0, 0, -1);
+                moveDir.normalize();
+
+                if (this.intention === 'ESCAPE' && this.targetBot) {
+                    moveDir = new THREE.Vector3().subVectors(camera.position, this.targetBot.mesh.position);
+                    moveDir.y = 0;
+                    if (moveDir.lengthSq() < 0.001) moveDir.set(0, 0, -1);
+                    moveDir.normalize();
+                    this.targetPos.copy(camera.position).add(moveDir.multiplyScalar(20));
+                    InputManager.keys.shift = true;
+                } else if (this.intention === 'HUNT' && this.targetBot) {
+                    this.targetPos.copy(this.targetBot.mesh.position);
+                    InputManager.keys.shift = true;
+                } else {
+                    this.subTimer -= dt;
+                    if (this.subTimer <= 0) {
+                        // Pick a random direction, but check if it's valid
+                        const angle = Math.random() * Math.PI * 2;
+                        const dir = new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle));
+                        if (!this.checkWallForward(dir, 10)) {
+                            this.targetPos.copy(camera.position).add(dir.multiplyScalar(20));
+                            this.subTimer = 1.0 + Math.random() * 2.0;
+                        } else {
+                            this.subTimer = 0.2; // Try again soon
+                        }
+                    }
+                    if (Math.random() < 0.1 && this.sprintTimer <= 0) this.sprintTimer = 2.0 + Math.random() * 2.0;
                 }
+
                 if (this.sprintTimer > 0) {
                     this.sprintTimer -= dt;
                     InputManager.keys.shift = true;
                 }
 
-                if (this.intention === 'ESCAPE' && this.targetBot) {
-                    const dir = new THREE.Vector3().subVectors(camera.position, this.targetBot.mesh.position).normalize();
-                    this.targetPos.copy(camera.position).add(dir.multiplyScalar(20));
-                    InputManager.keys.shift = true;
-                    if (player.onGround && Math.random() < 0.05 && this.slideTimer <= 0) this.slideTimer = 1.0 + Math.random();
-                } else if (this.intention === 'HUNT' && this.targetBot) {
-                    this.targetPos.copy(this.targetBot.mesh.position);
-                    InputManager.keys.shift = true;
-                    if (player.onGround && Math.random() < 0.05 && this.slideTimer <= 0) this.slideTimer = 0.8 + Math.random();
-                } else if (this.intention === 'ENGAGE' && this.targetBot) {
-                    this.targetPos.copy(this.targetBot.mesh.position);
-                    if (Math.random() < 0.5) InputManager.keys.a = true;
-                    else InputManager.keys.d = true;
-                    if (player.onGround && Math.random() < 0.1 && this.slideTimer <= 0) this.slideTimer = 0.5 + Math.random() * 0.5;
+                // Phase 2: Fluid Traversal with Raycasts
+                if (player.onGround) {
+                    // Slide if sprinting and moving
+                    if (this.sprintTimer > 0 && Math.random() < 0.05 && this.slideTimer <= 0) {
+                        this.slideTimer = 0.5 + Math.random();
+                    }
+                    
+                    // Check for gaps
+                    if (this.checkGapForward(moveDir, 3)) {
+                        player.onJumpInput(false); // Jump over gap
+                    }
                 } else {
-                    this.subTimer -= dt;
-                    if (this.subTimer <= 0) {
-                        this.targetPos.set(
-                            camera.position.x + (Math.random() - 0.5) * 40,
-                            camera.position.y + (Math.random() - 0.5) * 10,
-                            camera.position.z + (Math.random() - 0.5) * 40
-                        );
-                        this.subTimer = 1.0 + Math.random() * 2.0;
-                    }
-                    if (Math.random() < 0.1 && this.sprintTimer <= 0) this.sprintTimer = 2.0 + Math.random() * 2.0;
-                    if (player.onGround && Math.random() < 0.05 && this.slideTimer <= 0) this.slideTimer = 1.0 + Math.random();
-                }
-
-                if (player.isWallSliding) {
-                    if (Math.random() < 0.05) {
-                        player.onJumpInput(false);
-                        this.targetPos.copy(camera.position).add(new THREE.Vector3(
-                            (Math.random() - 0.5) * 20,
-                            0,
-                            (Math.random() - 0.5) * 20
-                        ));
-                    }
-                } else if (!player.onGround) {
-                    // Try to find a wall to slide on if airborne
-                    if (Math.random() < 0.1) {
-                        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
-                        globalRaycaster.set(camera.position, forward);
-                        globalRaycaster.far = 10;
-                        const hits = globalRaycaster.intersectObjects(walls);
-                        if (hits.length > 0) {
-                            this.targetPos.copy(hits[0].point);
+                    if (player.isWallSliding) {
+                        // Wall bounce
+                        if (Math.random() < 0.1) {
+                            player.onJumpInput(false);
+                            // Look away from wall
+                            this.targetPos.copy(camera.position).add(new THREE.Vector3((Math.random() - 0.5) * 20, 0, (Math.random() - 0.5) * 20));
+                        }
+                    } else {
+                        // Double jump if falling into a gap or trying to reach higher
+                        if (player.velocity.y < 0 && player.jumpCount < player.maxJumps) {
+                            if (this.checkGapForward(moveDir, 2)) {
+                                player.onJumpInput(false);
+                            }
+                        }
+                        
+                        // Seek walls to slide
+                        if (this.checkWallForward(moveDir, 4)) {
+                            // Keep moving forward to hit the wall
+                            InputManager.keys.w = true;
                         }
                     }
+                }
+
+                if (this.slideTimer > 0) {
+                    this.slideTimer -= dt;
+                    InputManager.keys.c = true;
                 }
             }
 
             updateCombat(dt) {
                 if (!this.targetBot || this.targetBot.isDeadCorpse) {
-                    this.targetBot = this.findClosestBot();
+                    this.stateTimer = 0; return;
+                }
+
+                const dist = camera.position.distanceTo(this.targetBot.mesh.position);
+                const hasLOS = this.checkLineOfSight(this.targetBot.mesh.position);
+
+                if (!hasLOS) {
+                    this.intention = 'HUNT';
+                    this.pickNewState();
+                    return;
                 }
 
                 this.stuckTimer += dt;
@@ -1334,65 +1434,82 @@
                     this.stuckTimer = 0;
                 }
 
-                if (this.targetBot) {
-                    this.targetPos.copy(this.targetBot.mesh.position).add(new THREE.Vector3(0, 1, 0));
-                    const dist = camera.position.distanceTo(this.targetBot.mesh.position);
-                    
-                    if (this.slideTimer > 0) {
-                        this.slideTimer -= dt;
-                        InputManager.keys.c = true;
-                    }
-                    if (this.sprintTimer > 0) {
-                        this.sprintTimer -= dt;
-                        InputManager.keys.shift = true;
-                    }
-
-                    if (dist > 8) {
-                        InputManager.keys.w = true;
-                        if (Math.random() < 0.1 && this.sprintTimer <= 0) this.sprintTimer = 1.0 + Math.random();
-                    } else if (dist < 3) {
-                        InputManager.keys.s = true;
-                    } else {
-                        if (Math.random() < 0.5) InputManager.keys.a = true;
-                        else InputManager.keys.d = true;
-                    }
-                    
-                    if (dist < 12 && Math.random() < 0.15) player.onAttackInput();
-                    if (player.onGround && Math.random() < 0.05 && this.slideTimer <= 0) this.slideTimer = 0.5 + Math.random() * 0.5;
-                } else {
-                    this.stateTimer = 0;
+                this.targetPos.copy(this.targetBot.mesh.position).add(new THREE.Vector3(0, 1, 0));
+                
+                if (this.slideTimer > 0) {
+                    this.slideTimer -= dt;
+                    InputManager.keys.c = true;
                 }
+                if (this.sprintTimer > 0) {
+                    this.sprintTimer -= dt;
+                    InputManager.keys.shift = true;
+                }
+
+                if (dist > 10) {
+                    InputManager.keys.w = true;
+                    if (Math.random() < 0.1 && this.sprintTimer <= 0) this.sprintTimer = 1.0 + Math.random();
+                } else if (dist < 4) {
+                    InputManager.keys.s = true;
+                } else {
+                    if (Math.random() < 0.5) InputManager.keys.a = true;
+                    else InputManager.keys.d = true;
+                }
+                
+                if (player.onGround && Math.random() < 0.05) player.onJumpInput(false);
+                else if (!player.onGround && player.jumpCount < player.maxJumps && Math.random() < 0.05) player.onJumpInput(false);
+
+                // Only attack if facing the bot and has LOS
+                const dirToBot = new THREE.Vector3().subVectors(this.targetBot.mesh.position, camera.position);
+                if (dirToBot.lengthSq() < 0.001) dirToBot.set(0, 0, -1);
+                dirToBot.normalize();
+                const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+                const dot = forward.dot(dirToBot);
+                
+                if (dist < 15 && hasLOS && dot > 0.8 && Math.random() < 0.2) {
+                    player.onAttackInput();
+                }
+                
+                if (player.onGround && Math.random() < 0.05 && this.slideTimer <= 0) this.slideTimer = 0.5 + Math.random() * 0.5;
             }
 
             startTeleporting() {
                 this.teleportPhase = 0;
-                this.subTimer = 0.2 + Math.random() * 0.5;
+                this.subTimer = 0.3 + Math.random() * 0.7; // Aiming phase
+                this.validTeleportTarget = null;
             }
 
             updateTeleporting(dt) {
                 this.subTimer -= dt;
                 if (this.teleportPhase === 0) {
-                    if (this.subTimer <= 0) {
-                        if (!player.teleportActive) player.onTeleportInput();
-                        this.teleportPhase = 1;
-                        this.subTimer = 0.5 + Math.random() * 1.5;
-                        
+                    if (!player.teleportActive) player.onTeleportInput();
+                    
+                    // Phase 3: Raycast to find valid floor point
+                    if (!this.validTeleportTarget) {
+                        let searchOrigin = camera.position;
                         if (this.intention === 'HUNT' && this.targetBot) {
-                            this.targetPos.copy(this.targetBot.mesh.position).add(new THREE.Vector3(0, 5, 0));
+                            searchOrigin = this.targetBot.mesh.position;
                         } else if (this.intention === 'ESCAPE' && this.targetBot) {
                             const dir = new THREE.Vector3().subVectors(camera.position, this.targetBot.mesh.position).normalize();
-                            this.targetPos.copy(camera.position).add(dir.multiplyScalar(30)).add(new THREE.Vector3(0, 10, 0));
-                        } else {
-                            this.targetPos.set(
-                                camera.position.x + (Math.random() - 0.5) * 40,
-                                camera.position.y + 5 + Math.random() * 15,
-                                camera.position.z + (Math.random() - 0.5) * 40
-                            );
+                            searchOrigin = camera.position.clone().add(dir.multiplyScalar(30));
                         }
+                        
+                        this.validTeleportTarget = this.findValidFloor(searchOrigin, 20);
+                        if (!this.validTeleportTarget) {
+                            // Fallback if no floor found
+                            this.validTeleportTarget = camera.position.clone().add(new THREE.Vector3((Math.random()-0.5)*20, -5, (Math.random()-0.5)*20));
+                        }
+                    }
+                    
+                    this.targetPos.copy(this.validTeleportTarget);
+                    
+                    if (this.subTimer <= 0) {
+                        this.teleportPhase = 1;
+                        this.subTimer = 0.2;
                     }
                 } else if (this.teleportPhase === 1) {
                     if (this.subTimer <= 0) {
                         if (player.teleportActive) player.onAttackInput();
+                        this.validTeleportTarget = null;
                         this.stateTimer = 0;
                     }
                 }
@@ -1400,12 +1517,15 @@
 
             startGadget() {
                 this.gadgetPhase = 0;
-                this.subTimer = 0.3 + Math.random() * 0.5;
+                this.subTimer = 0.3 + Math.random() * 0.7; // Aiming phase
+                this.pitchOverride = null;
                 
                 if (this.intention === 'ESCAPE') {
                     this.gadgetType = 'IMPULSE';
-                } else if (this.intention === 'ENGAGE' || this.intention === 'HUNT') {
-                    this.gadgetType = Math.random() < 0.5 ? 'VOID' : 'FRAG';
+                } else if (this.intention === 'HUNT') {
+                    this.gadgetType = Math.random() < 0.7 ? 'IMPULSE' : 'VOID';
+                } else if (this.intention === 'ENGAGE') {
+                    this.gadgetType = Math.random() < 0.5 ? 'FRAG' : 'VOID';
                 } else {
                     const gadgets = ['FRAG', 'VOID', 'IMPULSE'];
                     this.gadgetType = gadgets[Math.floor(Math.random() * gadgets.length)];
@@ -1419,22 +1539,36 @@
                 
                 if (this.gadgetPhase === 0) {
                     if (this.gadgetType === 'IMPULSE') {
-                        const escapeDir = (this.intention === 'ESCAPE' && this.targetBot) ? 
-                            new THREE.Vector3().subVectors(camera.position, this.targetBot.mesh.position).normalize() :
-                            new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize();
+                        // Phase 3: Smoothly pitch down for impulse
+                        this.pitchOverride = -Math.PI / 2 + 0.2; // Look almost straight down
                         
-                        this.targetPos.copy(camera.position).add(escapeDir.clone().negate().multiplyScalar(1.5)).add(new THREE.Vector3(0, -3, 0));
+                        let travelDir;
+                        if (this.intention === 'ESCAPE' && this.targetBot) {
+                            travelDir = new THREE.Vector3().subVectors(camera.position, this.targetBot.mesh.position).normalize();
+                        } else if (this.intention === 'HUNT' && this.targetBot) {
+                            travelDir = new THREE.Vector3().subVectors(this.targetBot.mesh.position, camera.position).normalize();
+                        } else {
+                            travelDir = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+                        }
+                        travelDir.y = 0;
+                        if (travelDir.lengthSq() < 0.001) travelDir.set(0, 0, -1);
+                        travelDir.normalize();
+                        
+                        // Look away from travel direction
+                        const lookDir = travelDir.clone().negate();
+                        this.targetPos.copy(camera.position).add(lookDir.multiplyScalar(10));
+                        
                     } else if (this.gadgetType === 'FRAG') {
                         if (this.targetBot) {
-                            this.targetPos.copy(camera.position).lerp(this.targetBot.mesh.position, 0.6).add(new THREE.Vector3(0, -2, 0));
+                            this.targetPos.copy(camera.position).lerp(this.targetBot.mesh.position, 0.5).add(new THREE.Vector3(0, -2, 0));
                         } else {
-                            this.targetPos.copy(camera.position).add(new THREE.Vector3((Math.random() - 0.5) * 20, -5, (Math.random() - 0.5) * 20));
+                            this.targetPos.copy(camera.position).add(new THREE.Vector3(0, 0, -10).applyQuaternion(camera.quaternion)).add(new THREE.Vector3(0, -5, 0));
                         }
                     } else if (this.gadgetType === 'VOID') {
                         if (this.targetBot) {
                             this.targetPos.copy(this.targetBot.mesh.position);
                         } else {
-                            this.targetPos.copy(camera.position).add(new THREE.Vector3((Math.random() - 0.5) * 30, 0, (Math.random() - 0.5) * 30));
+                            this.targetPos.copy(camera.position).add(new THREE.Vector3(0, 0, -20).applyQuaternion(camera.quaternion));
                         }
                     }
                     
@@ -1444,14 +1578,20 @@
                         this.subTimer = 0.5;
                     }
                 } else if (this.gadgetPhase === 1) {
+                    this.pitchOverride = null; // Restore normal pitch
+                    
                     if (this.gadgetType === 'IMPULSE') {
                         if (this.intention === 'ESCAPE' && this.targetBot) {
-                            this.targetPos.copy(camera.position).add(new THREE.Vector3().subVectors(camera.position, this.targetBot.mesh.position).normalize().multiplyScalar(10));
+                            const travelDir = new THREE.Vector3().subVectors(camera.position, this.targetBot.mesh.position).normalize();
+                            this.targetPos.copy(camera.position).add(travelDir.multiplyScalar(20));
+                        } else if (this.intention === 'HUNT' && this.targetBot) {
+                            this.targetPos.copy(this.targetBot.mesh.position);
                         }
-                        if (Math.random() < 0.2) player.onJumpInput(false);
+                        if (Math.random() < 0.5) player.onJumpInput(false);
                     }
+                    
                     if (this.subTimer <= 0) {
-                        this.stateTimer = 0; // End gadget state
+                        this.stateTimer = 0;
                     }
                 }
                 
@@ -1466,18 +1606,14 @@
                 this.targetEnvironment = null;
 
                 let nearestDistance = Infinity;
-                for (const portal of portals) {
-                    const distance = camera.position.distanceTo(portal.mesh.position);
-                    if (distance < nearestDistance) {
-                        nearestDistance = distance;
-                        this.targetEnvironment = portal;
-                    }
-                }
-                for (const jp of jumpPads) {
-                    const distance = camera.position.distanceTo(jp.mesh.position);
-                    if (distance < nearestDistance) {
-                        nearestDistance = distance;
-                        this.targetEnvironment = jp;
+                const targets = [...portals, ...jumpPads];
+                for (const t of targets) {
+                    const distance = camera.position.distanceTo(t.mesh.position);
+                    if (distance < 60) {
+                        if (distance < nearestDistance) {
+                            nearestDistance = distance;
+                            this.targetEnvironment = t;
+                        }
                     }
                 }
                 
@@ -1503,16 +1639,16 @@
 
                 this.targetPos.copy(this.targetEnvironment.mesh.position);
                 InputManager.keys.w = true;
+                InputManager.keys.shift = true;
                 
-                if (this.sprintTimer > 0) {
-                    this.sprintTimer -= dt;
-                    InputManager.keys.shift = true;
-                } else if (Math.random() < 0.05) {
-                    this.sprintTimer = 1.0 + Math.random();
+                if (this.targetEnvironment.mesh.position.y > camera.position.y + 2) {
+                    if (player.onGround || player.jumpCount < player.maxJumps) {
+                        if (Math.random() < 0.05) player.onJumpInput(false);
+                    }
                 }
                 
                 const dist = camera.position.distanceTo(this.targetEnvironment.mesh.position);
-                if (dist < 3) {
+                if (dist < 4) {
                     this.stateTimer = 0;
                 }
             }
