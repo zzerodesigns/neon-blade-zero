@@ -22,7 +22,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v48.5.0</title>
+    <title>Neon Blade: Melee Arena v48.6.0</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -754,7 +754,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.5.0<br>- Jump Pad Traversal System -</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.6.0<br>- Neural Override (AutopplaySystem) -</div>
         </div>
     </div>
 
@@ -1028,6 +1028,525 @@
             }
         };
 
+        class AutoplaySystem {
+            constructor() {
+                this.active = false;
+                this.intention = 'EXPLORE';
+                this.intentionTimer = 0;
+                this.state = 'IDLE';
+                this.stateTimer = 0;
+                this.targetBot = null;
+                this.targetPos = new THREE.Vector3();
+                this.subTimer = 0;
+                this.gadgetType = null;
+                this.cheatBuffer = "";
+                this.savedTeleportMode = null;
+                this.idleTime = 0;
+                this.gadgetPhase = 0;
+                this.teleportPhase = 0;
+                this.environmentPhase = 0;
+                this.targetEnvironment = null;
+                this.slideTimer = 0;
+                this.sprintTimer = 0;
+                this.lastPos = new THREE.Vector3();
+                this.stuckTimer = 0;
+            }
+
+            handleKey(key) {
+                if (key.length === 1) {
+                    this.cheatBuffer += key.toUpperCase();
+                    if (this.cheatBuffer.length > 4) this.cheatBuffer = this.cheatBuffer.slice(-4);
+                    if (this.cheatBuffer === "AUTO") {
+                        if (!this.active) {
+                            this.start();
+                        }
+                    }
+                }
+            }
+
+            cancel() {
+                if (this.active) {
+                    this.active = false;
+                    NarrativeSys.show("<span style='color:#ff3333'>Neural Override Disabled</span>", 3);
+                    if (player.aimingGadget) player.endAim();
+                    if (player.teleportActive) player.onTeleportInput();
+                    if (this.savedTeleportMode) teleportMode = this.savedTeleportMode;
+                    for (let k in InputManager.keys) InputManager.keys[k] = false;
+                    player.wantsToJump = false;
+                }
+            }
+
+            start() {
+                this.active = true;
+                this.savedTeleportMode = teleportMode;
+                teleportMode = 'AIM';
+                NarrativeSys.show("<span style='color:#33ff33'>Neural Override Enabled</span>", 3);
+                this.pickNewState();
+            }
+
+            update(dt) {
+                if (!this.active || player.isDead) return;
+
+                player.wantsToJump = false;
+
+                this.intentionTimer -= dt;
+                if (this.intentionTimer <= 0 || this.stateTimer <= 0) {
+                    this.evaluateIntention();
+                    if (this.stateTimer <= 0) {
+                        this.pickNewState();
+                    }
+                    this.intentionTimer = 1.0 + Math.random();
+                }
+
+                this.stateTimer -= dt;
+
+                for (let k in InputManager.keys) InputManager.keys[k] = false;
+                
+                const distFromCenter = camera.position.length();
+                if (distFromCenter > 130) {
+                    this.targetPos.set(0, 0, 0);
+                    InputManager.keys.w = true;
+                } else {
+                    switch (this.state) {
+                        case 'TRAVERSAL': this.updateTraversal(dt); break;
+                        case 'COMBAT': this.updateCombat(dt); break;
+                        case 'TELEPORTING': this.updateTeleporting(dt); break;
+                        case 'GADGET': this.updateGadget(dt); break;
+                        case 'ENVIRONMENT': this.updateEnvironment(dt); break;
+                        case 'IDLE': this.updateIdle(dt); break;
+                    }
+                }
+
+                const dx = this.targetPos.x - camera.position.x;
+                const dy = this.targetPos.y - camera.position.y;
+                const dz = this.targetPos.z - camera.position.z;
+                const distXZ = Math.sqrt(dx*dx + dz*dz);
+                
+                if (distXZ > 0.1 || Math.abs(dy) > 0.1) {
+                    const targetYaw = Math.atan2(-dx, -dz);
+                    const targetPitch = Math.atan2(dy, distXZ);
+
+                    let diffYaw = targetYaw - camera.rotation.y;
+                    while (diffYaw > Math.PI) diffYaw -= Math.PI * 2;
+                    while (diffYaw < -Math.PI) diffYaw += Math.PI * 2;
+                    
+                    camera.rotation.y += diffYaw * dt * 8;
+                    camera.rotation.x += (targetPitch - camera.rotation.x) * dt * 8;
+                    camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
+                }
+            }
+
+            evaluateIntention() {
+                let closestBot = this.findClosestBot();
+                
+                if (this.targetBot && !this.targetBot.isDeadCorpse) {
+                    const distToCurrent = camera.position.distanceTo(this.targetBot.mesh.position);
+                    if (distToCurrent < 100 && player.health >= 40) {
+                        closestBot = this.targetBot;
+                    }
+                }
+
+                const distToBot = closestBot ? camera.position.distanceTo(closestBot.mesh.position) : Infinity;
+                
+                if (player.health < 40 && distToBot < 30) {
+                    this.intention = 'ESCAPE';
+                    this.idleTime = 0;
+                } else if (distToBot < 15) {
+                    this.intention = 'ENGAGE';
+                    this.idleTime = 0;
+                } else if (distToBot < 60) {
+                    this.intention = 'HUNT';
+                    this.idleTime = 0;
+                } else {
+                    this.idleTime += 1;
+                    if (this.idleTime > 5 && closestBot) {
+                        this.intention = 'HUNT';
+                    } else {
+                        this.intention = 'EXPLORE';
+                    }
+                }
+                this.targetBot = closestBot;
+            }
+
+            pickNewState() {
+                if (player.aimingGadget) player.endAim();
+                if (player.teleportActive) player.onTeleportInput();
+
+                let possibleStates = [];
+                const highEnergy = player.energy > 80;
+                
+                switch (this.intention) {
+                    case 'ESCAPE':
+                        possibleStates = [
+                            { state: 'TRAVERSAL', weight: 50 },
+                            { state: 'GADGET', weight: highEnergy ? 60 : 30 },
+                            { state: 'ENVIRONMENT', weight: 20 },
+                            { state: 'TELEPORTING', weight: 20 }
+                        ];
+                        break;
+                    case 'ENGAGE':
+                        possibleStates = [
+                            { state: 'COMBAT', weight: 60 },
+                            { state: 'GADGET', weight: highEnergy ? 50 : 20 },
+                            { state: 'TRAVERSAL', weight: 20 }
+                        ];
+                        break;
+                    case 'HUNT':
+                        possibleStates = [
+                            { state: 'TRAVERSAL', weight: 60 },
+                            { state: 'TELEPORTING', weight: 30 },
+                            { state: 'ENVIRONMENT', weight: 10 },
+                            { state: 'GADGET', weight: highEnergy ? 30 : 5 }
+                        ];
+                        break;
+                    case 'EXPLORE':
+                    default:
+                        possibleStates = [
+                            { state: 'TRAVERSAL', weight: 50 },
+                            { state: 'ENVIRONMENT', weight: 30 },
+                            { state: 'IDLE', weight: 20 }
+                        ];
+                        break;
+                }
+
+                const totalWeight = possibleStates.reduce((sum, s) => sum + s.weight, 0);
+                let rand = Math.random() * totalWeight;
+                for (let s of possibleStates) {
+                    rand -= s.weight;
+                    if (rand <= 0) {
+                        this.state = s.state;
+                        break;
+                    }
+                }
+
+                if (this.state === 'COMBAT' || this.state === 'HUNT') {
+                    this.stateTimer = 4.0 + Math.random() * 4.0;
+                } else if (this.state === 'GADGET') {
+                    this.stateTimer = 1.5 + Math.random() * 1.5;
+                } else {
+                    this.stateTimer = 2.0 + Math.random() * 3.0;
+                }
+                
+                this.subTimer = 0;
+                this.gadgetPhase = 0;
+                this.teleportPhase = 0;
+                this.environmentPhase = 0;
+                
+                if (this.state === 'ENVIRONMENT') this.startEnvironment();
+                if (this.state === 'GADGET') this.startGadget();
+                if (this.state === 'TELEPORTING') this.startTeleporting();
+            }
+
+            findClosestBot() {
+                let closest = null;
+                let minDist = Infinity;
+                for (let b of enemies) {
+                    if (b.isDeadCorpse) continue;
+                    const d = b.mesh.position.distanceTo(camera.position);
+                    if (d < minDist) { minDist = d; closest = b; }
+                }
+                return closest;
+            }
+
+            updateTraversal(dt) {
+                InputManager.keys.w = true;
+                
+                this.stuckTimer += dt;
+                if (this.stuckTimer > 0.5) {
+                    if (this.lastPos.distanceTo(camera.position) < 1.0) {
+                        player.onJumpInput(false);
+                    }
+                    this.lastPos.copy(camera.position);
+                    this.stuckTimer = 0;
+                }
+
+                if (this.slideTimer > 0) {
+                    this.slideTimer -= dt;
+                    InputManager.keys.c = true;
+                }
+                if (this.sprintTimer > 0) {
+                    this.sprintTimer -= dt;
+                    InputManager.keys.shift = true;
+                }
+
+                if (this.intention === 'ESCAPE' && this.targetBot) {
+                    const dir = new THREE.Vector3().subVectors(camera.position, this.targetBot.mesh.position).normalize();
+                    this.targetPos.copy(camera.position).add(dir.multiplyScalar(20));
+                    InputManager.keys.shift = true;
+                    if (player.onGround && Math.random() < 0.05 && this.slideTimer <= 0) this.slideTimer = 1.0 + Math.random();
+                } else if (this.intention === 'HUNT' && this.targetBot) {
+                    this.targetPos.copy(this.targetBot.mesh.position);
+                    InputManager.keys.shift = true;
+                    if (player.onGround && Math.random() < 0.05 && this.slideTimer <= 0) this.slideTimer = 0.8 + Math.random();
+                } else if (this.intention === 'ENGAGE' && this.targetBot) {
+                    this.targetPos.copy(this.targetBot.mesh.position);
+                    if (Math.random() < 0.5) InputManager.keys.a = true;
+                    else InputManager.keys.d = true;
+                    if (player.onGround && Math.random() < 0.1 && this.slideTimer <= 0) this.slideTimer = 0.5 + Math.random() * 0.5;
+                } else {
+                    this.subTimer -= dt;
+                    if (this.subTimer <= 0) {
+                        this.targetPos.set(
+                            camera.position.x + (Math.random() - 0.5) * 40,
+                            camera.position.y + (Math.random() - 0.5) * 10,
+                            camera.position.z + (Math.random() - 0.5) * 40
+                        );
+                        this.subTimer = 1.0 + Math.random() * 2.0;
+                    }
+                    if (Math.random() < 0.1 && this.sprintTimer <= 0) this.sprintTimer = 2.0 + Math.random() * 2.0;
+                    if (player.onGround && Math.random() < 0.05 && this.slideTimer <= 0) this.slideTimer = 1.0 + Math.random();
+                }
+
+                if (player.isWallSliding) {
+                    if (Math.random() < 0.05) {
+                        player.onJumpInput(false);
+                        this.targetPos.copy(camera.position).add(new THREE.Vector3(
+                            (Math.random() - 0.5) * 20,
+                            0,
+                            (Math.random() - 0.5) * 20
+                        ));
+                    }
+                } else if (!player.onGround) {
+                    // Try to find a wall to slide on if airborne
+                    if (Math.random() < 0.1) {
+                        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(camera.quaternion);
+                        globalRaycaster.set(camera.position, forward);
+                        globalRaycaster.far = 10;
+                        const hits = globalRaycaster.intersectObjects(walls);
+                        if (hits.length > 0) {
+                            this.targetPos.copy(hits[0].point);
+                        }
+                    }
+                }
+            }
+
+            updateCombat(dt) {
+                if (!this.targetBot || this.targetBot.isDeadCorpse) {
+                    this.targetBot = this.findClosestBot();
+                }
+
+                this.stuckTimer += dt;
+                if (this.stuckTimer > 0.5) {
+                    if (this.lastPos.distanceTo(camera.position) < 1.0) {
+                        player.onJumpInput(false);
+                    }
+                    this.lastPos.copy(camera.position);
+                    this.stuckTimer = 0;
+                }
+
+                if (this.targetBot) {
+                    this.targetPos.copy(this.targetBot.mesh.position).add(new THREE.Vector3(0, 1, 0));
+                    const dist = camera.position.distanceTo(this.targetBot.mesh.position);
+                    
+                    if (this.slideTimer > 0) {
+                        this.slideTimer -= dt;
+                        InputManager.keys.c = true;
+                    }
+                    if (this.sprintTimer > 0) {
+                        this.sprintTimer -= dt;
+                        InputManager.keys.shift = true;
+                    }
+
+                    if (dist > 8) {
+                        InputManager.keys.w = true;
+                        if (Math.random() < 0.1 && this.sprintTimer <= 0) this.sprintTimer = 1.0 + Math.random();
+                    } else if (dist < 3) {
+                        InputManager.keys.s = true;
+                    } else {
+                        if (Math.random() < 0.5) InputManager.keys.a = true;
+                        else InputManager.keys.d = true;
+                    }
+                    
+                    if (dist < 12 && Math.random() < 0.15) player.onAttackInput();
+                    if (player.onGround && Math.random() < 0.05 && this.slideTimer <= 0) this.slideTimer = 0.5 + Math.random() * 0.5;
+                } else {
+                    this.stateTimer = 0;
+                }
+            }
+
+            startTeleporting() {
+                this.teleportPhase = 0;
+                this.subTimer = 0.2 + Math.random() * 0.5;
+            }
+
+            updateTeleporting(dt) {
+                this.subTimer -= dt;
+                if (this.teleportPhase === 0) {
+                    if (this.subTimer <= 0) {
+                        if (!player.teleportActive) player.onTeleportInput();
+                        this.teleportPhase = 1;
+                        this.subTimer = 0.5 + Math.random() * 1.5;
+                        
+                        if (this.intention === 'HUNT' && this.targetBot) {
+                            this.targetPos.copy(this.targetBot.mesh.position).add(new THREE.Vector3(0, 5, 0));
+                        } else if (this.intention === 'ESCAPE' && this.targetBot) {
+                            const dir = new THREE.Vector3().subVectors(camera.position, this.targetBot.mesh.position).normalize();
+                            this.targetPos.copy(camera.position).add(dir.multiplyScalar(30)).add(new THREE.Vector3(0, 10, 0));
+                        } else {
+                            this.targetPos.set(
+                                camera.position.x + (Math.random() - 0.5) * 40,
+                                camera.position.y + 5 + Math.random() * 15,
+                                camera.position.z + (Math.random() - 0.5) * 40
+                            );
+                        }
+                    }
+                } else if (this.teleportPhase === 1) {
+                    if (this.subTimer <= 0) {
+                        if (player.teleportActive) player.onAttackInput();
+                        this.stateTimer = 0;
+                    }
+                }
+            }
+
+            startGadget() {
+                this.gadgetPhase = 0;
+                this.subTimer = 0.3 + Math.random() * 0.5;
+                
+                if (this.intention === 'ESCAPE') {
+                    this.gadgetType = 'IMPULSE';
+                } else if (this.intention === 'ENGAGE' || this.intention === 'HUNT') {
+                    this.gadgetType = Math.random() < 0.5 ? 'VOID' : 'FRAG';
+                } else {
+                    const gadgets = ['FRAG', 'VOID', 'IMPULSE'];
+                    this.gadgetType = gadgets[Math.floor(Math.random() * gadgets.length)];
+                }
+                
+                player.beginAim(this.gadgetType);
+            }
+
+            updateGadget(dt) {
+                this.subTimer -= dt;
+                
+                if (this.gadgetPhase === 0) {
+                    if (this.gadgetType === 'IMPULSE') {
+                        const escapeDir = (this.intention === 'ESCAPE' && this.targetBot) ? 
+                            new THREE.Vector3().subVectors(camera.position, this.targetBot.mesh.position).normalize() :
+                            new THREE.Vector3(Math.random() - 0.5, 0, Math.random() - 0.5).normalize();
+                        
+                        this.targetPos.copy(camera.position).add(escapeDir.clone().negate().multiplyScalar(1.5)).add(new THREE.Vector3(0, -3, 0));
+                    } else if (this.gadgetType === 'FRAG') {
+                        if (this.targetBot) {
+                            this.targetPos.copy(camera.position).lerp(this.targetBot.mesh.position, 0.6).add(new THREE.Vector3(0, -2, 0));
+                        } else {
+                            this.targetPos.copy(camera.position).add(new THREE.Vector3((Math.random() - 0.5) * 20, -5, (Math.random() - 0.5) * 20));
+                        }
+                    } else if (this.gadgetType === 'VOID') {
+                        if (this.targetBot) {
+                            this.targetPos.copy(this.targetBot.mesh.position);
+                        } else {
+                            this.targetPos.copy(camera.position).add(new THREE.Vector3((Math.random() - 0.5) * 30, 0, (Math.random() - 0.5) * 30));
+                        }
+                    }
+                    
+                    if (this.subTimer <= 0) {
+                        this.gadgetPhase = 1;
+                        player.endAim();
+                        this.subTimer = 0.5;
+                    }
+                } else if (this.gadgetPhase === 1) {
+                    if (this.gadgetType === 'IMPULSE') {
+                        if (this.intention === 'ESCAPE' && this.targetBot) {
+                            this.targetPos.copy(camera.position).add(new THREE.Vector3().subVectors(camera.position, this.targetBot.mesh.position).normalize().multiplyScalar(10));
+                        }
+                        if (Math.random() < 0.2) player.onJumpInput(false);
+                    }
+                    if (this.subTimer <= 0) {
+                        this.stateTimer = 0; // End gadget state
+                    }
+                }
+                
+                if (Math.random() < 0.05) InputManager.keys.w = true;
+                if (Math.random() < 0.05) InputManager.keys.a = true;
+                if (Math.random() < 0.05) InputManager.keys.d = true;
+            }
+
+            startEnvironment() {
+                this.environmentPhase = 0;
+                this.subTimer = 0.5;
+                this.targetEnvironment = null;
+
+                let nearestDistance = Infinity;
+                for (const portal of portals) {
+                    const distance = camera.position.distanceTo(portal.mesh.position);
+                    if (distance < nearestDistance) {
+                        nearestDistance = distance;
+                        this.targetEnvironment = portal;
+                    }
+                }
+                for (const jp of jumpPads) {
+                    const distance = camera.position.distanceTo(jp.mesh.position);
+                    if (distance < nearestDistance) {
+                        nearestDistance = distance;
+                        this.targetEnvironment = jp;
+                    }
+                }
+                
+                if (!this.targetEnvironment) {
+                    this.stateTimer = 0;
+                }
+            }
+
+            updateEnvironment(dt) {
+                if (!this.targetEnvironment) {
+                    this.stateTimer = 0;
+                    return;
+                }
+                
+                this.stuckTimer += dt;
+                if (this.stuckTimer > 0.5) {
+                    if (this.lastPos.distanceTo(camera.position) < 1.0) {
+                        player.onJumpInput(false);
+                    }
+                    this.lastPos.copy(camera.position);
+                    this.stuckTimer = 0;
+                }
+
+                this.targetPos.copy(this.targetEnvironment.mesh.position);
+                InputManager.keys.w = true;
+                
+                if (this.sprintTimer > 0) {
+                    this.sprintTimer -= dt;
+                    InputManager.keys.shift = true;
+                } else if (Math.random() < 0.05) {
+                    this.sprintTimer = 1.0 + Math.random();
+                }
+                
+                const dist = camera.position.distanceTo(this.targetEnvironment.mesh.position);
+                if (dist < 3) {
+                    this.stateTimer = 0;
+                }
+            }
+
+            updateIdle(dt) {
+                this.stuckTimer += dt;
+                if (this.stuckTimer > 0.5) {
+                    if (this.lastPos.distanceTo(camera.position) < 1.0) {
+                        player.onJumpInput(false);
+                    }
+                    this.lastPos.copy(camera.position);
+                    this.stuckTimer = 0;
+                }
+
+                this.subTimer -= dt;
+                if (this.subTimer <= 0) {
+                    this.targetPos.set(
+                        camera.position.x + (Math.random() - 0.5) * 20,
+                        camera.position.y + (Math.random() - 0.5) * 10,
+                        camera.position.z + (Math.random() - 0.5) * 20
+                    );
+                    this.subTimer = 2.0 + Math.random() * 2.0;
+                }
+                if (this.slideTimer > 0) {
+                    this.slideTimer -= dt;
+                    InputManager.keys.c = true;
+                } else if (Math.random() < 0.01) {
+                    this.slideTimer = 1.0 + Math.random();
+                }
+            }
+        }
+
+        const autoplay = new AutoplaySystem();
+
         const InputManager = {
             keys: { w: false, a: false, s: false, d: false, space: false, shift: false, c: false, q: false, f: false, r: false, e: false },
             mouseDown: false,
@@ -1039,6 +1558,7 @@
                 window.addEventListener('contextmenu', (e) => e.preventDefault());
                 
                 document.addEventListener('mousedown', (e) => {
+                    if (isLocked && autoplay.active) autoplay.cancel();
                     if (e.button === 0) this.mouseDown = true;
                     if (isLocked && e.button === 0) {
                         player.onAttackInput();
@@ -1052,7 +1572,11 @@
                 document.addEventListener('mousemove', (e) => this.onMouseMove(e));
             },
             onKeyDown: function(e) {
-                switch(e.key.toLowerCase()) {
+                const key = e.key.toLowerCase();
+                const controlKeys = ['w', 'a', 's', 'd', ' ', 'shift', 'c', 'q', 'f', 'r', 'e'];
+                if (autoplay.active && controlKeys.includes(key)) autoplay.cancel();
+                autoplay.handleKey(e.key);
+                switch(key) {
                     case 'w': this.keys.w = true; break;
                     case 'a': this.keys.a = true; break;
                     case 's': this.keys.s = true; break;
@@ -1122,6 +1646,7 @@
             },
             onMouseMove: function(e) {
                 if (!isLocked || player.isDead) return;
+                if (autoplay.active) return;
                 camera.rotation.y -= e.movementX * 0.002;
                 camera.rotation.x -= e.movementY * 0.002;
                 camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
@@ -7384,6 +7909,7 @@
                 }
                 
                 // Logic Phase
+                autoplay.update(dt);
                 player.update(dt);
                 NarrativeSys.update(dt);
 

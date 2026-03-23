@@ -67,10 +67,10 @@
 ## 📖 version history / patch notes
 
 ### v48.5.0 - Jump Pad Traversal System
-*   **Jump Pads:** Introduced procedural Jump Pads as a new traversal mechanic that spawns dynamically across floors, walls, and platforms. These pads trigger a localized impulse explosion with a force of 100 upon contact.
-*   **Launch Physics:** Calculated explosion offsets based on surface normals to prevent backward launching. Standardized a specific upward bias (`dir.y = 0.3`) for explosions to ensure entities consistently clear floor geometry.
-*   **Bot Physics:** Patched a core physics bug that prevented grounded bots from launching correctly upon impact with impulse explosions.
-*   **Inversion Visuals:** Designed color-inverting hexagonal outlines using stacked ring geometry and `THREE.CustomBlending`, complemented by localized, outward-floating particle emissions.
+*   **Jump Pads:** Introduced procedural Jump Pads as a new traversal mechanic, spawning dynamically across floors, walls, and platforms.
+*   **Launch Physics:** Added collision-triggered impulse explosions with a localized radius and a force of 100. Calculated explosion offsets based on surface normals to prevent backward launching.
+*   **Bot Physics:** Fixed bot launch physics and standardized an upward bias for explosions. Patched a core physics bug preventing grounded bots from launching correctly upon impact with impulse explosions.
+*   **Ethereal Visuals:** The visual design features stacked ring geometry with custom blending for color inversion, complemented by localized, outward-floating particle emissions.
 
 ### v48.4.0 - Raven Magic & Ethereal Visuals
 *   **Floor Collision:** Doubled the thickness of the floor object (to 4 units) to prevent players from falling into the void during high-velocity impacts.
