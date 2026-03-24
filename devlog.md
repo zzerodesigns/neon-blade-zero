@@ -3,18 +3,27 @@
 > **Note to AI Agents:** Read this file to understand current bugs, planned features, and user observations. Do not modify the architecture based on this file alone; use it as a task list and context guide.
 
 ## 🐛 active bugs
-*   **Floating Teleport Marker:** The teleport marker floats in mid-air when aimed at the new OBB (rotated) objects. The current raycaster only tests against AABB bounds or passes through. Needs an OBB intersection test added to the teleport raycast logic.
+*   **AI Aiming Logic:** Neural Override occasionally aims gadgets or teleports into the sky or walls when no valid floor is found in the immediate radius.
+*   **Phantom Slashing:** AI sometimes performs attack inputs when the target is technically out of range or behind thin cover, leading to "slashing at nothing."
+*   **Survival Instincts:** AI doesn't prioritize `ESCAPE` state aggressively enough when health is low, often getting caught in a `COMBAT` loop until death.
+*   **Floating Teleport Marker:** Still persists on certain OBB rotated objects.
+*   **Geometry Clipping:** High-speed movement can occasionally cause the agent to clip through thin geometry if the physics step doesn't catch the collision.
 
 ## 📝 playtest observations & implementation notes
+*   **Neural Override Utility:** The Autoplay system is functional but "utilitarian." It moves with purpose but lacks the high-speed verticality and "flair" of a human player.
+*   **Spatial Awareness Success:** The addition of `checkGapForward` and `checkWallForward` has significantly reduced the AI's tendency to fall off platforms or run mindlessly into walls.
+*   **Gadget Utility:** Impulse is now a core part of AI traversal, used effectively to launch away from danger or toward targets, though frequency could still be higher.
 *   **UI Aesthetic Standard:** The "liquid glass" style (backdrop-filter blur, semi-transparent backgrounds, rounded corners, subtle drop shadows) is now the established standard for all UI elements (settings, messages, buttons) to ensure readability against bright backgrounds without visual clutter.
 *   **Collision Edge Cases:** The recent slope sliding bug revealed that SAT collision with OBBs can return downward-pointing normals if the player hits the underground flat faces of a ramp. Ground-checks (`_obbNormal.y < -0.1`) are necessary to force the physics engine to resolve upward along the slope.
 *   **OBB Sliding Friction & Slopes:** Sliding against any rotated surface (OBB walls, slopes) feels rough, like sliding on sandpaper. Slopes specifically suffer from a very obvious micro-bounce, and sliding downwards on them currently doesn't work at all.
+*   **Zero-Allocation Performance:** The migration to global scratchpads has effectively eliminated garbage collection spikes during high-frequency combat, maintaining a stable 60 FPS even with multiple active entities.
 
 ## 🎯 current priorities
+*   [ ] **AI Survival & Tactical Retreat:** Refine the `ESCAPE` intention to be more dominant at low health and improve the AI's ability to use cover or rapid teleportation to disengage.
+*   [ ] **Gadget Saturation:** Increase the frequency and variety of gadget usage in the `GADGET` state, especially for area denial (Frag/Void).
+*   [ ] **Wall Traversal Polish:** Implement dedicated "Wall Slide" and "Wall Run" logic for the AI to chain vertical movements more fluidly.
 *   [ ] **Sandpaper Physics & OBB Sliding:** Resolve friction issues against rotated objects (walls and slopes) and implement ground-sticking logic to prevent micro-bouncing on downward slopes.
-*   [ ] **OBB Raycasting & Physics Compatibility:** Update teleport marker projection math for rotated surfaces and audit legacy AABB physics interactions for full OBB compatibility.
-*   [ ] **Theme Visuals & Visibility Polish:** Overhaul visual clarity across all themes, improving contrast, adding solid interaction textures, and ensuring distinct object visibility.
-*   [ ] **Single Slash System (SSS):** Introduce deliberate, 1-damage single slashes with a hidden, non-decaying streak counter. Differentiate from auto-slashes via unique animations and audio feedback to encourage precision playstyles.
+*   [ ] **Intention Refinement:** Further tune the intention scoring weights to prevent "indecisive" state switching during rapid combat transitions.
 
 ## 💡 future ideas & roadmap
 ### Combat & Weaponry
@@ -54,6 +63,10 @@
 *   **Synthesized Melodies:** Integrate procedural Web Audio API melodies as easter eggs or ambient tracks.
 
 ## ✅ recently completed concepts
+- [x] **Neural Override (Autoplay):** Implemented a hierarchical AI system with intentions (Escape, Engage, Hunt, Explore) and state-based behaviors.
+- [x] **Spatial Awareness Raycasting:** Added forward gap and wall detection to the AI traversal logic.
+- [x] **Stuck Detection:** Implemented a position-tracking timer to force jumps when the AI is blocked by geometry.
+- [x] **Settings Modal:** Added a comprehensive settings menu for brightness, volume, FPS, and physics toggles.
 - [x] **Jump Pads:** Implemented surface-aligned jump pads on floors and walls with custom impulse physics and color-inverting visuals.
 - [x] **Bot Physics:** Fixed grounded-state velocity wiping and standardized an upward launch bias for explosions.
 - [x] **Floor Collision Fix:** Doubled floor thickness (to 4 units) to prevent high-velocity fall-throughs.
@@ -65,6 +78,29 @@
 - [x] **Weather Enhancements:** Increased snow/leaf particle density and expanded the spawn distance radius.
 
 ## 📖 version history / patch notes
+
+### v48.6.2 - Autonomous Tactical Refinement
+*   **Zero-Allocation Architecture:** Migrated all spatial and mathematical calculations to global scratchpads (`_aiDir`, `_aiTemp`, etc.) to eliminate garbage collection stutters.
+*   **Intention Scoring Framework:** Replaced the basic state machine with a nuanced goal evaluator (`ESCAPE`, `ENGAGE`, `HUNT`, `EXPLORE`) that weights priorities based on health, energy, and momentum.
+*   **Neural Momentum:** Introduced a momentum tracking system that rewards successful combat actions with increased aggression and tracking precision.
+*   **Survival Override:** Implemented an absolute escape override at critical health thresholds (<= 40%) to prioritize survivability.
+*   **Fluid Traversal:** Refined continuous sliding patterns and height-aware jumping logic for better navigation of complex vertical geometry.
+*   **Camera Stability:** Optimized camera interpolation and removed jitter from aiming logic during gadget execution.
+*   **Gadget Optimization:** Implemented centroid-based cluster aiming for more effective gadget deployment.
+
+### v48.6.1 - Neural Override 1.1 (Spatial Awareness)
+*   **Spatial Intelligence:** Integrated `checkGapForward` and `checkWallForward` raycasting. The AI now jumps over pits and anticipates walls.
+*   **Wall Interaction:** AI now actively seeks walls to trigger sliding and performs wall-bounces when airborne.
+*   **Stuck Recovery:** Added a `stuckTimer` that triggers a jump if the AI's position remains static for too long.
+*   **Gadget Refinement:** Impulse gadget now uses `pitchOverride` to look down for self-launching. Reduced aiming delays for all abilities (0.3s - 1.5s).
+*   **Visual FX:** Added "Neural Override" status text with CSS wipe animations and color-coded states (Cyan for enabled, Red for disabled).
+*   **Settings:** Expanded the settings modal with Brightness, Volume, FPS display, and Wall Tilt controls.
+
+### v48.6.0 - Neural Override - Autoplay System
+*   **Autoplay Core:** Introduced the `AutoplaySystem` (activated via "AUTO" cheat).
+*   **Intention System:** Implemented a high-level goal evaluator (`ESCAPE`, `ENGAGE`, `HUNT`, `EXPLORE`) based on health and proximity.
+*   **State Machine:** Behavior is now governed by weighted states (`TRAVERSAL`, `COMBAT`, `GADGET`, `TELEPORTING`, `ENVIRONMENT`).
+*   **Targeting:** Added `findBestTarget` with Line-of-Sight (LOS) checks to ensure the AI only engages visible enemies.
 
 ### v48.5.0 - Jump Pad Traversal System
 *   **Jump Pads:** Introduced procedural Jump Pads as a new traversal mechanic, spawning dynamically across floors, walls, and platforms.
@@ -114,6 +150,49 @@
 *   Established `architecture.md` and single-file strict rules.
 
 ## 🗄️ session logs
+
+### Session: Autonomous Tactical Refinement (v48.6.2)
+
+#### Development Log
+**Technical Stabilization & Behavioral Elevation**
+The transition from v48.6.1 to v48.6.2 focused on transforming the autonomous agent into a high-performance combatant while strictly adhering to a memory-efficient architecture. The development cycle began with a fundamental architectural shift to address performance degradation caused by frequent memory allocation within the high-frequency game loop. By migrating to a strict zero-allocation architecture using pre-allocated global scratchpads, we effectively eliminated garbage collection spikes and maintained a stable 60 FPS.
+
+**Intention Scoring & Neural Momentum**
+Once the performance foundation was secured, we moved away from a basic state machine toward a nuanced intention scoring framework. This allows the agent to weigh competing priorities such as survival, engagement, and exploration based on dynamic variables like health ratios and target proximity. The introduction of neural momentum and target locking ensured that the agent remains focused during combat, rewarding successful actions with increased aggression and tracking precision.
+
+**Fluid Traversal & Survival Instincts**
+The final phase addressed movement fluidity and tactical survival. Refinements included continuous sliding patterns and height-aware jumping logic, allowing the agent to navigate vertical geometry without losing momentum. Survival instincts were hardened through an absolute override system at critical health thresholds. Additionally, visual stability was improved by smoothing camera interpolation and removing jitter from the aiming logic.
+
+#### Prompt History
+*   **Architectural Foundation:** The user provided a handover note detailing the mission for v48.6.2. The agent confirmed the scratchpad system and the outline for paced jumping and centroid aiming.
+*   **Visual and Movement Polish:** The user noted camera shake during gadget throws. The agent identified vertical jitter and replaced it with a stable upward offset.
+*   **Behavioral Refinement:** The user critiqued erratic jumping and lack of target focus. The agent implemented minimum teleport distances, increased combat timers, and boosted weights for hunting.
+*   **Intelligence Upgrades:** The user requested an upgrade to the intention system. The agent introduced momentum tracking and aggression bias scaled by health and energy.
+*   **Survival and Navigation:** The user noted the agent was dying too early and failing vertical traversal. The agent implemented an absolute escape override and height-check raycasts for multi-jumping.
+*   **Final Execution Refinement:** The user addressed sliding bounces and wall collisions. The agent consolidated sliding logic into a duration-based mechanism and enhanced wall detection.
+
+### Session: Neural Override & Spatial Awareness (v48.6.1)
+
+#### Development Log
+**The Birth of Neural Override**
+The goal was to create an "Autoplay" system that felt intelligent rather than just a sequence of random inputs. We moved away from a simple reactive bot to a hierarchical system. The first iteration (v48.6.0) established the "Intention" layer—a high-level brain that decides if the player should be aggressive or defensive. This solved the issue of the AI wandering aimlessly, but it still struggled with basic navigation, often running off edges or getting stuck on corners.
+
+**Spatial Awareness & Raycasting**
+To fix the navigation issues, we implemented a "Spatial Awareness" module using raycasting. By projecting rays forward and downward, the AI can now "see" gaps in the floor and walls in its path. This allowed us to implement proactive jumping and wall-seeking. The AI now feels much more grounded, using the environment's verticality by intentionally hitting walls to slide and bounce.
+
+**Tactical Gadgetry**
+Gadget usage was overhauled to be intention-driven. The Impulse gadget, previously used randomly, is now a primary tool for both `ESCAPE` (launching away from enemies) and `HUNT` (launching toward them). We implemented a `pitchOverride` system that allows the AI to look at specific angles (like straight down for Impulse) without losing its horizontal target tracking. Aiming delays were also tightened to make the AI feel more responsive.
+
+**UI & Polish**
+To signal the state of the system, we added high-fidelity CSS animations for the "Neural Override" status. The "Liquid Glass" settings menu was also expanded to give users more control over the experience, including brightness and volume sliders that persist across sessions.
+
+#### Prompt History
+*   **Neural Override Concept:** The user requested a "Neural Override" system that could play the game automatically. The agent implemented the `AutoplaySystem` with a basic state machine.
+*   **Intention & Targeting:** The user asked for more intelligent decision-making. The agent added the `Intention` system and `findBestTarget` with LOS checks.
+*   **Navigation Failures:** Playtesting revealed the AI was falling off ledges. The user requested "Spatial Awareness." The agent added `checkGapForward` and `checkWallForward`.
+*   **Verticality & Walls:** The user wanted the AI to use wall-sliding. The agent added wall-seeking logic and wall-bounce triggers.
+*   **Gadget Refinement:** The user noted that gadgets weren't being used effectively. The agent tied gadget selection to intentions and implemented the `pitchOverride` for Impulse aiming.
+*   **Visual Feedback:** The user requested visual polish for the system status. The agent added the "Neural Override" text FX and expanded the settings modal.
 
 ### Session: Jump Pads & Physics Tuning (v48.5.0)
 
