@@ -22,7 +22,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v48.6.2</title>
+    <title>Neon Blade: Melee Arena v48.6.3</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -782,7 +782,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.6.2<br>- Autonomous Tactical Refinement -</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.6.3<br>- Golden Bot & Minimap -</div>
         </div>
     </div>
 
@@ -936,6 +936,60 @@
             visible: false,
             zoom: 3.5, 
             
+            preRender: function() {
+                if (!spatialGrid) return;
+                
+                // Find map bounds
+                let minX = Infinity, minZ = Infinity, maxX = -Infinity, maxZ = -Infinity;
+                const uniqueItems = new Set();
+                spatialGrid.cells.forEach(cell => {
+                    cell.forEach(item => {
+                        if (!item.mesh.userData.isFloor) {
+                            uniqueItems.add(item);
+                        }
+                    });
+                });
+                
+                uniqueItems.forEach(item => {
+                    if (item.box.min.x < minX) minX = item.box.min.x;
+                    if (item.box.min.z < minZ) minZ = item.box.min.z;
+                    if (item.box.max.x > maxX) maxX = item.box.max.x;
+                    if (item.box.max.z > maxZ) maxZ = item.box.max.z;
+                });
+                
+                // Add some padding
+                minX -= 10; minZ -= 10; maxX += 10; maxZ += 10;
+                
+                this.mapBounds = { minX, minZ, maxX, maxZ };
+                const width = maxX - minX;
+                const height = maxZ - minZ;
+                
+                if (width <= 0 || height <= 0) return;
+                
+                // Create offscreen canvas
+                if (!this.offscreenCanvas) {
+                    this.offscreenCanvas = document.createElement('canvas');
+                    this.offscreenCtx = this.offscreenCanvas.getContext('2d');
+                }
+                
+                // Scale factor to keep canvas size reasonable
+                const scale = 2; // 2 pixels per unit
+                this.offscreenScale = scale;
+                this.offscreenCanvas.width = width * scale;
+                this.offscreenCanvas.height = height * scale;
+                
+                this.offscreenCtx.clearRect(0, 0, this.offscreenCanvas.width, this.offscreenCanvas.height);
+                this.offscreenCtx.fillStyle = (currentTheme === 1) ? 'rgba(200, 200, 200, 0.6)' : 'rgba(100, 220, 255, 0.6)';
+                
+                uniqueItems.forEach(item => {
+                    const x = (item.box.min.x - minX) * scale;
+                    const z = (item.box.min.z - minZ) * scale;
+                    const w = (item.box.max.x - item.box.min.x) * scale;
+                    const d = (item.box.max.z - item.box.min.z) * scale;
+                    this.offscreenCtx.fillRect(x, z, w, d);
+                });
+            },
+
             init: function() {
                 this.canvas = document.getElementById('minimap');
                 this.ctx = this.canvas.getContext('2d');
@@ -959,6 +1013,8 @@
             update: function() {
                 if (!this.visible || !player || !this.ctx) return;
 
+                const now = performance.now();
+
                 // 1. Dynamic Zoom
                 const speed = new THREE.Vector2(player.velocity.x, player.velocity.z).length();
                 
@@ -981,24 +1037,12 @@
                 this.ctx.translate(-camera.position.x, -camera.position.z); 
 
                 // 4. Draw Walls
-                if (spatialGrid) {
-                    // Calculate visible range relative to zoom
-                    const range = (sz / this.zoom) * 0.8; 
-                    _groundBox.min.set(camera.position.x - range, -100, camera.position.z - range);
-                    _groundBox.max.set(camera.position.x + range, 100, camera.position.z + range);
-                    
-                    const nearby = spatialGrid.query(_groundBox, _groundSet);
-                    
-                    // Brighter wall color for better contrast on glass
-                    this.ctx.fillStyle = (currentTheme === 1) ? 'rgba(200, 200, 200, 0.6)' : 'rgba(100, 220, 255, 0.6)';
-                    
-                    nearby.forEach(item => {
-                        if (!item.mesh.userData.isFloor) {
-                            const w = item.box.max.x - item.box.min.x;
-                            const d = item.box.max.z - item.box.min.z;
-                            this.ctx.fillRect(item.box.min.x, item.box.min.z, w, d);
-                        }
-                    });
+                if (this.offscreenCanvas && this.mapBounds) {
+                    const drawX = this.mapBounds.minX;
+                    const drawZ = this.mapBounds.minZ;
+                    const drawW = this.offscreenCanvas.width / this.offscreenScale;
+                    const drawH = this.offscreenCanvas.height / this.offscreenScale;
+                    this.ctx.drawImage(this.offscreenCanvas, drawX, drawZ, drawW, drawH);
                 }
 
                 // 5 Draw Portals
@@ -1024,13 +1068,39 @@
                 this.ctx.globalAlpha = 1.0;
 
                 // 6. Draw Enemies
-                this.ctx.fillStyle = '#ff3333';
                 enemies.forEach(e => {
                     if (e.isDeadCorpse) return;
-                    this.ctx.beginPath();
-                    const r = 0.8 + (e.type.scale * 0.3);
-                    this.ctx.arc(e.mesh.position.x, e.mesh.position.z, r, 0, Math.PI * 2);
-                    this.ctx.fill();
+                    
+                    if (e.type.name === 'GOLDEN') {
+                        const dx = e.mesh.position.x - camera.position.x;
+                        const dz = e.mesh.position.z - camera.position.z;
+                        const dist = Math.sqrt(dx*dx + dz*dz);
+                        const maxDist = (center - 10) / this.zoom; 
+                        
+                        let drawX = e.mesh.position.x;
+                        let drawZ = e.mesh.position.z;
+                        
+                        if (dist > maxDist) {
+                            drawX = camera.position.x + (dx / dist) * maxDist;
+                            drawZ = camera.position.z + (dz / dist) * maxDist;
+                        }
+
+                        // Pulsing Golden Indicator
+                        const pulse = 1.0 + Math.sin(now * 0.01) * 0.3;
+                        this.ctx.fillStyle = '#ffd700';
+                        this.ctx.shadowBlur = 15;
+                        this.ctx.shadowColor = '#ffd700';
+                        this.ctx.beginPath();
+                        this.ctx.arc(drawX, drawZ, 3.5 * pulse, 0, Math.PI * 2);
+                        this.ctx.fill();
+                        this.ctx.shadowBlur = 0;
+                    } else {
+                        this.ctx.fillStyle = '#ff3333';
+                        this.ctx.beginPath();
+                        const r = 0.8 + (e.type.scale * 0.3);
+                        this.ctx.arc(e.mesh.position.x, e.mesh.position.z, r, 0, Math.PI * 2);
+                        this.ctx.fill();
+                    }
                 });
 
                 // 7. Draw North
@@ -2217,7 +2287,15 @@
 
             loadLevel: function(name) {
                 this.timer = 0;
-                this.queue = (LEVEL_SCRIPTS[name] || []).map(e => ({...e, triggered: false}));
+                let baseQueue = (LEVEL_SCRIPTS[name] || []).map(e => ({...e, triggered: false}));
+                
+                // Add universal hints for non-GYM maps
+                if (name !== 'GYM') {
+                    baseQueue.push({ time: 10.0, text: "Press 'M' to open Minimap", duration: 4.0, triggered: false });
+                    baseQueue.push({ time: 17.0, text: "Hunt the <span style='color:#ffd700'>Golden Bot</span>...<br><i style='font-size:0.8em; opacity:0.8'>track its golden pulse for a rare, lethal gift.</i>", duration: 5.0, triggered: false });
+                }
+                
+                this.queue = baseQueue;
                 this.hide();
             },
 
@@ -3171,6 +3249,9 @@
         let groundObjects = []; 
         let walls = [];        
         let enemies = [];
+        let goldenBuffActive = false;
+        let missedSlashesCount = 0;
+        let goldenBotRespawnTimer = 0;
         let decorations = [];
         let portals = [];
         let jumpPads = [];
@@ -3507,6 +3588,7 @@
                 if(scene.fog) scene.fog.density = next.config.fog;
                 
                 applyTheme(); 
+                Minimap.preRender();
                 
                 document.getElementById('map-btn').innerText = "MAP: " + name;
             }
@@ -3532,6 +3614,10 @@
                 for(let i=0; i<cfg.bots; i++) {
                      new Enemy(null, null, 'ROAM', 0, mapState);
                 }
+                
+                // Spawn initial golden bot
+                new Enemy(null, BOT_TYPES.GOLDEN, 'ROAM', 0, mapState);
+                goldenBotRespawnTimer = 0;
             },
 
             buildBase: function(ms) {
@@ -5575,6 +5661,13 @@
                 if (hitType === "MISS") {
                      AudioSys.playMiss();
                      showKillMessage("MISS", "graze");
+                     if (goldenBuffActive) {
+                         missedSlashesCount++;
+                         if (missedSlashesCount >= 6) {
+                             goldenBuffActive = false;
+                             showKillMessage("GOLDEN BUFF LOST", "critical", "#ff0000");
+                         }
+                     }
                      return; 
                 }
 
@@ -5614,6 +5707,7 @@
                 });
 
                 if (uniqueHitEnemies.size > 0) {
+                    if (goldenBuffActive) missedSlashesCount = 0;
                     player.totalHits += uniqueHitEnemies.size; 
 
                     const hitCount = uniqueHitEnemies.size;
@@ -5755,7 +5849,7 @@
                             }
                         }
 
-                        h.enemy.takeHit(finalDamage);
+                        h.enemy.takeHit(finalDamage, true);
                         
                         const pColor = hitType === "CRIT" ? 0xff0000 : 0x00ffff;
                         
@@ -5778,6 +5872,14 @@
                         slashMesh.scale.setScalar(1.2); 
                         slashMesh.userData.fadeSpeed = 0.06; 
                         slashMesh.userData.isHit = true; 
+                    }
+                } else {
+                    if (goldenBuffActive) {
+                        missedSlashesCount++;
+                        if (missedSlashesCount >= 6) {
+                            goldenBuffActive = false;
+                            showKillMessage("GOLDEN BUFF LOST", "critical", "#ff0000");
+                        }
                     }
                 }
             }
@@ -7370,10 +7472,11 @@
         }
 
         const BOT_TYPES = {
-            NORMAL: { scale: 1, hp: 200, speedMod: 1, dmgRed: 1, skill: 1, name: "NORMAL", color: 0x2F4F4F, eye: 0xffffff },   
-            BRUTE: { scale: 2, hp: 600, speedMod: 0.85, dmgRed: 1, skill: 2, name: "BRUTE", color: 0x191970, eye: 0xffff00 }, 
-            TITAN: { scale: 3, hp: 1200, speedMod: 0.75, dmgRed: 1, skill: 2, name: "TITAN", color: 0x4B0082, eye: 0xff8c00 }, 
-            COLOSSUS: { scale: 5, hp: 4000, speedMod: 0.6, dmgRed: 0.5, skill: 1, name: "COLOSSUS", color: 0x800000, eye: 0xff0000 } 
+            NORMAL: { scale: 1, hp: 200, speedMod: 1, dmgRed: 1, skill: 1, name: "NORMAL", color: 0x2F4F4F, eye: 0xffffff, metalness: 0.1, roughness: 0.2 },   
+            GOLDEN: { scale: 0.8, hp: 300, maxStamina: 50, staminaRegen: 5, speedMod: 1.5, dmgRed: 0.5, skill: 3, name: "GOLDEN", color: 0xffd700, eye: 0xffffff, metalness: 0.8, roughness: 0.1, emissive: 0xffd700, emissiveIntensity: 0.4 },
+            BRUTE: { scale: 2, hp: 600, speedMod: 0.85, dmgRed: 1, skill: 2, name: "BRUTE", color: 0x191970, eye: 0xffff00, metalness: 0.1, roughness: 0.2 }, 
+            TITAN: { scale: 3, hp: 1200, speedMod: 0.75, dmgRed: 1, skill: 2, name: "TITAN", color: 0x4B0082, eye: 0xff8c00, metalness: 0.1, roughness: 0.2 }, 
+            COLOSSUS: { scale: 5, hp: 4000, speedMod: 0.6, dmgRed: 0.5, skill: 1, name: "COLOSSUS", color: 0x800000, eye: 0xff0000, metalness: 0.1, roughness: 0.2 } 
         };
         
         function getBotReactionTime(bot) {
@@ -7402,60 +7505,88 @@
                 } else {
                     let x, z;
                     const usedDecorations = ms ? ms.decorations : decorations;
-                    const spawnRange = ms ? ms.config.size * 0.4 : 175;
+                    // Golden bots spawn closer to player initially to be seen
+                    const baseRange = ms ? ms.config.size * 0.4 : 175;
+                    const spawnRange = (typeOverride === BOT_TYPES.GOLDEN) ? Math.min(baseRange, 80) : baseRange;
                     let validSpawn = false;
+                    let attempts = 0;
 
-                    // Try spawning near decoration
-                    if (Math.random() < 0.4 && usedDecorations.length > 0) {
-                        const dec = usedDecorations[Math.floor(Math.random() * usedDecorations.length)];
-                        const range = (dec.scale - 2) * 0.6;
-                        if (range > 2) {
-                            x = dec.visualMesh.position.x + (Math.random() - 0.5) * 2 * range;
-                            z = dec.visualMesh.position.z + (Math.random() - 0.5) * 2 * range;
-                            validSpawn = true;
+                    do {
+                        validSpawn = false;
+                        // Try spawning near decoration
+                        if (Math.random() < 0.4 && usedDecorations.length > 0) {
+                            const dec = usedDecorations[Math.floor(Math.random() * usedDecorations.length)];
+                            const range = (dec.scale - 2) * 0.6;
+                            if (range > 2) {
+                                x = dec.visualMesh.position.x + (Math.random() - 0.5) * 2 * range;
+                                z = dec.visualMesh.position.z + (Math.random() - 0.5) * 2 * range;
+                                validSpawn = true;
+                            }
                         }
-                    }
 
-                    // Fallback random spawn
-                    if (!validSpawn) {
-                        do {
+                        // Fallback random spawn
+                        if (!validSpawn) {
                             x = (Math.random() - 0.5) * (spawnRange * 2);
                             z = (Math.random() - 0.5) * (spawnRange * 2);
-                        } while (Math.abs(x) < 20 && Math.abs(z) < 20);
-                    }
+                            // Ensure not too close to player for normal bots, but okay for golden
+                            if (typeOverride !== BOT_TYPES.GOLDEN && Math.abs(x) < 30 && Math.abs(z) < 30) {
+                                spawnY = -999;
+                                continue;
+                            }
+                        }
+                        
+                        spawnY = getRandomSpawnY(x, z);
+                        attempts++;
+                    } while (spawnY <= -999 && attempts < 50);
 
-                    spawnY = getRandomSpawnY(x, z);
-                    if (spawnY <= -999) spawnY = 0;
-
-                    // Determine Type based on Height
-                    let r = Math.random();
-                    let type = 'NORMAL';
-                    if (spawnY > 35) {
-                        if (r < 0.4) type = 'COLOSSUS';
-                        else if (r < 0.9) type = 'TITAN';
-                        else type = 'BRUTE';
-                    } else if (spawnY > 5) {
-                        if (r < 0.05) type = 'COLOSSUS';
-                        else if (r < 0.4) type = 'TITAN';
-                        else if (r < 0.8) type = 'BRUTE';
-                        else type = 'NORMAL';
+                    // If still no ground, abort spawn to prevent "random deaths" from falling
+                    if (spawnY <= -999) {
+                        this.isDead = true; // Mark for immediate cleanup if needed, but constructor can't easily abort
+                        this.mesh.visible = false;
+                        this.health = 0;
+                        // We'll just put it far away and let it be removed if it's a normal bot
+                        this.mesh.position.set(0, -1000, 0); 
                     } else {
-                        if (r < 0.01) type = 'COLOSSUS';
-                        else if (r < 0.05) type = 'TITAN';
-                        else if (r < 0.20) type = 'BRUTE';
-                        else type = 'NORMAL';
+                        if (typeOverride) {
+                            this.type = typeOverride;
+                        } else {
+                            // Determine Type based on Height
+                            let r = Math.random();
+                            let type = 'NORMAL';
+                            if (spawnY > 35) {
+                                if (r < 0.4) type = 'COLOSSUS';
+                                else if (r < 0.9) type = 'TITAN';
+                                else type = 'BRUTE';
+                            } else if (spawnY > 5) {
+                                if (r < 0.05) type = 'COLOSSUS';
+                                else if (r < 0.4) type = 'TITAN';
+                                else if (r < 0.8) type = 'BRUTE';
+                                else type = 'NORMAL';
+                            } else {
+                                if (r < 0.01) type = 'COLOSSUS';
+                                else if (r < 0.05) type = 'TITAN';
+                                else if (r < 0.20) type = 'BRUTE';
+                                else type = 'NORMAL';
+                            }
+                            this.type = BOT_TYPES[type];
+                        }
+                        this.mesh.position.set(x, spawnY + this.type.scale, z);
+                        
+                        if (this.type === BOT_TYPES.GOLDEN) {
+                            showKillMessage("GOLDEN BOT DETECTED", "achievement", "#ffd700");
+                        }
                     }
-                    this.type = BOT_TYPES[type];
-                    this.mesh.position.set(x, spawnY + this.type.scale, z);
                 }
 
                 // --- Mesh Setup ---
-                const bodyMat = new THREE.MeshPhysicalMaterial({
+                const matOpts = {
                     color: this.type.color,
-                    metalness: 0.1,
-                    roughness: 0.2,
-                    clearcoat: 0.5
-                });
+                    metalness: this.type.metalness || 0.1,
+                    roughness: this.type.roughness || 0.2,
+                    emissive: this.type.emissive || 0x000000,
+                    emissiveIntensity: this.type.emissiveIntensity || 0
+                };
+                const bodyMat = new THREE.MeshStandardMaterial(matOpts);
                 this.body = new THREE.Mesh(sharedEnemyGeo, bodyMat);
 
                 if (ms && ms.config.bots > 100) this.body.castShadow = false;
@@ -7465,9 +7596,9 @@
                 this.mesh.add(this.body);
 
                 this.outline = new THREE.LineSegments(sharedEnemyEdgeGeo, new THREE.LineBasicMaterial({
-                    color: 0xffffff,
+                    color: this.type.name === 'GOLDEN' ? this.type.color : 0xffffff,
                     transparent: true,
-                    opacity: 0.3
+                    opacity: this.type.name === 'GOLDEN' ? 0.8 : 0.3
                 }));
                 this.outline.scale.setScalar(1.02);
                 this.mesh.add(this.outline);
@@ -7545,9 +7676,9 @@
                 this.dodgeReactionTimer = 0;
                 this.ledgeTimer = 0;
                 this.lastPos = new THREE.Vector2(this.mesh.position.x, this.mesh.position.z);
-                this.stamina = CONFIG.botStaminaMax;
-                this.maxStamina = CONFIG.botStaminaMax;
-                this.staminaRegen = CONFIG.botStaminaRegen;
+                this.maxStamina = this.type.maxStamina || CONFIG.botStaminaMax;
+                this.stamina = this.maxStamina;
+                this.staminaRegen = this.type.staminaRegen || CONFIG.botStaminaRegen;
                 this.visionTimer = Math.random() * 0.5;
                 this.canSeePlayerCached = false;
 
@@ -7575,16 +7706,23 @@
 
             updateTheme(t) {
                 if (t === 2) {
-                    this.outline.material.color.setHex(0x00ffff);
+                    this.outline.material.color.setHex(this.type.name === 'GOLDEN' ? this.type.color : 0x00ffff);
                     this.outline.material.opacity = 0.8;
-                    this.body.material.color.setHex(0x000000);
-                    this.body.material.emissive.setHex(0x000000);
-                    this.body.material.emissiveIntensity = 0;
+                    if (this.type.name !== 'GOLDEN') {
+                        this.body.material.color.setHex(0x000000);
+                        this.body.material.emissive.setHex(0x000000);
+                        this.body.material.emissiveIntensity = 0;
+                    } else {
+                        this.body.material.color.setHex(this.type.color);
+                        this.body.material.emissive.setHex(this.type.emissive || 0x000000);
+                        this.body.material.emissiveIntensity = this.type.emissiveIntensity || 0;
+                    }
                 } else {
-                    this.outline.material.color.setHex(0xffffff);
-                    this.outline.material.opacity = 0.3;
+                    this.outline.material.color.setHex(this.type.name === 'GOLDEN' ? this.type.color : 0xffffff);
+                    this.outline.material.opacity = this.type.name === 'GOLDEN' ? 0.8 : 0.3;
                     this.body.material.color.setHex(this.type.color);
-                    this.body.material.emissiveIntensity = 0;
+                    this.body.material.emissive.setHex(this.type.emissive || 0x000000);
+                    this.body.material.emissiveIntensity = this.type.emissiveIntensity || 0;
                 }
             }
 
@@ -7816,6 +7954,15 @@
                             // Zero-Allocation Retreat Dir
                             _aiDir.subVectors(this.mesh.position, playerPos).normalize();
                             
+                            // Golden Bot: Maintain safe distance instead of full retreat
+                            if (this.type.name === 'GOLDEN') {
+                                if (dist > 15) {
+                                    _aiDir.multiplyScalar(-1); // Move towards player if too far
+                                } else if (dist > 10 && dist < 15) {
+                                    _aiDir.set(0,0,0); // Stay put if in sweet spot
+                                }
+                            }
+
                             // Throttle wall avoidance checks
                             if (!this.lastRetreatWallCheck || performance.now() - this.lastRetreatWallCheck > 200) {
                                 globalRaycaster.set(this.mesh.position, _aiDir);
@@ -7861,6 +8008,16 @@
                         // Teleport Logic (Simplified Allocations)
                         if (this.teleportTimer <= 0 && this.stamina >= 10 && this.teleportDelay <= 0) {
                             let wantsToTp = (dist < 15 && this.isRetreating) || (dist > 25 && !this.isRetreating) || (dist < 15 && !this.isRetreating);
+                            
+                            // Golden Bot: More purposeful teleportation
+                            if (this.type.name === 'GOLDEN') {
+                                wantsToTp = (dist < 6) || (dist > 30) || (hpPct < 0.3 && dist < 15);
+                                // Teleport if player is looking at us and close
+                                camera.getWorldDirection(_aiTemp);
+                                _tempB.subVectors(this.mesh.position, playerPos).normalize();
+                                if (_aiTemp.dot(_tempB) > 0.95 && dist < 10) wantsToTp = true;
+                            }
+
                             if (wantsToTp && !this.teleportReactionPending) {
                                 this.teleportDelay = getBotReactionTime(this) / 1000;
                                 this.teleportReactionPending = true;
@@ -7868,6 +8025,7 @@
                             if (this.teleportDelay <= 0 && this.teleportReactionPending) {
                                 this.teleportReactionPending = false;
                                 let tpChance = (this.isRetreating ? 0.05 : (dist > 25 ? 0.02 : 0.005));
+                                if (this.type.name === 'GOLDEN') tpChance = 0.8; // High chance if logic says we want to tp
 
                                 if (Math.random() < tpChance * intervalMultiplier) {
                                     _aiTemp.set(0,0,0); // Use as 'newPos' holder
@@ -7876,7 +8034,13 @@
                                     const maxRange = 20;
                                     const tpRange = minRange + (1.0 - hpPct) * (maxRange - minRange);
                                     
-                                    if (this.isRetreating) {
+                                    if (this.type.name === 'GOLDEN' && dist < 10 && Math.random() < 0.6) {
+                                        // Flank: Teleport behind player
+                                        camera.getWorldDirection(_aiDir);
+                                        _aiDir.y = 0; _aiDir.normalize();
+                                        _aiTemp.copy(playerPos).addScaledVector(_aiDir, -8);
+                                        validTp = true;
+                                    } else if (this.isRetreating || (this.type.name === 'GOLDEN' && dist < 10)) {
                                         _aiDir.subVectors(this.mesh.position, playerPos).normalize();
                                         _aiDir.x += (Math.random() - 0.5) * 0.5;
                                         _aiDir.z += (Math.random() - 0.5) * 0.5;
@@ -7952,7 +8116,7 @@
                         if (this.mesh.position.distanceTo(dest) < 3) {
                             this.state = 'SEARCH';
                             this.searchTimer = 3000;
-                            this.body.material.color.setHex(0xffaa00);
+                            if (this.type.name !== 'GOLDEN') this.body.material.color.setHex(0xffaa00);
                         }
                     }
                 } else if (this.state === 'SEARCH') {
@@ -7960,11 +8124,11 @@
                     this.searchTimer -= dt * 1000;
                     if (this.canSeePlayer(playerPos)) {
                         this.state = 'AGGRO';
-                        this.body.material.color.setHex(0x8b0000);
+                        if (this.type.name !== 'GOLDEN') this.body.material.color.setHex(0x8b0000);
                         this.reactionTimer = CONFIG.botAggroDelay;
                     } else if (this.searchTimer <= 0) {
                         this.state = 'ROAM';
-                        this.body.material.color.setHex(this.type.color);
+                        if (this.type.name !== 'GOLDEN') this.body.material.color.setHex(this.type.color);
                         this.pickRoamTarget();
                     }
                 }
@@ -8077,6 +8241,17 @@
                     if (Math.random() < 0.3 * intervalMultiplier) spawnSnowTrail(this.mesh.position, this.velocity, yOffTrail);
                     if (Math.random() < 0.5 * intervalMultiplier) spawnSnowKickup(this.mesh.position, this.velocity, yOffKick);
                 }
+
+                // Golden Aura
+                if (this.type.name === 'GOLDEN' && !this.isDeadCorpse) {
+                    if (Math.random() < 0.2 * intervalMultiplier) {
+                        _aiTemp.copy(this.mesh.position);
+                        _aiTemp.x += (Math.random() - 0.5) * 1.5;
+                        _aiTemp.y += Math.random() * 2.0;
+                        _aiTemp.z += (Math.random() - 0.5) * 1.5;
+                        spawnParticles(_aiTemp, 0xffd700, 1, 0.5);
+                    }
+                }
             }
 
             updatePhysics(dt, distSq) {
@@ -8180,6 +8355,27 @@
                     this.healthBarGroup.visible = true;
                     this.healthBar.scale.x = Math.max(0, this.health / this.maxHealth);
                 }
+                
+                if (this.mesh.position.y < -50 && !this.isDeadCorpse) {
+                    // Bot Recycling
+                    let rx, rz;
+                    const spawnRange = MapManager.current ? MapManager.current.config.size * 0.4 : 175;
+                    let found = false;
+                    for(let i=0; i<10; i++) {
+                        rx = (Math.random() - 0.5) * (spawnRange * 2);
+                        rz = (Math.random() - 0.5) * (spawnRange * 2);
+                        const ry = getRandomSpawnY(rx, rz);
+                        if (ry > -999) {
+                            this.mesh.position.set(rx, ry + this.type.scale, rz);
+                            this.velocity.set(0, 0, 0);
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        this.takeHit(this.maxHealth * 10);
+                    }
+                }
 
                 // Collision Bounds & Resolution
                 const isNear = distSq < 2500;
@@ -8224,7 +8420,11 @@
                 return Math.abs(this.mesh.position.y - (groundY + this.type.scale)) < 0.5;
             }
 
-            takeHit(amt) {
+            takeHit(amt, isSlash = false) {
+                if (goldenBuffActive && this.type.name !== 'GOLDEN' && isSlash) {
+                    amt = this.maxHealth * 2;
+                }
+                
                 if (this.isDeadCorpse || this.state === 'CONFUSED') {
                     if (this.state === 'CONFUSED') {
                         amt *= 2;
@@ -8242,14 +8442,20 @@
                 this.health -= amt;
                 this.lastDamageTime = performance.now();
                 this.body.material.color.setHex(0xffffff);
+                this.body.material.emissiveIntensity = 1.0;
                 setTimeout(() => {
                     if (!this.isDeadCorpse && this.state !== 'CONFUSED') {
-                        if (currentTheme === 2) {
+                        if (this.type.name === 'GOLDEN') {
+                            this.body.material.color.setHex(this.type.color);
+                            this.body.material.emissiveIntensity = this.type.emissiveIntensity || 0;
+                        } else if (currentTheme === 2) {
                             this.body.material.color.setHex(0x000000);
+                            this.body.material.emissiveIntensity = 0;
                         } else {
                             if (this.state === 'SEARCH') this.body.material.color.setHex(0xffaa00);
                             else if (this.state === 'AGGRO') this.body.material.color.setHex(0x8b0000);
                             else this.body.material.color.setHex(this.type.color);
+                            this.body.material.emissiveIntensity = 0;
                         }
                     }
                 }, 100);
@@ -8259,6 +8465,13 @@
                     this.hasAggroed = true;
                 }
                 if (this.health <= 0) {
+                    if (this.type.name === 'GOLDEN') {
+                        goldenBuffActive = true;
+                        missedSlashesCount = 0;
+                        goldenBotRespawnTimer = 10;
+                        showKillMessage("GOLDEN BUFF ACQUIRED!", "critical", "#ffd700");
+                    }
+                    
                     addScore(1000 * this.type.scale);
                     GameStats.botKills++;
                     GameStats.checkKillMilestone();
@@ -8366,6 +8579,9 @@
         }
 
         function resetGame() {
+            goldenBuffActive = false;
+            missedSlashesCount = 0;
+            goldenBotRespawnTimer = 0.1;
             player.health = CONFIG.playerMaxHP;
             player.energy = CONFIG.energyMax; 
             player.score = 0;
@@ -8463,6 +8679,15 @@
                 
                 if (Math.random() < 0.05 && enemies.length < cap) {
                     new Enemy(null, null, 'ROAM', 0, MapManager.current);
+                }
+                
+                if (goldenBotRespawnTimer > 0) {
+                    goldenBotRespawnTimer -= dt;
+                    if (goldenBotRespawnTimer <= 0) {
+                        goldenBotRespawnTimer = 0;
+                        new Enemy(null, BOT_TYPES.GOLDEN, 'ROAM', 0, MapManager.current);
+                        showKillMessage("GOLDEN BOT HAS SPAWNED!", "critical", "#ffd700");
+                    }
                 }
                 
                 // Logic Phase

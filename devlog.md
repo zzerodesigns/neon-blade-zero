@@ -63,6 +63,13 @@
 *   **Synthesized Melodies:** Integrate procedural Web Audio API melodies as easter eggs or ambient tracks.
 
 ## ✅ recently completed concepts
+- [x] **Contextual Onboarding:** Integrated universal narrative hints for Minimap usage and Golden Bot tracking on all standard maps.
+- [x] **Golden Bot Balancing:** Finalized stats with reduced scale (0.8x), increased HP (1.5x), and high damage resistance (0.5x multiplier) relative to standard bots.
+- [x] **Golden Bot Integration:** Added a high-value, evasive Golden Bot with a 3-minute respawn timer and a one-hit-kill sword buff (lost after 5 misses).
+- [x] **Minimap Optimization:** Overhauled minimap rendering using an offscreen static canvas, achieving a flawless 60FPS.
+- [x] **Bot Recycling:** Implemented a system to catch and respawn bots that fall out of bounds (Y < -50).
+- [x] **Golden Bot AI:** Developed a "Level 5" AI that maintains a dynamic safe distance, conserves energy, and executes flanking teleports.
+- [x] **Golden Bot Visuals:** Refined the bot's material to a highly reflective, polished "solid gold bar" look with a clamped minimap indicator.
 - [x] **Neural Override (Autoplay):** Implemented a hierarchical AI system with intentions (Escape, Engage, Hunt, Explore) and state-based behaviors.
 - [x] **Spatial Awareness Raycasting:** Added forward gap and wall detection to the AI traversal logic.
 - [x] **Stuck Detection:** Implemented a position-tracking timer to force jumps when the AI is blocked by geometry.
@@ -78,6 +85,14 @@
 - [x] **Weather Enhancements:** Increased snow/leaf particle density and expanded the spawn distance radius.
 
 ## 📖 version history / patch notes
+
+### v48.6.3 - Golden Bot Integration & Minimap Optimization
+*   **Golden Bot:** Added a high-value Golden Bot designed as an advanced practice target. Final tuning: 0.8x scale, 1.5x HP, 5x energy, 2.5x stamina regeneration, and 0.5x damage taken relative to standard bots.
+*   **Minimap Overhaul:** Completely rewrote minimap rendering to use an offscreen static canvas, eliminating per-frame spatial queries and achieving a flawless 60FPS.
+*   **Narrative Onboarding:** Integrated universal hints for Minimap usage (10s) and Golden Bot tracking (17s) on all non-GYM maps.
+*   **Bot Recycling:** Implemented a failsafe system to catch entities falling out of bounds (Y < -50) and safely respawn them within the arena.
+*   **Golden Buff System:** Defeating the Golden Bot grants a one-hit-kill buff strictly limited to sword slashes. The buff is revoked after 5 missed swings.
+*   **Visual & UI Polish:** Refined the Golden Bot's material to a true metallic gold finish, added a sparkling aura, and implemented a clamped minimap indicator for tracking out-of-range targets.
 
 ### v48.6.2 - Autonomous Tactical Refinement
 *   **Zero-Allocation Architecture:** Migrated all spatial and mathematical calculations to global scratchpads (`_aiDir`, `_aiTemp`, etc.) to eliminate garbage collection stutters.
@@ -150,6 +165,33 @@
 *   Established `architecture.md` and single-file strict rules.
 
 ## 🗄️ session logs
+
+### Session: Golden Bot & Minimap Optimization (v48.6.3)
+
+#### Development Log
+**Initial Implementation & Spawning Mechanics**
+The development cycle for this version began with the conceptualization of the Golden Bot—a high-value, elusive target designed to test the player's mobility and melee skills. The initial implementation successfully established the core loop: spawning the bot, granting a one-hit-kill buff upon its defeat, and revoking that buff after consecutive missed slashes. However, we immediately encountered environmental issues where bots were spawning over pits and falling to their deaths. We addressed this by implementing a robust ground-verification system and eventually a recycling mechanic that catches any bot falling out of bounds and safely respawns them within the arena, ensuring a stable enemy population.
+
+**Performance Bottlenecks & Minimap Overhaul**
+As we integrated the Golden Bot's unique minimap indicator and visual aura, severe performance degradation became apparent. The game experienced heavy lag, particularly when rendering the minimap and standing in close proximity to the new bot. Initially, a frame-rate throttle was applied to the minimap, but this resulted in a jarring visual disconnect. We pivoted to a much more sophisticated architectural solution: offscreen static rendering. By rendering the static map geometry to an offscreen canvas once per level load and simply drawing that cached image during the game loop, we eliminated thousands of per-frame spatial queries. This breakthrough completely resolved the lag, allowing the minimap to run at a buttery-smooth 60FPS.
+
+**Visual Identity & AI Refinement**
+Achieving the correct "solid gold bar" aesthetic required significant iteration. Early attempts left the bot looking either overly emissive (glowing) or completely black due to lighting and material property mismatches. We carefully balanced the metalness, roughness, and subtle emissive values to create a highly reflective, polished gold finish that remains consistent across all map themes. Concurrently, we refined the bot's AI to act as a true "Level 5" practice target. Instead of erratic, panicky fleeing, the bot now maintains a dynamic safe distance, manages its doubled energy pool to execute purposeful flanking maneuvers, and reacts specifically to the player entering sword range.
+
+**Polish & Combat Balancing**
+In the final phase, we focused on balancing the reward mechanics and providing better player guidance. The one-hit-kill buff was restricted strictly to sword slashes, preventing players from clearing the map effortlessly with gadgets. To compensate, the miss penalty was made more forgiving, allowing up to five misses before the buff is revoked. We also introduced universal narrative hints to guide players toward the Minimap and the Golden Bot's unique mechanics. Finally, the Golden Bot's stats were manually tuned to create a "Boss" variant: smaller (0.8x scale), significantly more resilient (1.5x HP and 0.5x damage taken), and highly mobile with a massive energy pool, while its skill level was set to Lv 3 for a fair yet challenging reaction time. We also enhanced the minimap tracking by clamping the Golden Bot's indicator to the edge of the screen when it is out of range.
+
+#### Prompt History
+*   **Phase 1: Concept & Core Mechanics:** The user requested a new enemy type, a golden, shiny variant of the standard small bot with twice the energy pool and specialized evasion AI. The agent implemented the core mechanics, including the 3-minute respawn timer and the one-hit-kill buff.
+*   **Resolving Spawn and Visibility Issues:** The user noted that the Golden Bot was rarely visible and bots were dying randomly off-screen. The agent adjusted the spawn radius and added a ground-verification loop to prevent environmental deaths.
+*   **Phase 2: Systemic Stability & Performance:** The user requested bot recycling for out-of-bounds entities, visual enhancements for the Golden Bot (sparkling aura, minimap indicator), and minimap performance optimization. The agent implemented recycling, visual upgrades, and initially throttled the minimap to 30fps.
+*   **Addressing Severe Lag and Minimap Overhaul:** The user rejected the 30fps throttle and demanded a proper architectural fix for the minimap lag. The agent implemented offscreen static rendering, eliminating per-frame spatial queries and achieving 60FPS.
+*   **Phase 3: AI Refinement & Visual Polish:** The user identified proximity lag and a degraded AI. After a quota exhaustion incident, the agent successfully resolved the proximity lag and restored the original evasive AI.
+*   **Refining Combat AI and Visual Reversion:** The user requested minimal changes to refine the bot's stats (normal HP, 2x energy) and AI (dynamic safe distance, reactive flanking), while reverting its appearance to a bright, golden look without excessive glowing. The agent implemented these targeted adjustments.
+*   **Correcting the Black Material Rendering:** The user noted the bot was rendering black. The agent balanced the metalness, roughness, and emissive properties to achieve a true "solid gold bar" look.
+*   **Balancing the Buff and Minimap Clamping:** The user requested restricting the buff to sword slashes, increasing the miss allowance to 5, and clamping the minimap indicator. The agent finalized the combat loop and UI enhancements.
+*   **Final Polish & Narrative Onboarding:** The user requested universal narrative hints for the Minimap and Golden Bot on all standard maps. The agent implemented these hints at 10s and 17s respectively.
+*   **Manual Stat Tuning:** The user manually adjusted the Golden Bot's stats (scale, HP, stamina, speed, damage reduction, and skill level) to create a balanced "Boss" variant. The agent provided a technical breakdown of these changes and confirmed the damage reduction multiplier logic.
 
 ### Session: Autonomous Tactical Refinement (v48.6.2)
 
