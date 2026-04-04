@@ -22,7 +22,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v48.6.3</title>
+    <title>Neon Blade: Melee Arena v48.6.4</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -782,7 +782,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.6.3<br>- Golden Bot & Minimap -</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.6.4<br>- Geometry & Theming & Palette Overhaul -</div>
         </div>
     </div>
 
@@ -982,11 +982,66 @@
                 this.offscreenCtx.fillStyle = (currentTheme === 1) ? 'rgba(200, 200, 200, 0.6)' : 'rgba(100, 220, 255, 0.6)';
                 
                 uniqueItems.forEach(item => {
-                    const x = (item.box.min.x - minX) * scale;
-                    const z = (item.box.min.z - minZ) * scale;
-                    const w = (item.box.max.x - item.box.min.x) * scale;
-                    const d = (item.box.max.z - item.box.min.z) * scale;
-                    this.offscreenCtx.fillRect(x, z, w, d);
+                    if (item.mesh && item.mesh.userData && item.mesh.userData.obb) {
+                        const obb = item.mesh.userData.obb;
+                        const cx = obb.center.x;
+                        const cz = obb.center.z;
+                        const hx = obb.halfSize.x;
+                        const hy = obb.halfSize.y;
+                        const hz = obb.halfSize.z;
+                        
+                        const ax = new THREE.Vector3();
+                        const ay = new THREE.Vector3();
+                        const az = new THREE.Vector3();
+                        obb.rotation.extractBasis(ax, ay, az);
+                        
+                        const pts = [];
+                        for(let i=-1; i<=1; i+=2) {
+                            for(let j=-1; j<=1; j+=2) {
+                                for(let k=-1; k<=1; k+=2) {
+                                    pts.push({
+                                        x: cx + i*hx*ax.x + j*hy*ay.x + k*hz*az.x,
+                                        z: cz + i*hx*ax.z + j*hy*ay.z + k*hz*az.z
+                                    });
+                                }
+                            }
+                        }
+                        
+                        pts.sort((a, b) => a.x !== b.x ? a.x - b.x : a.z - b.z);
+                        const hull = [];
+                        const cross = (o, a, b) => (a.x - o.x) * (b.z - o.z) - (a.z - o.z) * (b.x - o.x);
+                        
+                        for (let i = 0; i < pts.length; i++) {
+                            while (hull.length >= 2 && cross(hull[hull.length - 2], hull[hull.length - 1], pts[i]) <= 0) {
+                                hull.pop();
+                            }
+                            hull.push(pts[i]);
+                        }
+                        const lowerLen = hull.length;
+                        for (let i = pts.length - 2; i >= 0; i--) {
+                            while (hull.length > lowerLen && cross(hull[hull.length - 2], hull[hull.length - 1], pts[i]) <= 0) {
+                                hull.pop();
+                            }
+                            hull.push(pts[i]);
+                        }
+                        hull.pop();
+                        
+                        this.offscreenCtx.beginPath();
+                        for (let i = 0; i < hull.length; i++) {
+                            const px = (hull[i].x - minX) * scale;
+                            const pz = (hull[i].z - minZ) * scale;
+                            if (i === 0) this.offscreenCtx.moveTo(px, pz);
+                            else this.offscreenCtx.lineTo(px, pz);
+                        }
+                        this.offscreenCtx.closePath();
+                        this.offscreenCtx.fill();
+                    } else {
+                        const x = (item.box.min.x - minX) * scale;
+                        const z = (item.box.min.z - minZ) * scale;
+                        const w = (item.box.max.x - item.box.min.x) * scale;
+                        const d = (item.box.max.z - item.box.min.z) * scale;
+                        this.offscreenCtx.fillRect(x, z, w, d);
+                    }
                 });
             },
 
@@ -3253,6 +3308,7 @@
         let missedSlashesCount = 0;
         let goldenBotRespawnTimer = 0;
         let decorations = [];
+        let obbDecorations = [];
         let portals = [];
         let jumpPads = [];
         let spatialGrid = null;
@@ -3416,6 +3472,7 @@
                 this.walls = [];
                 this.enemies = [];
                 this.decorations = [];
+                this.obbDecorations = [];
                 this.portals = [];
                 this.jumpPads = [];
                 
@@ -3515,6 +3572,7 @@
                 walls = next.walls;
                 enemies = next.enemies;
                 decorations = next.decorations;
+                obbDecorations = next.obbDecorations;
                 portals = next.portals;
                 jumpPads = next.jumpPads;
                 spatialGrid = next.spatialGrid;
@@ -3593,6 +3651,129 @@
                 document.getElementById('map-btn').innerText = "MAP: " + name;
             }
         };
+
+        const GIFT_PALETTES = [
+            { box: 0xcc0000, ribbon: 0xffd700 }, 
+            { box: 0x006400, ribbon: 0xcc0000 }, 
+            { box: 0x0044aa, ribbon: 0xc0c0c0 }, 
+            { box: 0xffffff, ribbon: 0xcc0000 }, 
+            { box: 0x0033bb, ribbon: 0xffd700 }, // Replaced purple with blue
+            { box: 0xffff00, ribbon: 0xff0000 }, 
+            { box: 0xff0000, ribbon: 0xffff00 }, 
+            { box: 0x0088ff, ribbon: 0xffffff }, 
+            { box: 0x00ff00, ribbon: 0x0088ff }, // Replaced purple ribbon with blue
+            { box: 0xff8800, ribbon: 0x000000 },
+            // Replaced pinks with more blues/cyans
+            { box: 0x0055ff, ribbon: 0x00ffff },
+            { box: 0x00aaaa, ribbon: 0x0088ff },
+            { box: 0x222222, ribbon: 0xffaa00 },
+            { box: 0xffffff, ribbon: 0x00aa00 },
+            { box: 0x0044ff, ribbon: 0xffff00 }, // Replaced purple with blue
+            // Additional blue/cyan variations to dilute pinks/purples
+            { box: 0x003366, ribbon: 0x00ffff },
+            { box: 0x004d4d, ribbon: 0x00cccc },
+            { box: 0x005f73, ribbon: 0x94d2bd },
+            { box: 0x002244, ribbon: 0x0088ff },
+            { box: 0xcc6600, ribbon: 0x0044ff }
+        ];
+        const DARK_PALETTES = [
+            0x8B4513, 0x4682B4, 0xBDB76B, 0x556B2F, 0x212121, 0x8e44ad, 0xADD8E6, 0x121212, 0x002200, 0x000080,
+            0xA0522D, 0x4A6B82, 0xDAA520, 0x4F7942, 0x303030, 0x9b59b6, 0xB0E0E6, 0x181818, 0x001100, 0x89CFF0,
+            0xCD853F, 0x3B5998, 0xCFB53B, 0x2E8B57, 0x424242, 0x7d3c98, 0x87CEEB, 0x0A0A0A, 0x052205, 0x6495ED,
+            0xD2691E, 0x708090, 0xC5B358, 0x6B8E23, 0x616161, 0x6c3483, 0x87CEFA, 0x050505, 0x0A2A0A, 0x4169E1,
+            0x8B0000, 0x34495E, 0xD4AF37, 0x2D5A27, 0x2c3e50, 0xad1457, 0xE67E22, 0x5DADE2, 0xF1C40F, 0x0000CD,
+            0xB22222, 0x2C3E50, 0x808000, 0x3E6B34, 0x34495e, 0x880e4f, 0xD35400, 0x3498DB, 0xF4D03F, 0x3E2723,
+            0x8E4417, 0x2E4053, 0x9B870C, 0x4A7C44, 0x1c2833, 0xCA6F1E, 0x2E86C1, 0xD4AC0D, 0x964B00, 0x4E342E,
+            0x21618C, 0x827717, 0x5B8E55, 0x283747, 0xBA4A00, 0x1B4F72, 0xB7950B, 0x7B3F00, 0x0088ff, 0x32CD32,
+            0x9E9D24, 0x1B5E20, 0x00ffff, 0xA04000, 0x00cccc, 0xAFB42B, 0x2E7D32, 0x00aaaa, 0x6F4E37, 0xADFF2F,
+            0x5dade2, 0xC0CA33, 0x388E3C, 0x85c1e9, 0x5C4033, 0xF7DC6F, 0x145A32, 0x186A3B, 0x1D8348, 0x00FF00
+        ];
+
+        function createPumpkinFace(w, h, d) {
+            const faceGroup = new THREE.Group();
+            const faceMat = new THREE.MeshStandardMaterial({ 
+                color: 0xffaa00, 
+                emissive: 0xffaa00, 
+                emissiveIntensity: 2,
+                roughness: 0.3,
+                metalness: 0.2
+            });
+            
+            // Thickness matching ribbons (ribbons are 1.02x, so they stick out by 0.01x on each side)
+            const thickness = d * 0.02;
+            const zPos = d * 0.5 + thickness * 0.5;
+            
+            const style = Math.floor(Math.random() * 4);
+            
+            if (style === 0) { // Classic
+                const eyeGeo = new THREE.ConeGeometry(w * 0.15, thickness, 3);
+                const eyeL = new THREE.Mesh(eyeGeo, faceMat);
+                eyeL.position.set(-w * 0.25, h * 0.1, zPos); 
+                eyeL.rotation.x = -Math.PI/2; eyeL.rotation.z = Math.PI;
+                const eyeR = new THREE.Mesh(eyeGeo, faceMat);
+                eyeR.position.set(w * 0.25, h * 0.1, zPos);
+                eyeR.rotation.x = -Math.PI/2; eyeR.rotation.z = Math.PI;
+                const mouthGeo = new THREE.BoxGeometry(w * 0.6, h * 0.15, thickness);
+                const mouth = new THREE.Mesh(mouthGeo, faceMat);
+                mouth.position.set(0, -h * 0.25, zPos);
+                faceGroup.add(eyeL); faceGroup.add(eyeR); faceGroup.add(mouth);
+            } else if (style === 1) { // Angry
+                const eyeGeo = new THREE.BoxGeometry(w * 0.2, h * 0.05, thickness);
+                const eyeL = new THREE.Mesh(eyeGeo, faceMat);
+                eyeL.position.set(-w * 0.25, h * 0.15, zPos);
+                eyeL.rotation.z = -Math.PI/8;
+                const eyeR = new THREE.Mesh(eyeGeo, faceMat);
+                eyeR.position.set(w * 0.25, h * 0.15, zPos);
+                eyeR.rotation.z = Math.PI/8;
+                const mouthGeo = new THREE.BoxGeometry(w * 0.5, h * 0.1, thickness);
+                const mouth = new THREE.Mesh(mouthGeo, faceMat);
+                mouth.position.set(0, -h * 0.25, zPos);
+                faceGroup.add(eyeL); faceGroup.add(eyeR); faceGroup.add(mouth);
+            } else if (style === 2) { // Surprised
+                const eyeGeo = new THREE.CylinderGeometry(w * 0.1, w * 0.1, thickness, 8);
+                const eyeL = new THREE.Mesh(eyeGeo, faceMat);
+                eyeL.position.set(-w * 0.25, h * 0.15, zPos);
+                eyeL.rotation.x = Math.PI/2;
+                const eyeR = new THREE.Mesh(eyeGeo, faceMat);
+                eyeR.position.set(w * 0.25, h * 0.15, zPos);
+                eyeR.rotation.x = Math.PI/2;
+                const mouthGeo = new THREE.CylinderGeometry(w * 0.15, w * 0.15, thickness, 8);
+                const mouth = new THREE.Mesh(mouthGeo, faceMat);
+                mouth.position.set(0, -h * 0.25, zPos);
+                mouth.rotation.x = Math.PI/2;
+                faceGroup.add(eyeL); faceGroup.add(eyeR); faceGroup.add(mouth);
+            } else { // Happy
+                const eyeGeo = new THREE.BoxGeometry(w * 0.15, h * 0.15, thickness);
+                const eyeL = new THREE.Mesh(eyeGeo, faceMat);
+                eyeL.position.set(-w * 0.25, h * 0.15, zPos);
+                const eyeR = new THREE.Mesh(eyeGeo, faceMat);
+                eyeR.position.set(w * 0.25, h * 0.15, zPos);
+                const mouthGeo = new THREE.BoxGeometry(w * 0.6, h * 0.05, thickness);
+                const mouth = new THREE.Mesh(mouthGeo, faceMat);
+                mouth.position.set(0, -h * 0.25, zPos);
+                const toothGeo = new THREE.BoxGeometry(w * 0.1, h * 0.1, thickness);
+                const tooth1 = new THREE.Mesh(toothGeo, faceMat);
+                tooth1.position.set(-w * 0.15, -h * 0.2, zPos);
+                const tooth2 = new THREE.Mesh(toothGeo, faceMat);
+                tooth2.position.set(w * 0.15, -h * 0.2, zPos);
+                faceGroup.add(eyeL); faceGroup.add(eyeR); faceGroup.add(mouth); faceGroup.add(tooth1); faceGroup.add(tooth2);
+            }
+            
+            const stemGeo = new THREE.CylinderGeometry(w * 0.05, w * 0.05, h * 0.25, 6);
+            const stemMat = new THREE.MeshStandardMaterial({ 
+                color: 0x006400,
+                roughness: 0.8,
+                metalness: 0.05,
+                transparent: true,
+                opacity: 0.9,
+                side: THREE.DoubleSide
+            });
+            const stem = new THREE.Mesh(stemGeo, stemMat);
+            stem.position.set(0, h * 0.6, 0);
+            faceGroup.add(stem);
+            
+            return faceGroup;
+        }
 
         const LevelBuilder = {
             build: function(mapState) {
@@ -3686,7 +3867,7 @@
 
                 // --- FLOOR & PERIMETER ---
                 // FIX: Added 'null' for rotation argument to restore correct argument alignment
-                // Signature: createBox(x, y, z, w, h, d, mat, isFloor, isWall, ms, rotation, disableCull, customOrder)
+                // Signature: createBox(x, y, z, w, h, d, mat, isFloor, isWall, ms, rotation, disableCull, customOrder, isRamp)
                 this.createBox(0, -2, 0, size, 4, size, materials.floor, true, false, ms, null, true, -1);
 
                 if (ms.name === 'TITAN') {
@@ -3760,40 +3941,40 @@
                 const scaleMod = ms.config.scale;
                 const matSolid = materials.obstacle; // Use solid material, not glass
 
-                // --- A. PERIMETER BANKING (Velodrome Walls) ---
-                // Connects floor to the outer walls with a 45-degree slope
+                // --- A. PERIMETER BANKING (Velodrome Ramps) ---
                 const arenaSize = ms.config.size;
-                const bankWidth = 60 * scaleMod; // Increased width to reach walls and floor
-                const bankDist = (arenaSize / 2) - 18 * scaleMod; // Push closer to walls
-                const bankLen = arenaSize; // Full length
-                const bankY = 18 * scaleMod; // Lowered so bottom edge is underground
-
-                // 45 degrees (0.785 rad)
-                const bankAng = Math.PI / 4;
+                const bankThickness = 2 * scaleMod;
+                const bankAng = Math.PI / 4; // 45 degrees
                 
-                // North Bank (Pitch +)
-                this.createBox(0, bankY, -bankDist, bankLen, 2, bankWidth, matSolid, false, true, ms, new THREE.Euler(bankAng, 0, 0));
-                // South Bank (Pitch -)
-                this.createBox(0, bankY, bankDist, bankLen, 2, bankWidth, matSolid, false, true, ms, new THREE.Euler(-bankAng, 0, 0));
-                // East Bank (Roll +)
-                this.createBox(bankDist, bankY, 0, bankWidth, 2, bankLen, matSolid, false, true, ms, new THREE.Euler(0, 0, bankAng));
-                // West Bank (Roll -)
-                this.createBox(-bankDist, bankY, 0, bankWidth, 2, bankLen, matSolid, false, true, ms, new THREE.Euler(0, 0, -bankAng));
-
-                // Corner Banks
-                // By placing the corner banks at bankDist * 0.7071, they form a perfect octagonal bevel.
-                // Using the same pitch (bankAng) and depth (bankWidth) ensures they are perfectly flush
-                // with the straight banks and don't stick out below the floor.
-                const cornerDist = bankDist * 0.7071; 
-                const cW = bankDist * 1.5; // Width of the ramp (wide enough to overlap straight banks)
-                const cLen = bankWidth; // Length/Depth of the ramp (same as straight banks to limit vertical depth)
-                const cY = bankY; // Same as bankY to ensure perfect intersection
+                // Calculate slope length to reach hub height (26.1)
+                const targetHeight = 26.1 * scaleMod;
+                const bankSlopeLen = targetHeight / Math.sin(bankAng); // ~36.9
                 
-                // Note: The Yaw angles (Y-axis rotation) combined with Pitch (X-axis) point the normal away from the corner.
-                this.createBox(cornerDist, cY, -cornerDist, cW, 2, cLen, matSolid, false, true, ms, new THREE.Euler(bankAng, -Math.PI/4, 0, 'YXZ')); // NE
-                this.createBox(-cornerDist, cY, -cornerDist, cW, 2, cLen, matSolid, false, true, ms, new THREE.Euler(bankAng, Math.PI/4, 0, 'YXZ')); // NW
-                this.createBox(cornerDist, cY, cornerDist, cW, 2, cLen, matSolid, false, true, ms, new THREE.Euler(bankAng, -3*Math.PI/4, 0, 'YXZ')); // SE
-                this.createBox(-cornerDist, cY, cornerDist, cW, 2, cLen, matSolid, false, true, ms, new THREE.Euler(bankAng, 3*Math.PI/4, 0, 'YXZ')); // SW
+                // Calculate Y and Dist to make edges flush with floor (y=0) and wall (dist=arenaSize/2)
+                const bankY = (bankSlopeLen / 2) * Math.sin(bankAng) - (bankThickness / 2) * Math.cos(bankAng);
+                
+                // Helper to get distance from center to box center given target top edge distance R
+                const getBankDist = (R) => R - (bankSlopeLen / 2) * Math.cos(bankAng) + (bankThickness / 2) * Math.sin(bankAng);
+
+                const bankDistStraight = getBankDist(arenaSize / 2);
+                
+                // Straight Banks: Full arena width/length to touch side walls
+                const bankSideLen = arenaSize;
+                
+                this.createBox(0, bankY, -bankDistStraight, bankSideLen, bankThickness, bankSlopeLen, matSolid, false, false, ms, new THREE.Euler(bankAng, 0, 0), false, null, true);
+                this.createBox(0, bankY, bankDistStraight, bankSideLen, bankThickness, bankSlopeLen, matSolid, false, false, ms, new THREE.Euler(-bankAng, 0, 0), false, null, true);
+                this.createBox(bankDistStraight, bankY, 0, bankSlopeLen, bankThickness, bankSideLen, matSolid, false, false, ms, new THREE.Euler(0, 0, bankAng), false, null, true);
+                this.createBox(-bankDistStraight, bankY, 0, bankSlopeLen, bankThickness, bankSideLen, matSolid, false, false, ms, new THREE.Euler(0, 0, -bankAng), false, null, true);
+
+                // Corner Banks: Extended to reach the walls
+                const cornerSideLen = 102; 
+                const bankDistCorner = getBankDist((arenaSize / 2) * Math.sqrt(2) - (cornerSideLen / 2));
+                const cornerPos = bankDistCorner * 0.7071;
+
+                this.createBox(cornerPos, bankY, -cornerPos, cornerSideLen, bankThickness, bankSlopeLen, matSolid, false, false, ms, new THREE.Euler(bankAng, -Math.PI/4, 0, 'YXZ'), false, null, true); // NE
+                this.createBox(-cornerPos, bankY, -cornerPos, cornerSideLen, bankThickness, bankSlopeLen, matSolid, false, false, ms, new THREE.Euler(bankAng, Math.PI/4, 0, 'YXZ'), false, null, true); // NW
+                this.createBox(cornerPos, bankY, cornerPos, cornerSideLen, bankThickness, bankSlopeLen, matSolid, false, false, ms, new THREE.Euler(bankAng, -3*Math.PI/4, 0, 'YXZ'), false, null, true); // SE
+                this.createBox(-cornerPos, bankY, cornerPos, cornerSideLen, bankThickness, bankSlopeLen, matSolid, false, false, ms, new THREE.Euler(bankAng, 3*Math.PI/4, 0, 'YXZ'), false, null, true); // SW
 
 
                 // --- B. 8-WAY SLOPE HUB (Center) ---
@@ -3806,25 +3987,25 @@
                 const rY = (rLen/2 * Math.sin(rAng)) - (rH/2 * Math.cos(rAng));
 
                 // Cardinal
-                this.createBox(0, rY, rDist, rW, rH, rLen, matSolid, false, true, ms, new THREE.Euler(rAng, 0, 0)); // S
-                this.createBox(0, rY, -rDist, rW, rH, rLen, matSolid, false, true, ms, new THREE.Euler(-rAng, 0, 0)); // N
-                this.createBox(rDist, rY, 0, rLen, rH, rW, matSolid, false, true, ms, new THREE.Euler(0, 0, -rAng)); // E
-                this.createBox(-rDist, rY, 0, rLen, rH, rW, matSolid, false, true, ms, new THREE.Euler(0, 0, rAng)); // W
+                this.createBox(0, rY, rDist, rW, rH, rLen, matSolid, false, false, ms, new THREE.Euler(rAng, 0, 0), false, null, true); // S
+                this.createBox(0, rY, -rDist, rW, rH, rLen, matSolid, false, false, ms, new THREE.Euler(-rAng, 0, 0), false, null, true); // N
+                this.createBox(rDist, rY, 0, rLen, rH, rW, matSolid, false, false, ms, new THREE.Euler(0, 0, -rAng), false, null, true); // E
+                this.createBox(-rDist, rY, 0, rLen, rH, rW, matSolid, false, false, ms, new THREE.Euler(0, 0, rAng), false, null, true); // W
 
                 // Diagonal
                 const dOff = rDist * 0.7071;
                 // Rotations must combine Y-yaw and X/Z-pitch
-                this.createBox(dOff, rY, dOff, rW, rH, rLen, matSolid, false, true, ms, new THREE.Euler(rAng, -Math.PI/4, 0, 'YXZ')); // SE
-                this.createBox(-dOff, rY, dOff, rW, rH, rLen, matSolid, false, true, ms, new THREE.Euler(rAng, Math.PI/4, 0, 'YXZ')); // SW
-                this.createBox(dOff, rY, -dOff, rW, rH, rLen, matSolid, false, true, ms, new THREE.Euler(-rAng, Math.PI/4, 0, 'YXZ')); // NE
-                this.createBox(-dOff, rY, -dOff, rW, rH, rLen, matSolid, false, true, ms, new THREE.Euler(-rAng, -Math.PI/4, 0, 'YXZ')); // NW
+                this.createBox(dOff, rY, dOff, rW, rH, rLen, matSolid, false, false, ms, new THREE.Euler(rAng, -Math.PI/4, 0, 'YXZ'), false, null, true); // SE
+                this.createBox(-dOff, rY, dOff, rW, rH, rLen, matSolid, false, false, ms, new THREE.Euler(rAng, Math.PI/4, 0, 'YXZ'), false, null, true); // SW
+                this.createBox(dOff, rY, -dOff, rW, rH, rLen, matSolid, false, false, ms, new THREE.Euler(-rAng, Math.PI/4, 0, 'YXZ'), false, null, true); // NE
+                this.createBox(-dOff, rY, -dOff, rW, rH, rLen, matSolid, false, false, ms, new THREE.Euler(-rAng, -Math.PI/4, 0, 'YXZ'), false, null, true); // NW
 
 
                 // --- C. CENTRAL HUB CUBE ---
                 // Replace the 4 rotated obstacles with one big flat cube
                 const hubSize = 48 * scaleMod;
                 const hubHeight = 26.1 * scaleMod; // Matches the inner height of the ramps
-                this.createBox(0, hubHeight/2, 0, hubSize, hubHeight, hubSize, matSolid, false, true, ms, new THREE.Euler(0, Math.PI/4, 0));
+                this.createBox(0, hubHeight/2, 0, hubSize, hubHeight, hubSize, matSolid, false, false, ms, new THREE.Euler(0, Math.PI/4, 0));
 
                 // --- D. FLOATING CUBES ---
                 for(let i=0; i<15; i++) {
@@ -3832,7 +4013,7 @@
                     const fX = (Math.random() - 0.5) * 150 * scaleMod;
                     const fZ = (Math.random() - 0.5) * 150 * scaleMod;
                     const fY = 60 + Math.random() * 100 * scaleMod;
-                    this.createBox(fX, fY, fZ, fSize, fSize, fSize, matSolid, false, true, ms, new THREE.Euler(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI));
+                    this.createBox(fX, fY, fZ, fSize, fSize, fSize, matSolid, false, false, ms, new THREE.Euler(Math.random()*Math.PI, Math.random()*Math.PI, Math.random()*Math.PI));
                 }
             },
 
@@ -3965,7 +4146,7 @@
                 return { vertical, horizontal };
             },
             
-            createBox: function(x, y, z, w, h, d, mat, isFloor, isWall, ms, rotation = null, disableCull = false, customOrder = null) {
+            createBox: function(x, y, z, w, h, d, mat, isFloor, isWall, ms, rotation = null, disableCull = false, customOrder = null, isRamp = false) {
                 const geo = new THREE.BoxGeometry(w, h, d);
                 const mesh = new THREE.Mesh(geo, mat);
                 mesh.position.set(x, y, z);
@@ -3979,8 +4160,9 @@
                 mesh.castShadow = !isFloor && !isWall;
                 mesh.receiveShadow = true;
                 mesh.userData.isFloor = isFloor;
+                mesh.userData.isRamp = isRamp;
                 
-                if (isWall || !isFloor) {
+                if (isWall || isRamp || !isFloor) {
                      const edges = new THREE.EdgesGeometry(geo);
                      const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.05 }));
                      mesh.add(line);
@@ -3994,18 +4176,125 @@
                 const mapAABB = mesh.geometry.boundingBox.clone();
                 mapAABB.applyMatrix4(mesh.matrixWorld);
                 
+                // If it's a box (not a floor or wall), add decorations
+                if (!isFloor && !isWall) {
+                    mesh.material = mesh.material.clone();
+                    
+                    const palette = GIFT_PALETTES[Math.floor(Math.random() * GIFT_PALETTES.length)];
+                    const darkColor = DARK_PALETTES[Math.floor(Math.random() * DARK_PALETTES.length)];
+                    mesh.userData.palette = palette;
+                    mesh.userData.darkColor = darkColor;
+
+                    if (!isRamp) {
+                        // Face Group
+                        const faceGroup = createPumpkinFace(w, h, d);
+                        mesh.add(faceGroup);
+                        mesh.userData.faceGroup = faceGroup;
+
+                        // Ribbon Group
+                        const ribbonGroup = new THREE.Group();
+                        const ribbonMat = new THREE.MeshStandardMaterial({ 
+                            color: palette.ribbon, roughness: 0.3, metalness: 0.2,
+                            polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1
+                        });
+                        const knotMat = new THREE.MeshStandardMaterial({
+                            color: palette.ribbon, roughness: 0.8, metalness: 0.05,
+                            transparent: true, opacity: 0.9, side: THREE.DoubleSide,
+                            polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1
+                        });
+                        
+                        const r1Geo = new THREE.BoxGeometry(w * 1.01, h * 1.01, d * 0.2); 
+                        const r1 = new THREE.Mesh(r1Geo, ribbonMat);
+                        const r2Geo = new THREE.BoxGeometry(w * 0.2, h * 1.01, d * 1.01); 
+                        const r2 = new THREE.Mesh(r2Geo, ribbonMat);
+                        const bowGeo = new THREE.SphereGeometry(w * 0.2, 16, 16);
+                        const bow = new THREE.Mesh(bowGeo, knotMat);
+                        bow.scale.set(1, 0.2, 1);
+                        bow.position.set(0, h * 0.5, 0);
+                        ribbonGroup.add(r1); ribbonGroup.add(r2); ribbonGroup.add(bow);
+                        mesh.add(ribbonGroup);
+                        mesh.userData.ribbonGroup = ribbonGroup;
+                        mesh.userData.ribbonMat = ribbonMat;
+                    }
+
+                    // Update Theme Function
+                    mesh.userData.updateTheme = function(t) {
+                        const m = this;
+                        const ud = m.userData;
+                        m.material.emissive.setHex(0x000000);
+                        m.material.emissiveIntensity = 0;
+                        m.material.roughness = 0.3;
+                        m.material.metalness = 0.0;
+                        m.material.clearcoat = 0.5;
+                        m.material.clearcoatRoughness = 0.1;
+                        m.material.reflectivity = 0.5;
+                        m.material.ior = 1.5;
+
+                        if (ud.faceGroup) ud.faceGroup.visible = false;
+                        if (ud.ribbonGroup) ud.ribbonGroup.visible = false;
+                        if (ud.wireframeMesh) {
+                            ud.wireframeMesh.material.opacity = 0.25;
+                            ud.wireframeMesh.material.color.setHex(0x000000);
+                        }
+
+                        if (t === 3) { // Halloween
+                            const r = 0.9 + Math.random()*0.1; 
+                            const g = 0.05 + Math.random()*0.15; 
+                            m.material.color.setRGB(r, g, 0); 
+                            m.material.emissive.setRGB(r*0.1, g*0.1, 0);
+                            m.material.emissiveIntensity = 1.0;
+                            if (ud.faceGroup) {
+                                ud.faceGroup.visible = true;
+                                ud.faceGroup.rotation.y = (Math.PI / 2) * Math.floor(Math.random() * 4);
+                            }
+                            if (ud.wireframeMesh) ud.wireframeMesh.material.color.setHex(0xff0000);
+                        } else if (t === 0) { // Light
+                            m.material.color.setHex(ud.palette.box);
+                            if (ud.ribbonMat) ud.ribbonMat.color.setHex(ud.palette.ribbon);
+                            if (ud.ribbonGroup) ud.ribbonGroup.visible = true;
+                            if (ud.wireframeMesh) ud.wireframeMesh.material.color.setHex(0x000000);
+                        } else if (t === 1) { // Dark
+                            m.material.color.setHex(ud.darkColor);
+                            if (ud.wireframeMesh) ud.wireframeMesh.material.color.setHex(0x000000);
+                        } else if (t === 2) { // Neon
+                            m.material.color.setHex(0x001122); 
+                            if (ud.wireframeMesh) ud.wireframeMesh.material.color.setHex(0x00ffff);
+                        }
+                    }.bind(mesh);
+                }
+
                 // Narrowphase: OBB (Only if rotated)
                 if (rotation) {
                     const obb = new OBB();
                     obb.fromBox3(mesh.geometry.boundingBox);
                     obb.applyMatrix4(mesh.matrixWorld);
                     mesh.userData.obb = obb;
+
+                    // Apply wireframe hull to OBB objects (except floors as requested, 
+                    // but sloped platforms/ramps are OBBs and should be included)
+                    if (!isFloor) {
+                        const wireMat = new THREE.MeshBasicMaterial({
+                            map: textures.boxBorder,
+                            transparent: true,
+                            color: 0x000000,
+                            opacity: 0.25,
+                            polygonOffset: true,
+                            polygonOffsetFactor: -4,
+                            polygonOffsetUnits: -4,
+                            depthTest: true,
+                            depthWrite: false
+                        });
+                        const wireframeMesh = new THREE.Mesh(geo, wireMat);
+                        mesh.add(wireframeMesh);
+                        mesh.userData.wireframeMesh = wireframeMesh;
+                        ms.obbDecorations.push(mesh);
+                    }
                 }
                 
                 ms.spatialGrid.insert(mesh, mapAABB);
                 ms.mapObjects.push(mesh);
-                if (isFloor || !isWall) ms.groundObjects.push(mesh);
-                if (!isFloor) ms.walls.push(mesh);
+                if (isFloor || isRamp || !isWall) ms.groundObjects.push(mesh);
+                if (isWall) ms.walls.push(mesh);
             },
             
             spawnDecorations: function(count, minScale, maxScale, rangeX, rangeZ, minY, maxY, ms) {
@@ -5885,6 +6174,23 @@
             }
         }
 
+        function createBoxBorderTexture() {
+            const size = 512;
+            const canvas = document.createElement('canvas');
+            canvas.width = size; canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, size, size);
+            const thick = 0.5; 
+            ctx.lineWidth = thick; 
+            ctx.strokeStyle = '#ffffff'; 
+            ctx.strokeRect(thick/2, thick/2, size - thick, size - thick);
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.magFilter = THREE.LinearFilter;
+            tex.minFilter = THREE.LinearMipmapLinearFilter;
+            tex.generateMipmaps = true;
+            return tex;
+        }
+
         function createGridTexture(type) {
             const canvas = document.createElement('canvas');
             canvas.width = 1024; canvas.height = 1024;
@@ -6140,6 +6446,7 @@
             textures.gridNeon = createGridTexture('neon');
             textures.solid = createGridTexture('solid');
             textures.glow = createGlowTexture();
+            textures.boxBorder = createBoxBorderTexture();
             
             sharedSnowGeo = new THREE.PlaneGeometry(0.1, 0.1);
             sharedLeafGeo = new THREE.PlaneGeometry(0.3, 0.3); 
@@ -6424,15 +6731,19 @@
             materials.floor.emissiveMap = null;
             materials.wall.emissiveIntensity = 0;
             materials.wall.emissiveMap = null;
+            materials.obstacle.emissiveIntensity = 0;
+            materials.obstacle.emissiveMap = null;
 
             // --- Theme Specifics with Brightness Multiplier ---
             const b = brightnessMultiplier; // Short alias
+            let baseFog = MapManager.current ? MapManager.current.config.fog : 0.004;
+            let isStandardArena = MapManager.current && ['ARENA', 'TITAN', 'GYM'].includes(MapManager.current.name);
 
             if (currentTheme === 0) { // LIGHT (SNOW)
                 const bgCol = 0x667788; 
                 scene.background = new THREE.Color(bgCol);
                 // Respect World Fog Density
-                scene.fog = new THREE.FogExp2(bgCol, MapManager.current ? MapManager.current.config.fog : 0.004); 
+                scene.fog = new THREE.FogExp2(bgCol, baseFog); 
                 body.style.backgroundColor = "#667788";
                 ui.classList.add('light-theme');
                 
@@ -6443,6 +6754,7 @@
                 materials.floor.roughness = 0.9;
                 materials.wall.color.setHex(0xdddddd);
                 materials.wall.roughness = 0.5;
+                materials.obstacle.color.setHex(0xcccccc); // Match AABB default
                 
                 currentSlashColor = 0x0088ff;
                 materials.marker.color.setHex(0x003366); 
@@ -6460,17 +6772,20 @@
                 if (currentTheme === 1) { // DARK
                     const bgCol = 0x20242a; 
                     scene.background = new THREE.Color(bgCol);
-                    scene.fog = new THREE.FogExp2(bgCol, MapManager.current ? MapManager.current.config.fog : 0.007);
+                    let fogDensity = baseFog;
+                    if (isStandardArena) fogDensity *= 1.5; // slight touch more fog density
+                    scene.fog = new THREE.FogExp2(bgCol, fogDensity);
                     body.style.backgroundColor = "#20242a";
                     
                     materials.floor.map = textures.solid;
-                    materials.floor.color.setHex(0x1a1e26); 
+                    materials.floor.color.setHex(0x12151c); 
                     materials.floor.roughness = 0.4; 
                     materials.floor.metalness = 0.1;
                     
                     materials.wall.color.setHex(0x3b4252); 
                     materials.wall.roughness = 1.0;
                     materials.wall.metalness = 0.0;
+                    materials.obstacle.color.setHex(0x2d333b); // Match AABB warm color range
                     
                     currentSlashColor = 0xffaa00; 
                     materials.marker.color.setHex(0xff8800);
@@ -6484,7 +6799,7 @@
                 } else if (currentTheme === 2) { // NEON
                     const bgCol = 0x050505;
                     scene.background = new THREE.Color(bgCol);
-                    scene.fog = new THREE.FogExp2(bgCol, MapManager.current ? MapManager.current.config.fog : 0.007);
+                    scene.fog = new THREE.FogExp2(bgCol, baseFog);
                     body.style.backgroundColor = "#050505";
                     
                     materials.floor.map = textures.gridDefault;
@@ -6493,6 +6808,7 @@
                     materials.floor.roughness = 0.5; 
                     
                     materials.wall.color.setHex(0x001122); 
+                    materials.obstacle.color.setHex(0x001122); // Match AABB Neon color
                     
                     currentSlashColor = 0x00ffff; 
                     materials.marker.color.setHex(0x00ffff);
@@ -6506,7 +6822,9 @@
                 } else { // HALLOWEEN
                     const bgCol = 0x663311;
                     scene.background = new THREE.Color(bgCol); 
-                    scene.fog = new THREE.FogExp2(bgCol, MapManager.current ? MapManager.current.config.fog : 0.004);
+                    let fogDensity = baseFog;
+                    if (isStandardArena) fogDensity *= 1.25; // very ever so slight touch of fog
+                    scene.fog = new THREE.FogExp2(bgCol, fogDensity);
                     body.style.backgroundColor = "#663311";
                     
                     materials.floor.map = textures.solid;
@@ -6516,6 +6834,9 @@
                     
                     materials.wall.color.setHex(0x7a3e00); 
                     materials.wall.roughness = 1.0;
+                    materials.obstacle.color.setHex(0xff8800); // Match AABB Halloween orange
+                    materials.obstacle.emissive.setHex(0x331100);
+                    materials.obstacle.emissiveIntensity = 1.0;
                     
                     currentSlashColor = 0xff8800; 
                     materials.marker.color.setHex(0xff4400);
@@ -6531,34 +6852,28 @@
             if(materials.slash) materials.slash.color.setHex(currentSlashColor);
             
             decorations.forEach(d => d.updateTheme(currentTheme));
+            obbDecorations.forEach(mesh => {
+                if (mesh.userData.updateTheme) {
+                    mesh.userData.updateTheme(currentTheme);
+                } else {
+                    const wm = mesh.userData.wireframeMesh;
+                    if (wm) {
+                        wm.material.opacity = 0.25;
+                        if (currentTheme === 3) wm.material.color.setHex(0xff0000);
+                        else if (currentTheme === 2) wm.material.color.setHex(0x00ffff);
+                        else wm.material.color.setHex(0x000000);
+                    }
+                }
+            });
             enemies.forEach(e => e.updateTheme(currentTheme));
         }
-
-        const GIFT_PALETTES = [
-            { box: 0xcc0000, ribbon: 0xffd700 }, 
-            { box: 0x006400, ribbon: 0xcc0000 }, 
-            { box: 0x0044aa, ribbon: 0xc0c0c0 }, 
-            { box: 0xffffff, ribbon: 0xcc0000 }, 
-            { box: 0x663399, ribbon: 0xffd700 },
-            { box: 0xffff00, ribbon: 0xff0000 }, 
-            { box: 0xff0000, ribbon: 0xffff00 }, 
-            { box: 0x0088ff, ribbon: 0xffffff }, 
-            { box: 0x00ff00, ribbon: 0x8800ff },
-            { box: 0xff8800, ribbon: 0x000000 },
-            { box: 0xff00ff, ribbon: 0x00ffff },
-            { box: 0x00ffff, ribbon: 0xff00ff },
-            { box: 0x222222, ribbon: 0xffaa00 },
-            { box: 0xffffff, ribbon: 0x00aa00 },
-            { box: 0xaa00ff, ribbon: 0xffff00 }
-        ];
-        const WARM_PALETTES = [0x8B4513, 0xA0522D, 0xCD853F, 0xD2691E, 0xBC8F8F];
 
         class Decoration {
             constructor(x, y, z, scale, ms = null) {
                 this.scale = scale;
                 const size = 2;
                 this.palette = GIFT_PALETTES[Math.floor(Math.random() * GIFT_PALETTES.length)];
-                this.warmColor = WARM_PALETTES[Math.floor(Math.random() * WARM_PALETTES.length)];
+                this.darkColor = DARK_PALETTES[Math.floor(Math.random() * DARK_PALETTES.length)];
 
                 const colliderGeo = new THREE.BoxGeometry(size, size, size);
                 const colliderMat = new THREE.MeshBasicMaterial({ visible: false });
@@ -6613,28 +6928,18 @@
                     scene.add(this.visualMesh);
                 }
                 
-                const edges = new THREE.EdgesGeometry(visualGeo);
-                this.edges = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.15 }));
-                this.visualMesh.add(this.edges);
+                const wireMat = new THREE.MeshBasicMaterial({
+                    map: textures.boxBorder,
+                    transparent: true,
+                    color: 0x000000,
+                    polygonOffset: true,
+                    polygonOffsetFactor: -1,
+                    polygonOffsetUnits: -1
+                });
+                this.wireframeMesh = new THREE.Mesh(visualGeo, wireMat);
+                this.visualMesh.add(this.wireframeMesh);
 
-                this.faceGroup = new THREE.Group();
-                const faceMat = new THREE.MeshBasicMaterial({ color: 0xffff00 });
-                const eyeGeo = new THREE.ConeGeometry(0.3, 0.1, 3);
-                const eyeL = new THREE.Mesh(eyeGeo, faceMat);
-                eyeL.position.set(-0.5, 0.2, 1.01); 
-                eyeL.rotation.x = -Math.PI/2; eyeL.rotation.z = Math.PI;
-                const eyeR = new THREE.Mesh(eyeGeo, faceMat);
-                eyeR.position.set(0.5, 0.2, 1.01);
-                eyeR.rotation.x = -Math.PI/2; eyeR.rotation.z = Math.PI;
-                const mouthGeo = new THREE.BoxGeometry(1.2, 0.3, 0.1);
-                const mouth = new THREE.Mesh(mouthGeo, faceMat);
-                mouth.position.set(0, -0.5, 1.01);
-                this.faceGroup.add(eyeL); this.faceGroup.add(eyeR); this.faceGroup.add(mouth);
-                const stemGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.5, 6);
-                const stemMat = new THREE.MeshBasicMaterial({ color: 0x006400 });
-                this.stem = new THREE.Mesh(stemGeo, stemMat);
-                this.stem.position.set(0, 1.2, 0);
-                this.faceGroup.add(this.stem);
+                this.faceGroup = createPumpkinFace(size, size, size);
                 this.visualMesh.add(this.faceGroup);
 
                 this.ribbonGroup = new THREE.Group();
@@ -6671,41 +6976,43 @@
             }
 
             updateTheme(t) {
-                this.mat.color.setHex(0xcccccc);
                 this.mat.emissive.setHex(0x000000);
+                this.mat.emissiveIntensity = 0;
                 this.mat.wireframe = false;
+                this.mat.roughness = 0.3;
+                this.mat.metalness = 0.0;
+                this.mat.clearcoat = 0.5;
+                this.mat.clearcoatRoughness = 0.1;
+                this.mat.reflectivity = 0.5;
+                this.mat.ior = 1.5;
+
                 this.faceGroup.visible = false;
                 this.ribbonGroup.visible = false;
-                this.edges.visible = true;
-                this.edges.material.opacity = 0.1;
-                this.edges.material.color.setHex(0xffffff);
-                this.edges.material.linewidth = 1;
+                this.wireframeMesh.visible = true;
+                this.wireframeMesh.material.opacity = 0.25;
+                this.wireframeMesh.material.color.setHex(0x000000);
                 this.visualMesh.rotation.y = 0; 
 
                 if (t === 3) { // Halloween
                     const r = 0.9 + Math.random()*0.1; 
                     const g = 0.05 + Math.random()*0.15; 
                     this.mat.color.setRGB(r, g, 0); 
-                    this.mat.emissive = new THREE.Color(r*0.1, g*0.1, 0);
+                    this.mat.emissive.setRGB(r*0.1, g*0.1, 0);
+                    this.mat.emissiveIntensity = 1.0;
                     this.faceGroup.visible = true;
-                    this.edges.visible = false;
+                    this.wireframeMesh.material.color.setHex(0xff0000);
                     this.faceGroup.rotation.y = (Math.PI / 2) * Math.floor(Math.random() * 4);
                 } else if (t === 0) { // Light
                     this.mat.color.setHex(this.palette.box);
                     this.ribbonMat.color.setHex(this.palette.ribbon);
                     this.ribbonGroup.visible = true;
-                    this.edges.material.color.setHex(0x000000);
-                } else {
-                    if(t === 1) { 
-                         this.mat.color.setHex(this.warmColor);
-                         this.mat.emissive.setHex(0x000000);
-                         this.edges.visible = false; 
-                    }
-                    if(t === 2) { 
-                         this.mat.color.setHex(0x001122); 
-                         this.edges.material.color.setHex(0x00ffff); 
-                         this.edges.material.opacity = 0.5; 
-                    }
+                    this.wireframeMesh.material.color.setHex(0x000000);
+                } else if (t === 1) { // Dark
+                    this.mat.color.setHex(this.darkColor);
+                    this.wireframeMesh.material.color.setHex(0x000000);
+                } else if (t === 2) { // Neon
+                    this.mat.color.setHex(0x001122); 
+                    this.wireframeMesh.material.color.setHex(0x00ffff); 
                 }
             }
         }
@@ -6753,8 +7060,11 @@
                     vel = new THREE.Vector3((Math.random()-0.5)*2, -4 - Math.random()*4, (Math.random()-0.5)*2);
                     type = 'snow';
                 } else {
-                    const mat = new THREE.MeshBasicMaterial({ color: Math.random() > 0.5 ? 0xffaa00 : 0x884400, side: THREE.DoubleSide });
+                    const leafColors = [0xffaa00, 0x884400, 0xcc6600, 0xaa3300, 0xdd9900, 0x992200];
+                    const leafColor = leafColors[Math.floor(Math.random() * leafColors.length)];
+                    const mat = new THREE.MeshBasicMaterial({ color: leafColor, side: THREE.DoubleSide });
                     mesh = new THREE.Mesh(sharedLeafGeo, mat);
+                    mesh.scale.setScalar(0.5 + Math.random() * 1.0);
                     mesh.position.set(px, py, pz);
                     mesh.rotation.set(Math.random(), Math.random(), Math.random());
                     vel = new THREE.Vector3((Math.random()-0.5)*3, -3 - Math.random()*3, (Math.random()-0.5)*3);

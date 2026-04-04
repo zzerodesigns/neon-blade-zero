@@ -63,6 +63,8 @@
 *   **Synthesized Melodies:** Integrate procedural Web Audio API melodies as easter eggs or ambient tracks.
 
 ## ✅ recently completed concepts
+- [x] **Decoration Outlines:** Fixed a bug where `Decoration` objects (standard orange boxes) were missing the new thick black outlines.
+- [x] **Thick Box Outlines:** Implemented thick black outlines for all 6 sides of every box across all themes, creating a stylized, high-contrast aesthetic.
 - [x] **Contextual Onboarding:** Integrated universal narrative hints for Minimap usage and Golden Bot tracking on all standard maps.
 - [x] **Golden Bot Balancing:** Finalized stats with reduced scale (0.8x), increased HP (1.5x), and high damage resistance (0.5x multiplier) relative to standard bots.
 - [x] **Golden Bot Integration:** Added a high-value, evasive Golden Bot with a 3-minute respawn timer and a one-hit-kill sword buff (lost after 5 misses).
@@ -85,6 +87,14 @@
 - [x] **Weather Enhancements:** Increased snow/leaf particle density and expanded the spawn distance radius.
 
 ## 📖 version history / patch notes
+
+### v48.6.4 - Geometry, Theming, and Palette Overhaul
+*   **Inverted Hull Outlines:** Bypassed WebGL line-width limitations using a performant, texture-based "Inverted Hull" technique to create thick, stylized outlines for all obstacles (AABB and OBB). Resolved aliasing via LinearFilter and 512x512 resolution.
+*   **Gym Map Geometry:** Mathematically corrected perimeter ramp geometry to align perfectly flush with walls and corners.
+*   **Unified Theming:** Unified OBB and AABB theming architecture so all rotated obstacles correctly inherit dynamic color palettes and seasonal decorations (ribbons, pumpkin faces), while strictly excluding structural ramps from decorations.
+*   **Pumpkin Faces & Leaves:** Added 4 distinct pumpkin face variations with physical 3D thickness and randomized falling leaf colors and sizes.
+*   **Minimap Projection:** Upgraded the minimap to accurately project and render rotated OBBs using a 2D convex hull algorithm.
+*   **Dark Theme Palette:** Refactored Dark theme colors into a 100-color `DARK_PALETTES` array, creating a diverse mix of subdued blues, greys, earthy tones, and greens, while reducing the spawn rate of pinks and teals. Darkened the floor to `0x12151c` and stabilized fog density multipliers.
 
 ### v48.6.3 - Golden Bot Integration & Minimap Optimization
 *   **Golden Bot:** Added a high-value Golden Bot designed as an advanced practice target. Final tuning: 0.8x scale, 1.5x HP, 5x energy, 2.5x stamina regeneration, and 0.5x damage taken relative to standard bots.
