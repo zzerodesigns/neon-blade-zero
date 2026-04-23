@@ -7,9 +7,9 @@
 *   **Phantom Slashing:** AI sometimes performs attack inputs when the target is technically out of range or behind thin cover, leading to "slashing at nothing."
 *   **Survival Instincts:** AI doesn't prioritize `ESCAPE` state aggressively enough when health is low, often getting caught in a `COMBAT` loop until death.
 *   **Floating Teleport Marker:** Still persists on certain OBB rotated objects.
-*   **Geometry Clipping:** High-speed movement can occasionally cause the agent to clip through thin geometry if the physics step doesn't catch the collision.
 
 ## 📝 playtest observations & implementation notes
+*   **Tactile Physics Integration:** The shift to continuous collision detection (CCD) naturally fixed high-speed geometry clipping and created a strong "battering ram" feel. Combined with rigid-body ragdoll tumbling, the simulation possesses significantly more physical weight.
 *   **Neural Override Utility:** The Autoplay system is functional but "utilitarian." It moves with purpose but lacks the high-speed verticality and "flair" of a human player.
 *   **Spatial Awareness Success:** The addition of `checkGapForward` and `checkWallForward` has significantly reduced the AI's tendency to fall off platforms or run mindlessly into walls.
 *   **Gadget Utility:** Impulse is now a core part of AI traversal, used effectively to launch away from danger or toward targets, though frequency could still be higher.
@@ -34,7 +34,6 @@
 *   **Dynamic AI Profiles:** Implement scalable intelligence and aggression matrices for varied bot behaviors.
 *   **Advanced Combat Tactics:** Develop dedicated AI modules for flanking, retreating, and complex attack patterns.
 *   **Passive "Inspect" State:** Introduce a non-hostile observation state for cautious or curious bots.
-*   **Animation & State Polish:** Add transitional keyframes for falling bots and correct orientation/HP bar alignment for incapacitated states.
 
 ### Visuals & Interface
 *   **Floating Damage Numbers:** Implement an optional MMO-style damage counter overlay above enemy HP bars.
@@ -63,30 +62,28 @@
 *   **Synthesized Melodies:** Integrate procedural Web Audio API melodies as easter eggs or ambient tracks.
 
 ## ✅ recently completed concepts
-- [x] **Decoration Outlines:** Fixed a bug where `Decoration` objects (standard orange boxes) were missing the new thick black outlines.
-- [x] **Thick Box Outlines:** Implemented thick black outlines for all 6 sides of every box across all themes, creating a stylized, high-contrast aesthetic.
-- [x] **Contextual Onboarding:** Integrated universal narrative hints for Minimap usage and Golden Bot tracking on all standard maps.
-- [x] **Golden Bot Balancing:** Finalized stats with reduced scale (0.8x), increased HP (1.5x), and high damage resistance (0.5x multiplier) relative to standard bots.
-- [x] **Golden Bot Integration:** Added a high-value, evasive Golden Bot with a 3-minute respawn timer and a one-hit-kill sword buff (lost after 5 misses).
-- [x] **Minimap Optimization:** Overhauled minimap rendering using an offscreen static canvas, achieving a flawless 60FPS.
-- [x] **Bot Recycling:** Implemented a system to catch and respawn bots that fall out of bounds (Y < -50).
-- [x] **Golden Bot AI:** Developed a "Level 5" AI that maintains a dynamic safe distance, conserves energy, and executes flanking teleports.
-- [x] **Golden Bot Visuals:** Refined the bot's material to a highly reflective, polished "solid gold bar" look with a clamped minimap indicator.
-- [x] **Neural Override (Autoplay):** Implemented a hierarchical AI system with intentions (Escape, Engage, Hunt, Explore) and state-based behaviors.
-- [x] **Spatial Awareness Raycasting:** Added forward gap and wall detection to the AI traversal logic.
-- [x] **Stuck Detection:** Implemented a position-tracking timer to force jumps when the AI is blocked by geometry.
-- [x] **Settings Modal:** Added a comprehensive settings menu for brightness, volume, FPS, and physics toggles.
-- [x] **Jump Pads:** Implemented surface-aligned jump pads on floors and walls with custom impulse physics and color-inverting visuals.
-- [x] **Bot Physics:** Fixed grounded-state velocity wiping and standardized an upward launch bias for explosions.
-- [x] **Floor Collision Fix:** Doubled floor thickness (to 4 units) to prevent high-velocity fall-throughs.
-- [x] **Universal Raven Magic:** Applied the "Inverted Hull" effect to Portals, Void Implosion, and the Teleport Marker.
-- [x] **Ethereal Wireframe Stacking:** Implemented a 5-layer wireframe stack with decaying opacity for all ethereal objects.
-- [x] **Portal Visuals:** Added dual color inversion to inner/outer shapes and a 30% opacity color-matched raven hull.
-- [x] **Void Implosion Polish:** Adjusted hull opacity to 80%, restored asynchronous wireframe rotation, and hid wireframes when the player is inside.
-- [x] **Teleport Marker Visibility:** Upgraded with difference blending for perfect contrast, a 20% raven hull, Z-fighting fixes (0.001 Y-offset), and half-speed synchronized aura ring rotation.
-- [x] **Weather Enhancements:** Increased snow/leaf particle density and expanded the spawn distance radius.
+- [x] **Stasis Gadget (Temporal Dilation):** Implemented a 0.1x timescale integration scaler tied to a unique inverse-Void explosive perimeter.
+- [x] **Dynamic Gadget Loadouts:** Expanded the pause screen to support UI hot-swapping for F, R, and E keys.
+- [x] **Continuous Collision Detection (CCD):** Completely eliminated high-speed hitbox tunneling via swept-sphere dot-impact physics checks.
+- [x] **Organic Ragdoll Tumbling:** Replaced static bot falls with a rigid-body solver applying angular torque, velocity vectors, and dampening logic.
+- [x] **Tactile Prop Interactions:** Enabled interactive sweeping/kicking of mid-air or floor-settled projectiles and unified global ricochet behaviors.
+- [x] **Exponential Combat Weight:** Mathematically scaled sword lethality and physical pushes to player momentum arrays directly.
+- [x] **Bot Banking Posture:** Added fractional pitch and Z-axis tilt to enemy models based on their traversal/sprinting paths.
+- [x] **Fatal Corpse Explosions:** Tied `applyExplosionForce()` logic to death frames, aggressively launching ragdolls radially outwards.
+- [x] **Ordnance Parrying:** Added a mechanical interaction allowing players to knock projectiles physically with a sword swing while slicing down their fuses.
+- [x] **Dynamic HP Tracking:** Implemented global 8-vertex bound tracking to perfectly calculate HP bar floating heights over ragdoll structures dynamically.
+- [x] **Statistical Isolation:** Introduced `isScoringHit` boolean gates to freeze Combo meters definitively over corpses or inanimate triggers.
 
 ## 📖 version history / patch notes
+
+### v48.7.0 - Tactile Ragdoll Physics & Stasis Gadget Loadout
+*   **Gadget Loadouts:** Expanded the fixed keybind system to support a dynamic UI Loadout system, letting users map F,R,E to any available gadget via the Pause menu, featuring symmetrical geometric neon-blue designs and tactile audio feedback loops.
+*   **Stasis Field (Temporal Dilation):** Implemented a new gadget (STASIS) that dynamically manipulates the `timeScale` parameter passed to the entity loop. Entrants (Player, Bot, Projectile) inside its radius operate at 0.1x physics speed globally. Styled visually as an inverted, matte-core void implosion with an outward-shattering expansion.
+*   **Combat Weight & Scaling:** Sword damage scales exponentially with player velocity. Added tangible physics nudges on strikes and explosive radial impacts on death. HP bars were refactored to dynamically track the absolute highest geometric vertex of a bot's bounding box.
+*   **Universal Kinetic Projectiles:** Projectiles resolve true physical impacts between each other and players/bots. Players can sweep or "kick" bouncing grenades, thrown grenades bounce authentically off of AI bots, and sticky gadgets dynamically track offset vertices on rotating targets to stop "hovering". A sword parry mechanic actively deflects mid-air gadgets and accelerates their timer.
+*   **Ragdoll Tumbling Physics:** Refactored the bot fall sequence into a full rigid-body integration. Bots accurately inherit angular torque and horizontal sweep vectors off heavy momentum transfers across an 8-vertex collision check. Micro-bouncing jitter was resolved using an `isNaturallyStill` check that natively halts gravity physics when kinetic energy dissipates, transitioning bots smoothly into the `FALLEN` state.
+*   **Swept-Sphere CCD (Tunneling Fix):** Fixed high-velocity slides completely skipping bot hit-boxes. Injected a Continuous Collision Detection pass using relative dot-impact integration—turning sliding player models into impenetrable batting-rams that realistically stall movement. Extended raycast limits prevent juggling despawns.
+*   **Meta-State Isolation:** Deflected ordnance and physical strikes on grounded corpses are rigorously filtered from the metrics through an `isScoringHit` gate, preserving precise combo and style matrix calculations.
 
 ### v48.6.4 - Geometry, Theming, and Palette Overhaul
 *   **Inverted Hull Outlines:** Bypassed WebGL line-width limitations using a performant, texture-based "Inverted Hull" technique to create thick, stylized outlines for all obstacles (AABB and OBB). Resolved aliasing via LinearFilter and 512x512 resolution.
@@ -269,6 +266,48 @@ Following a period of severe AI degradation and quota exhaustion, the project wa
 *   **Density & Vector Correction:** The user demanded jump pad density match the portal count and a final fix for the backward-launching physics. The agent updated the explosion origin to sit slightly behind the pad's surface (opposite its normal), ensuring the impulse vector always pushes outward, and matched the spawn counts.
 *   **Final Polish & Manual Adjustments:** After manual rollbacks and edits to standardize a `0.3` upward bias for explosions, the user restated the final architectural requirements. The agent documented the final stable state, confirming the AABB/OBB wall raycasting, normal-based explosion offset, custom blending materials, and outward-floating particles.
 *   **Project Migration & Upward Bias Correction:** Following a catastrophic failure loop that exhausted the Pro model quota, the user migrated the codebase to a new account. Using the Flash model, the user sought to correctly apply the upward bias exclusively to bots impacted by impulse explosions, and attempted to fix broken entity knockback mechanics. The Flash model successfully corrected the bias but failed to resolve the knockback issue, which was abandoned to finalize the v48.5.0 build.
+
+### Session: Tactile Ragdoll Physics & Stasis Gadget Loadout (v48.7.0)
+
+#### Development Log
+**System Architecture Audit & Time Dilation Design**
+The development of version v48.7.0 focused on transitioning the game to a tactile physics model and introducing chronological time manipulation. The session began by creating a UI-driven slot system to hot-swap gadgets from the pause menu, alongside the inception of the "Stasis" grenade. To achieve actual "bullet time," we avoided artificially slowing player inputs or AI timers. Instead, time-dilation was implemented by scaling the delta-time (`dt`) applied within the physics engine, ensuring an authentic slow-motion simulation for any entity caught in the field.
+
+**UI Symmetry & Aesthetic Harmonization**
+Significant effort was directed toward UI styling and visual cohesion. The gadget selection overlay required multiple recalibrations to balance CSS scaling transforms against tight geometric padding. Visually, the Stasis field's shader animation was synchronized to its slowed timescale and given a collapsing exit animation. The grenade's color profile was completely rebuilt using the Void gadget as a template, achieving a dark core and neon wireframe without emissive washout.
+
+**Universal Kinetics & Projectile Systems**
+The simulation's physical integrity was expanded to treat thrown gadgets as solid kinetic entities. Projectiles were reprogrammed to adhere to surface collision normals accurately, bounce off moving enemies, and experience push/pull displacement from active grenade blast zones. Continuous Collision Detection (CCD) safeguards were integrated using cylindrical proximity scans, allowing the player to naturally kick or displace settled grenades. A 150ms spawn buffer eliminated instant self-detonations upon high-velocity throws.
+
+**True Ragdoll Integration & Stability Constraints**
+The largest architectural shift replaced hardcoded bot fall animations with a dynamic rigid-body ragdoll system. While this generated organic tumbling, it introduced persistent floor jitter as gravity forced continuous collision micro-adjustments. Rather than applying artificial friction to freeze the bodies prematurely, we introduced an `isNaturallyStill` check. Once a horizontal ragdoll's kinetic energy naturally fell below a minimal threshold, gravity integration was bypassed, allowing the body to come to a complete, stable rest. To complement this, bots were given procedural banking animations, rolling into their turns and pitching forward when sprinting to increase physical heft.
+
+**Combat Weight, Scaling, & Meta-State Scrubbing**
+A major focus was placed on making combat feel heavy and impactful. Sword damage was mathematically linked to player momentum via an exponential velocity multiplier, while the first strike (click) received a baseline 4x damage multiplier. Physicality was reinforced by adding a subtle nudge force on every successful slash. Fatal blows now trigger a localized radial explosive impulse—launching the corpse, staggering nearby enemies, and applying recoil to the player. HP bars were rewritten to dynamically track the absolute highest geometric vertex of a bot's bounding box, ensuring they float accurately above both towering titans and flat ragdolls. Finally, the scoring systems were rigorously filtered. An `isScoringHit` gate was established to ensure strikes on dead bodies and parried projectiles no longer inflated the combo counter or style matrix artificially.
+
+#### Prompt History
+*   **System Architecture Audit:** The user established a baseline for `v48.6.4`, demanding a strict read-only audit to ensure understanding before changes. The AI systematically analyzed movement, gadgets, and maps.
+*   **Gadget Slot System & "Bullet Time":** The user proposed a loadout swapping overlay and a Stasis gadget, asking for an evaluation of technical feasibility. The AI confirmed feasibility, but initially flawed its "bullet time" approach globally.
+*   **Enforcing True Physics Scaling:** The user rejected artificial slow-motion hacks, demanding genuine time dilation via `dt` manipulation to guarantee physics integrity across all entities. The AI corrected its architectural course.
+*   **Forced Execution of Stasis Mechanics:** After the AI summarized theorical models, the user aggressively ordered immediate execution. The AI implemented Stasis with the 0.1x timescale scalar and a pause menu loadout.
+*   **Detonation Timing & Outer Glow:** The user provided UI feedback and noted the Stasis grenades were idling too long. The AI fixed Stasis indexing in `CONFIG.gadgetPhysics` restricting the fuse to 1.5 seconds.
+*   **Symmetry Refinement & Layout Struggles:** Following failed attempts by the AI to correctly scale the gadget UI array, the user demanded exact 1:1 gap geometric symmetry. The AI padded bounds to escape aggressive CSS transform scaling logic.
+*   **Stasis Extinction Shader Pacing:** The chaotic shader mapping spun wildly at real-time speeds inside slow-motion fields. The AI decoupled shader time from the clock, capping spin rates and adding a 0.4s shrinking quadratic ease-out upon extinction.
+*   **Color Matching Calibration:** The AI repetitively blew out emissive parameters rendering the grenade white. The user mandated stripping the Void gadget material architecture strictly and swapping base hex codes, establishing the blue matte core/neon outline properly.
+*   **Map Transition State Hibernation:** Changing maps orphaned active fields. The AI formulated a caching matrix dynamically detaching 3D groups upon scene unmounting and restoring relative coordinates seamlessly per level.
+*   **Precise Surface Adhesion:** Sticky throwables hovered unnaturally using hardcoded mesh top-center offsets. The AI bypassed deterministic offsets, generating dynamic surface coordinate adhesion models cleanly on moving targets.
+*   **Bouncing Frags & Unified Jump Pads:** The user asked for physical grenade bounces off NPCs. The AI implemented ricochet bounding vectors on enemies—but briefly restricted Jump Pads to grenades exclusively before the user forced a swift rollback to restore player environment interactions.
+*   **Tactile Momentum Displacement:** Floor-level objects failed to kick due to vertical scaling checks. The AI locked Sticky physics vectors to geometrical spheres and instantiated 2D cylindrical sweeping scans eliminating height thresholds directly so items could scatter accurately.
+*   **Temporal Launch Safeguards:** High-speed throws clipped into bounding models instantly self-detonating. The AI built an immutable 150ms latency bypass securing mid-air ordinance deployment without physics collisions natively.
+*   **Reanimating Fallen Bots & UI Geometry:** The AI decoupled arbitrary static `return` limiters, routing falling bodies into gravitational computation loops resolving dynamic physical shoving on prone bot instances flawlessly.
+*   **Bot Posture & Turn Animation:** The user requested leaning physics to sell the movement weight of turning enemies. The AI implemented a fractional pitch and Z-axis banking offset logic based exclusively on strafing paths and sprint checks.
+*   **Migrating to True Ragdoll Logic:** Finding animations incapable of handling uncalculated physical force strikes, the user demanded complete rigid-body tumbling mechanics. The AI introduced angular momentum inputs mathematically capturing vertex terrestrial collisions per frame cleanly.
+*   **Tunneling Fixes & Continuous Collision Detection:** High-speed slicing caused players to ghost seamlessly through collisions. The AI instituted Continuous Collision Detection (CCD) processing dot-impact intersections across swept trajectories, violently stalling movement properly.
+*   **Hunting The Vanishing Ragdolls:** Bouncing unrecovered bots disappeared abruptly natively exceeding hard-coded 10-unit length down-casts. The AI removed ray-cast constraints resolving vertical aerial bounding completely cleanly.
+*   **Combat Weapon Scaling & Dynamic Fatalities:** The user requested sweeping combat momentum overhauls. The AI installed an exponential speed damage multiplier and programmed fatal strikes to trigger `applyExplosionForce` launches radially while anchoring the HP tracking 0.8 meters directly above the maximum vertex point globally securely.
+*   **Eradicating Micro-Stutter Settling:** Organic ragdoll gravity loops introduced infinite micro-bounces globally on resting terrain frames improperly. The AI incorporated an `isNaturallyStill` check, cleanly severing frictionless gravity operations matching horizontal rest requirements smoothly.
+*   **Parry Mechanics Implementation:** The user requested intercepting environmental hazards elegantly. The AI patched katana impact logic directing precise physical forces outward and peeling timer intervals organically off target mid-air projectiles dynamically.
+*   **Statistical Meta-State Isolation:** The AI erected an `isScoringHit` boolean filter definitively protecting the combo scaling metrics completely isolating physical strike interactions absent the `DEAD` state correctly finalizing version logic.
 
 #### Addendum: Post-Implementation Failures & Quota Exhaustion
 Following the successful implementation of the Jump Pads, the user attempted to refine the spawn logic for both portals and jump pads, alongside minor visual tweaks. This initiated a catastrophic breakdown in the AI's reasoning capabilities. The agent entered a loop of severe confusion, repeatedly overwriting stable logic with broken, hallucinated code. Over the course of 20 minutes, the agent systematically dismantled the working architecture, generating complete garbage and entirely exhausting the user's Gemini Pro 3.1 Preview quota.

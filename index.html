@@ -22,7 +22,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v48.6.4</title>
+    <title>Neon Blade: Melee Arena v48.7.0</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -179,6 +179,19 @@
             border-color: #00ffaa; box-shadow: 0 0 15px #00ffaa; color: #00ffaa; 
             background: rgba(0, 255, 170, 0.1);
         }
+
+        .ability-icon.loadout-gadget-btn {
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: rgba(255, 255, 255, 0.7);
+            transition: all 0.2s ease;
+        }
+        .ability-icon.loadout-gadget-btn:hover {
+            border-color: #33ccff;
+            box-shadow: 0 0 20px rgba(51,204,255,0.8);
+            background: rgba(51, 204, 255, 0.15);
+            color: #33ccff;
+        }
+
         .ability-key { font-size: 1.2rem; font-family: 'Arial Black', sans-serif; }
         .ability-name { font-size: 0.5rem; letter-spacing: 1px; opacity: 0.8; }
         
@@ -434,7 +447,7 @@
         /* --- SETTINGS & UI SPARKS (Refined v5) --- */
         #settings-btn { padding: 15px; min-width: 60px; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; border-radius: 50%; }
         
-        #settings-modal {
+        #settings-modal, #loadout-modal {
             position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
             width: 560px; /* Square-ish */
             background: rgba(5, 10, 15, 0.6); 
@@ -449,7 +462,7 @@
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6);
         }
         
-        #settings-modal h2 { 
+        #settings-modal h2, #loadout-modal h2 { 
             margin: 0 0 40px 0; 
             color: #33ccff; 
             font-family: 'Arial Black', sans-serif; 
@@ -713,6 +726,11 @@
             <div id="session-timer">Session Time: 00:00</div>
 
             <div class="btn-row" style="margin-top: 10px; gap: 15px;">
+                <button class="btn-secondary" id="loadout-btn" title="Gadget Loadout" style="padding: 15px; min-width: 60px; width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; border-radius: 50%;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M4 4h6v6H4zm10 0h6v6h-6zM4 14h6v6H4zm10 0h6v6h-6z"/>
+                    </svg>
+                </button>
                 <button class="btn-secondary" id="tp-mode-btn">TP MODE: AIM</button>
                 <button class="btn-secondary" id="theme-btn">THEME: LIGHT</button>
                 <button class="btn-secondary" id="map-btn">MAP: ARENA</button>
@@ -781,14 +799,83 @@
                 <div class="close-btn" id="settings-close">CLOSE</div>
             </div>
 
+            <!-- NEW LOADOUT MODAL -->
+            <div id="loadout-modal">
+                <h2>GADGET LOADOUT</h2>
+                <div style="text-align:center; font-size:0.8rem; color:#8899aa; font-family:'Segoe UI', sans-serif; text-transform:uppercase; font-weight:600; letter-spacing:2px; margin-bottom:25px; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">CLICK TO CYCLE GADGET</div>
+
+                <div class="ability-group" style="margin: 0 auto 0 auto; transform: skewX(-10deg) scale(1.4); transform-origin: center;">
+                    <div class="ability-icon loadout-gadget-btn" style="cursor:pointer;" onclick="cycleGadget('f')">
+                        <div class="ability-icon-inner">
+                            <div class="ability-key">F</div>
+                            <div class="ability-name" id="menu-loadout-f">FRAG</div>
+                        </div>
+                    </div>
+                    <div class="ability-icon loadout-gadget-btn" style="cursor:pointer;" onclick="cycleGadget('r')">
+                        <div class="ability-icon-inner">
+                            <div class="ability-key">R</div>
+                            <div class="ability-name" id="menu-loadout-r">VOID</div>
+                        </div>
+                    </div>
+                    <div class="ability-icon loadout-gadget-btn" style="cursor:pointer;" onclick="cycleGadget('e')">
+                        <div class="ability-icon-inner">
+                            <div class="ability-key">E</div>
+                            <div class="ability-name" id="menu-loadout-e">IMPULSE</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display:flex; justify-content:center; gap:20px; margin-top:80px; margin-bottom:0;">
+                    <button class="btn-secondary" onclick="resetLoadout()" style="padding:10px 20px; font-size:1rem; flex:1;">RESET DEFAULT</button>
+                    <div class="close-btn" id="loadout-close" style="margin:0; padding:15px; flex:1; display:flex; align-items:center; justify-content:center;">CLOSE</div>
+                </div>
+            </div>
+
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.6.4<br>- Geometry & Theming & Palette Overhaul -</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.7.0<br>- Tactile Ragdoll Physics & Stasis Gadget Loadout -</div>
         </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     
     <script>
+        const stasisFields = [];
+        const PlayerLoadout = {
+            f: 'FRAG',
+            r: 'VOID',
+            e: 'IMPULSE'
+        };
+        const AvailableGadgets = ['FRAG', 'VOID', 'IMPULSE', 'STASIS'];
+
+        function cycleGadget(slot) {
+            if (typeof AudioSys !== 'undefined') AudioSys.playUI(true);
+            const current = PlayerLoadout[slot];
+            const mapped = Object.values(PlayerLoadout);
+            const unmapped = AvailableGadgets.filter(g => !mapped.includes(g));
+            if (unmapped.length > 0) {
+                PlayerLoadout[slot] = unmapped[0];
+                updateLoadoutUI();
+            }
+        }
+
+        function resetLoadout() {
+            if (typeof AudioSys !== 'undefined') AudioSys.playUI(true);
+            PlayerLoadout.f = 'FRAG';
+            PlayerLoadout.r = 'VOID';
+            PlayerLoadout.e = 'IMPULSE';
+            updateLoadoutUI();
+        }
+
+        function updateLoadoutUI() {
+            document.getElementById('menu-loadout-f').innerText = PlayerLoadout.f;
+            document.getElementById('menu-loadout-r').innerText = PlayerLoadout.r;
+            document.getElementById('menu-loadout-e').innerText = PlayerLoadout.e;
+            
+            document.getElementById('icon-f').querySelector('.ability-name').innerText = PlayerLoadout.f;
+            document.getElementById('icon-r').querySelector('.ability-name').innerText = PlayerLoadout.r;
+            document.getElementById('icon-e').querySelector('.ability-name').innerText = PlayerLoadout.e;
+        }
+
         // --- CONFIGURATION ---
         const CONFIG = {
             baseSpeed: 7, 
@@ -809,7 +896,7 @@
             energyDrain: 5, 
             energyRegen: 10, 
             teleportCost: 2,
-            gadgetCost: { frag: 7, void: 6, impulse: 5 },
+            gadgetCost: { frag: 7.5, void: 10, impulse: 5, stasis: 15 },
             gadgetCooldown: 0, 
             attackRange: 8,
             attackCooldown: 250,
@@ -819,7 +906,8 @@
             gadgetPhysics: {
                 frag: { throwSpeed: 70, life: 5.0, bounciness: 0.5, friction: 0.5 },
                 void: { throwSpeed: 60, life: 1.5 },
-                impulse: { throwSpeed: 50, life: 10.0 }
+                impulse: { throwSpeed: 50, life: 10.0 },
+                stasis: { throwSpeed: 60, life: 1.5 }
             },
             botBaseHP: 200, 
             botDamage: 2,   
@@ -2258,19 +2346,19 @@
                     case 'f': 
                         if (!this.keys.f) { 
                             this.keys.f = true; 
-                            if(isLocked && !player.isDead) player.beginAim('FRAG'); 
+                            if(isLocked && !player.isDead) player.beginAim(PlayerLoadout.f); 
                         }
                         break;
                     case 'r':
                         if (!this.keys.r) { 
                             this.keys.r = true; 
-                            if(isLocked && !player.isDead) player.beginAim('VOID'); 
+                            if(isLocked && !player.isDead) player.beginAim(PlayerLoadout.r); 
                         }
                         break;
                     case 'e':
                         if (!this.keys.e) { 
                             this.keys.e = true; 
-                            if(isLocked && !player.isDead) player.beginAim('IMPULSE'); 
+                            if(isLocked && !player.isDead) player.beginAim(PlayerLoadout.e); 
                         }
                         break;
                     case 'g':
@@ -3036,14 +3124,83 @@
                 snapOsc.start(tSnap); snapOsc.stop(killNode); 
             },
 
-            playImpulse: function(pos) {
+            playStasis: function(pos) {
+            // Reverse of playVoid
+                if (!this.ctx) return;
+                const t = this.ctx.currentTime;
+                
+                const dur = 0.33;
+                const end = t + dur;
+                const killNode = t + 0.50;
+
+                const masterGain = this.ctx.createGain();
+                const distGain = this.ctx.createGain();
+                distGain.gain.value = pos ? this.getDistanceMod(pos) : 1.0;
+                
+                // Re-applying the exact master entry from version 1
+                masterGain.gain.setValueAtTime(0, t);
+                masterGain.gain.linearRampToValueAtTime(0.01, t + 0.02); 
+                masterGain.gain.linearRampToValueAtTime(1, t + 0.03); 
+                masterGain.gain.setValueAtTime(1, end);
+
+                masterGain.connect(distGain);
+                distGain.connect(this.masterGain || this.ctx.destination);
+
+                // 1. Expansion Gust (Sine) - Gain increased to 0.3
+                const osc = this.ctx.createOscillator();
+                const og = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, t); 
+                osc.frequency.exponentialRampToValueAtTime(40, end); 
+                og.gain.setValueAtTime(0, t);
+                og.gain.linearRampToValueAtTime(0.3, t + 0.13); 
+                og.gain.linearRampToValueAtTime(0, end); 
+
+                // 2. Initial Burst (Snap) - Gain increased to 0.6
+                const snapDur = 0.028;
+                const snapOsc = this.ctx.createOscillator();
+                const snapG = this.ctx.createGain();
+                snapOsc.type = 'triangle';
+                snapOsc.frequency.setValueAtTime(100, t); 
+                snapOsc.frequency.exponentialRampToValueAtTime(150, t + snapDur);
+                snapG.gain.setValueAtTime(0, t);
+                snapG.gain.linearRampToValueAtTime(0.6, t + 0.02); 
+                snapG.gain.linearRampToValueAtTime(0, t + snapDur);
+
+                // 3. Dissipating Texture (Noise) - Gain increased to 0.3
+                const bSize = this.ctx.sampleRate * 0.5;
+                const b = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
+                const d = b.getChannelData(0);
+                for(let i=0; i<bSize; i++) d[i] = Math.random() * 2 - 1;
+                const n = this.ctx.createBufferSource();
+                n.buffer = b;
+                const ng = this.ctx.createGain();
+                const nf = this.ctx.createBiquadFilter();
+                nf.type = 'bandpass';
+                nf.frequency.setValueAtTime(1500, t);
+                nf.frequency.exponentialRampToValueAtTime(100, end); 
+                nf.Q.value = 2.0; 
+                ng.gain.setValueAtTime(0, t);
+                ng.gain.linearRampToValueAtTime(0.3, t + 0.08); 
+                ng.gain.linearRampToValueAtTime(0, end); 
+
+                n.connect(nf); nf.connect(ng); ng.connect(masterGain);
+                osc.connect(og); og.connect(masterGain);
+                snapOsc.connect(snapG); snapG.connect(masterGain);
+
+                osc.start(t); osc.stop(killNode); 
+                n.start(t); n.stop(killNode);
+                snapOsc.start(t); snapOsc.stop(t + snapDur); 
+            },
+
+            playImpulse: function(pos, volModifier = 1.0) {
                 if (!this.ctx) return;
                 const t = this.ctx.currentTime;
 
                 // 1. SIGNAL MANAGEMENT
                 const masterGain = this.ctx.createGain();
                 const distGain = this.ctx.createGain();
-                distGain.gain.value = pos ? this.getDistanceMod(pos) : 1.0;
+                distGain.gain.value = (pos ? this.getDistanceMod(pos) : 1.0) * volModifier;
                 
                 // Subsonic Filter: Removes eardrum pressure without losing the 'thud'
                 const hp = this.ctx.createBiquadFilter();
@@ -3239,6 +3396,15 @@
         // --- ZERO-ALLOCATION MATH SCRATCHPAD ---
         const _UP = new THREE.Vector3(0, 1, 0);
         const _ZERO = new THREE.Vector3(0, 0, 0);
+        const _quat = new THREE.Quaternion();
+        const _quat2 = new THREE.Quaternion();
+        
+        const _boxVertices = [
+            new THREE.Vector3(-0.5, -1, -0.5), new THREE.Vector3(0.5, -1, -0.5),
+            new THREE.Vector3(-0.5, -1, 0.5), new THREE.Vector3(0.5, -1, 0.5),
+            new THREE.Vector3(-0.5, 1, -0.5), new THREE.Vector3(0.5, 1, -0.5),
+            new THREE.Vector3(-0.5, 1, 0.5), new THREE.Vector3(0.5, 1, 0.5)
+        ];
         
         // Player Physics Scratchpad
         const _pFwd = new THREE.Vector3();
@@ -3484,6 +3650,7 @@
                 this.savedPlayerRot = new THREE.Euler(0, 0, 0, 'YXZ');
                 this.savedPlayerVel = new THREE.Vector3(0, 0, 0);
                 this.savedProjectiles = [];
+                this.savedStasisFields = [];
                 this.savedLockState = { active: false, pos: null };
                 this.hasEntered = false;
                 this.moonBox = null;
@@ -3543,6 +3710,10 @@
                     this.current.savedProjectiles = [...projectiles];
                     this.current.savedProjectiles.forEach(p => scene.remove(p.mesh));
                     
+                    // Hibernate stasis fields
+                    this.current.savedStasisFields = [...stasisFields];
+                    this.current.savedStasisFields.forEach(sf => scene.remove(sf.group));
+                    
                     this.current.group.visible = false;
                 }
                 
@@ -3559,6 +3730,7 @@
                 weatherParticles.length = 0;
 
                 projectiles.length = 0;
+                stasisFields.length = 0;
 
                 // 3. Swap to New
                 this.current = next;
@@ -3628,6 +3800,15 @@
                         projectiles.push(p);
                     });
                     next.savedProjectiles = [];
+                }
+
+                // Restore Stasis Fields
+                if (next.savedStasisFields.length > 0) {
+                    next.savedStasisFields.forEach(sf => {
+                        scene.add(sf.group);
+                        stasisFields.push(sf);
+                    });
+                    next.savedStasisFields = [];
                 }
                 
                 // Update Shadows
@@ -4517,12 +4698,12 @@
                 }
             }
 
-            onAttackInput() {
+            onAttackInput(isClick = false) {
                 if (teleportMode === 'AIM' && this.teleportActive) {
                     tryAimTeleport();
-                    this.currentWeapon.use(); 
+                    this.currentWeapon.use(isClick); 
                 } else {
-                    this.currentWeapon.use();
+                    this.currentWeapon.use(isClick);
                 }
             }
 
@@ -4572,9 +4753,9 @@
 
             beginAim(type) {
                 this.aimingGadget = type;
-                document.getElementById('icon-f').classList.toggle('active', type==='FRAG');
-                document.getElementById('icon-r').classList.toggle('active', type==='VOID');
-                document.getElementById('icon-e').classList.toggle('active', type==='IMPULSE');
+                document.getElementById('icon-f').classList.toggle('active', type===PlayerLoadout.f);
+                document.getElementById('icon-r').classList.toggle('active', type===PlayerLoadout.r);
+                document.getElementById('icon-e').classList.toggle('active', type===PlayerLoadout.e);
             }
             
             endAim() {
@@ -4605,6 +4786,7 @@
                 if (type === 'FRAG') cost = CONFIG.gadgetCost.frag;
                 if (type === 'VOID') cost = CONFIG.gadgetCost.void;
                 if (type === 'IMPULSE') cost = CONFIG.gadgetCost.impulse;
+                if (type === 'STASIS') cost = CONFIG.gadgetCost.stasis;
 
                 if (this.energy < cost) {
                     AudioSys.playMiss();
@@ -5267,10 +5449,10 @@
                     const pos = this.mesh.position;
                     
                     // Check distance using plane distance and radius
-                    const checkTrigger = (entityPos, radius = 0.5) => {
+                    const checkTrigger = (entityPos, radius = 0.5, height = 6.0) => {
                         const toEntity = entityPos.clone().sub(pos);
                         const distFromPlane = toEntity.dot(this.normal);
-                        if (distFromPlane > -0.5 && distFromPlane < 6.0) {
+                        if (distFromPlane > -0.5 && distFromPlane < height) {
                             const projected = toEntity.clone().sub(this.normal.clone().multiplyScalar(distFromPlane));
                             // Account for entity radius to trigger on edge contact
                             if (projected.length() < (1.5 + radius)) {
@@ -5280,21 +5462,26 @@
                         return false;
                     };
 
-                    if (checkTrigger(camera.position, 0.5)) {
+                    if (checkTrigger(camera.position, 0.5, 6.0)) {
                         this.trigger(camera.position, true);
                         return;
                     }
                     for (let e of enemies) {
-                        if (e.isDeadCorpse) continue;
-                        if (checkTrigger(e.mesh.position, e.type.scale)) {
+                        if (checkTrigger(e.mesh.position, e.type.scale, 6.0)) {
                             this.trigger(e.mesh.position, false, e);
+                            return;
+                        }
+                    }
+                    for (let p of projectiles) {
+                        if (p.active && !p.stuckTo && checkTrigger(p.mesh.position, 0.4, 1.2)) {
+                            this.trigger(p.mesh.position, false, null, p);
                             return;
                         }
                     }
                 }
             }
 
-            trigger(entityPos, isPlayer, entity = null) {
+            trigger(entityPos, isPlayer, entity = null, projectile = null) {
                 if (this.cooldown > 0) return;
                 this.cooldown = 2.0;
 
@@ -5326,6 +5513,8 @@
                     applyForce(camera.position, player.velocity, true);
                 } else if (entity) {
                     applyForce(entity.mesh.position, entity.velocity, false);
+                } else if (projectile) {
+                    applyForce(projectile.mesh.position, projectile.velocity, false);
                 }
             }
         }
@@ -5459,8 +5648,8 @@
                 this.radius = 0.2;
                 this.stuckTo = null;
                 
-                const phys = CONFIG.gadgetPhysics;
-                this.life = type === 'VOID' ? phys.void.life : (type === 'IMPULSE' ? phys.impulse.life : phys.frag.life);
+                const phys = CONFIG.gadgetPhysics[type.toLowerCase()];
+                this.life = phys ? phys.life : 5.0;
 
                 // Initialize rotation axis for "baseball" spin
                 this.spinAxis = new THREE.Vector3(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize();
@@ -5496,11 +5685,11 @@
                 let emissiveInt = 0.8;
                 let opacity = 1.0;
 
-                if (type === 'VOID') {
-                    color = 0x220044; // Very dark purple base
-                    roughness = 1.0;  // Fully Matte (No shine)
-                    metalness = 0.0;  // No reflection
-                    emissiveInt = 0;  // No self-glow on the core
+                if (type === 'VOID' || type === 'STASIS') {
+                    color = (type === 'VOID') ? 0x220044 : 0x001122; // Dark matte base
+                    roughness = 1.0;  // Fully Matte
+                    metalness = 0.0;  
+                    emissiveInt = 0;  // No core glow
                 }
                 else if (type === 'FRAG') {
                     color = 0xff3300; 
@@ -5526,13 +5715,14 @@
                 
                 // Wireframe Shell
                 let wireCol = 0xffffff;
-                if (type === 'VOID') wireCol = 0x8A2BE2; // Purple wire over dark matte core
+                if (type === 'VOID') wireCol = 0x8A2BE2; 
+                if (type === 'STASIS') wireCol = 0x00BFFF; 
                 
                 const wireMat = new THREE.MeshBasicMaterial({ 
                     color: wireCol, 
                     wireframe: true, 
                     transparent: true, 
-                    opacity: (type === 'VOID' ? 0.2 : 0.5) 
+                    opacity: (type === 'VOID' || type === 'STASIS' ? 0.2 : 0.5) 
                 });
                 this.wire = new THREE.Mesh(wireGeo, wireMat);
                 this.mesh.add(this.wire);
@@ -5541,6 +5731,7 @@
                 scene.add(this.mesh);
                 this.active = true;
                 this.portalCooldown = 0;
+                this.launchCooldown = 0.15; // Safeguard against self-hit on spawn
             }
 
             update(dt) {
@@ -5549,13 +5740,110 @@
                 if (this.life < 1.0) this.wire.material.opacity = Math.random() > 0.5 ? 0.8 : 0.2;
                 if (this.life <= 0) { this.explode(); return; }
                 if (this.portalCooldown > 0) this.portalCooldown -= dt;
+                if (this.launchCooldown > 0) this.launchCooldown -= dt;
                 if (this.stuckTo) {
-                    if (this.stuckTo.isDeadCorpse || this.stuckTo.health <= 0) this.stuckTo = null;
-                    else if(this.stuckTo.mesh) this.mesh.position.copy(this.stuckTo.mesh.position).add(this.stuckOffset);
-                    return; 
+                    let active = true;
+                    if (this.stuckTo.health <= 0 || this.stuckTo.isDeadCorpse) active = false;
+                    if (this.stuckTo.active === false) active = false; 
+
+                    if (!active) {
+                        this.stuckTo = null;
+                        this.velocity.set(0,0,0); // Drop if parent dies/explodes
+                    } else {
+                        const targetPos = this.stuckTo.isPlayer ? camera.position : this.stuckTo.mesh.position;
+                        this.mesh.position.copy(targetPos).add(this.stuckOffset);
+                        return; 
+                    }
                 }
                 this.velocity.y -= CONFIG.gravity * dt;
                 _projPos.copy(this.mesh.position).addScaledVector(this.velocity, dt);
+
+                // --- PROACTIVE ENTITY COLLISIONS (Improved Kick & Precise Sticking) ---
+                let hitObject = null;
+                let targetPos = null;
+                let targetVel = null;
+                let targetRadius = 0.35; // Standard 
+
+                // 1. Check Enemies
+                for(let e of enemies) {
+                    const d = e.mesh.position.distanceTo(_projPos);
+                    const r = e.type.scale; // Visual Scale
+                    if (d < r + 0.5) { hitObject = e; targetPos = e.mesh.position; targetVel = e.velocity; targetRadius = r; break; }
+                }
+                // 2. Check Player (Improved Floor Kick)
+                if (!hitObject && this.launchCooldown <= 0) {
+                    // Check horizontal distance first for kick range
+                    const dx = camera.position.x - _projPos.x;
+                    const dz = camera.position.z - _projPos.z;
+                    const hDistSq = dx*dx + dz*dz;
+                    const dy = camera.position.y - _projPos.y; // Height diff (Camera is at ~1.6m)
+                    
+                    if (hDistSq < 1.0 && dy > 0 && dy < 2.0) { 
+                        hitObject = { isPlayer: true };
+                        targetPos = camera.position.clone();
+                        targetPos.y -= 1.0; // Point towards "feet" for math
+                        targetVel = player.velocity;
+                        targetRadius = 0.6;
+                    }
+                }
+                // 3. Check Other Projectiles (Mutual Interaction)
+                if (!hitObject) {
+                    for (let pj of projectiles) {
+                        if (pj === this || !pj.active || pj.stuckTo === this) continue;
+                        const d = pj.mesh.position.distanceTo(_projPos);
+                        const rOther = (pj.type === 'FRAG' ? 0.45 : 0.25);
+                        if (d < (rOther + 0.35)) { 
+                            hitObject = pj; 
+                            targetPos = pj.mesh.position; 
+                            targetVel = pj.velocity; 
+                            targetRadius = rOther; 
+                            break; 
+                        }
+                    }
+                }
+
+                if (hitObject) {
+                    const dHit = _projPos.distanceTo(targetPos);
+                    if (dHit > 0.001) {
+                        const n = _projPos.clone().sub(targetPos).normalize();
+                        const myRad = (this.type === 'FRAG' ? 0.45 : 0.25);
+                        const overlap = (myRad + targetRadius) - dHit;
+                        _projPos.addScaledVector(n, Math.max(0, overlap)); // Displacement Resolve
+
+                        if (this.type === 'IMPULSE') { this.active = false; this.explode(); return; }
+                        if (this.type === 'VOID' || this.type === 'STASIS') { 
+                            this.stuckTo = hitObject; 
+                            this.stuckOffset = _projPos.clone().sub(targetPos); 
+                            return; 
+                        }
+                        if (this.type === 'FRAG') {
+                            const fragPhys = CONFIG.gadgetPhysics.frag;
+                            const relVel = this.velocity.clone().sub(targetVel || _vec3_1.set(0,0,0));
+                            const dot = relVel.dot(n);
+                            if (dot < 0) {
+                                this.velocity.copy(relVel.reflect(n).multiplyScalar(fragPhys.bounciness));
+                                // Transfer momentum (The Kick)
+                                if (targetVel) {
+                                    // Make kick more consistent even at low speeds
+                                    const shove = targetVel.length() > 0.1 ? targetVel.clone().multiplyScalar(1.2) : n.clone().multiplyScalar(2.0);
+                                    this.velocity.add(shove);
+                                    this.velocity.y += 2.0; // Guaranteed hop to clear friction
+                                }
+                            }
+                            // Apply force to the other entity (Reciprocal Impulse)
+                            if (hitObject.velocity && !hitObject.isPlayer) {
+                                const pushPower = Math.max(3.0, relVel.length() * 0.6);
+                                hitObject.velocity.addScaledVector(n, -pushPower);
+                                if (hitObject.spinAxis) { // For other projectiles
+                                    hitObject.spinAxis.set(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize();
+                                }
+                            }
+                            this.spinAxis.set(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize();
+                        }
+                    }
+                }
+
+                // --- WORLD COLLISIONS (Walls/Floors) ---
                 if (this.portalCooldown <= 0) {
                     for(let p of portals) {
                         if(_projPos.distanceTo(p.mesh.position) < 2.0) {
@@ -5567,29 +5855,23 @@
                     }
                 }
                 _projDir.subVectors(_projPos, this.mesh.position);
-                const dist = _projDir.length();
-                if (dist > 0.001) {
+                const wallDist = _projDir.length();
+                if (wallDist > 0.001) {
                     _projDir.normalize();
                     globalRaycaster.set(this.mesh.position, _projDir);
-                    globalRaycaster.far = dist;
+                    globalRaycaster.far = wallDist;
                     const hits = globalRaycaster.intersectObjects(mapObjects);
-                    let enemyHit = null;
-                    for(let e of enemies) {
-                        if (!e.isDeadCorpse && e.mesh.position.distanceTo(_projPos) < e.type.scale + 0.5) {
-                            enemyHit = e; break;
-                        }
-                    }
-                    if (enemyHit) {
-                        if (this.type === 'IMPULSE') { this.active = false; this.explode(); return; }
-                        if (this.type === 'VOID') { this.stuckTo = enemyHit; this.stuckOffset = new THREE.Vector3(0, 1, 0); return; }
-                        if (this.type === 'FRAG') this.velocity.negate().multiplyScalar(0.4);
-                    }
+
                     if (hits.length > 0) {
                         if (this.type === 'IMPULSE') { this.active = false; this.explode(); return; }
-                        if (this.type === 'VOID') {
-                            this.active = false; this.mesh.position.copy(hits[0].point); this.velocity.set(0,0,0);
-                            this.active = true; this.stuckTo = { mesh: { position: hits[0].point }, isDeadCorpse: false, health: 1 };
-                            this.stuckOffset = new THREE.Vector3(0,0,0); return;
+                        if (this.type === 'VOID' || this.type === 'STASIS') {
+                            this.active = false; 
+                            this.mesh.position.copy(hits[0].point); 
+                            this.velocity.set(0,0,0);
+                            this.active = true; 
+                            this.stuckTo = { mesh: { position: hits[0].point.clone() }, isDeadCorpse: false, health: 1 };
+                            this.stuckOffset = new THREE.Vector3(0,0,0); 
+                            return;
                         }
                         if (this.type === 'FRAG') {
                             const n = hits[0].face.normal;
@@ -5601,8 +5883,6 @@
                                 if (this.velocity.y < 0.5) this.velocity.y = 0; 
                             }
                             this.mesh.position.copy(hits[0].point).addScaledVector(n, 0.2);
-                            
-                            // Change spin on bounce
                             this.spinAxis.set(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize();
                         }
                     } else this.mesh.position.copy(_projPos);
@@ -5611,14 +5891,16 @@
                 this.mesh.rotateOnAxis(this.spinAxis, this.spinSpeed * dt);
 
                 // Pooled trail updates
-                if (Math.random() < (this.type === 'VOID' ? 0.4 : this.type === 'FRAG' ? 0.3 : 0.2)) {
+                if (Math.random() < (this.type === 'VOID' || this.type === 'STASIS' ? 0.4 : this.type === 'FRAG' ? 0.3 : 0.2)) {
                     const p = _particlePool[_particleIdx];
                     _particleIdx = (_particleIdx + 1) % 800;
                     p.active = true; p.type = 'static';
                     p.mesh.visible = true; p.mesh.position.copy(this.mesh.position);
-                    if (this.type === 'VOID') {
+                    
+                    if (this.type === 'VOID' || this.type === 'STASIS') {
                         p.life = 0.5; p.maxLife = 0.5; p.targetOpacity = 0.6; p.velocity.set(0, 0.5, 0);
-                        p.mesh.material.color.setHex(0x110022); p.mesh.material.blending = THREE.NormalBlending;
+                        const trailCol = (this.type === 'VOID') ? 0x110022 : 0x001122;
+                        p.mesh.material.color.setHex(trailCol); p.mesh.material.blending = THREE.NormalBlending;
                     } else if (this.type === 'FRAG') {
                         p.life = 0.4; p.maxLife = 0.4; p.targetOpacity = 0.4; p.velocity.set(0, 0.5, 0);
                         p.mesh.material.color.setHex(0x664422); p.mesh.material.blending = THREE.NormalBlending;
@@ -5643,63 +5925,35 @@
                 let color = 0x00ff00;
 
                 if (this.type === 'FRAG') { 
-                    range = 30; damage = 200; force = 50; color = 0xff3300; 
+                    range = 30; damage = 300; force = 45; color = 0xff3300; 
                     this.spawnExplosion(pos, range);
                 } 
                 else if (this.type === 'VOID') { 
-                    range = 25; damage = 150; force = -70; color = 0x8A2BE2; 
+                    range = 25; damage = 150; force = -100; color = 0x8A2BE2; 
                     this.spawnImplosion(pos, range, color);
                 } 
                 else if (this.type === 'IMPULSE') { 
-                    range = 20; damage = 10; force = 60; color = 0x00ffff; 
+                    range = 20; damage = 0; force = 60; color = 0x00ffff; 
                     this.spawnShockwave(pos, range, color);
                 }
+                else if (this.type === 'STASIS') {
+                    range = 25; damage = 50; force = 100; color = 0x00BFFF; 
+                    stasisFields.push(new StasisField(pos, range, color));
+                }
                 
-                if(this.type !== 'VOID' && this.type !== 'IMPULSE') {
+                if(this.type !== 'VOID' && this.type !== 'IMPULSE' && this.type !== 'STASIS') {
                     spawnImpact(pos, color, range/2); 
                 }
                 
-                spawnRipple(pos, new THREE.Vector3(0,1,0), color);
+                if (this.type !== 'STASIS') spawnRipple(pos, new THREE.Vector3(0,1,0), color);
                 
                 // Routed audio logic
                 if (this.type === 'IMPULSE') AudioSys.playImpulse(pos);
                 else if (this.type === 'VOID') AudioSys.playVoid(pos);
+                else if (this.type === 'STASIS') AudioSys.playStasis(pos);
                 else AudioSys.playFrag(pos);
 
-                for (let e of enemies) {
-                    if (e.isDeadCorpse) continue;
-                    const dist = e.mesh.position.distanceTo(pos);
-                    
-                    if (dist < range) {
-                        const falloff = 1 - (dist / range);
-                        if (damage > 0) e.takeHit(damage * falloff);
-                        const dir = e.mesh.position.clone().sub(pos).normalize();
-                        
-                        if(this.type === 'VOID') {
-                            const pullStrength = (dist / range); 
-                            e.velocity.addScaledVector(dir, force * pullStrength); 
-                        } else {
-                             dir.y = 0.3; dir.normalize(); 
-                             e.velocity.addScaledVector(dir, force * falloff);
-                        }
-                    }
-                }
-                
-                const pDist = camera.position.distanceTo(pos);
-                if (pDist < range) {
-                     const falloff = 1 - (pDist / range);
-                     const dir = camera.position.clone().sub(pos).normalize();
-                     
-                     if(damage > 0) damagePlayer(damage * 0.1 * falloff);
-                     
-                     if(this.type === 'VOID') {
-                         const pullStrength = (pDist / range);
-                         player.velocity.addScaledVector(dir, force * pullStrength * 0.5);
-                     } else {
-                         player.velocity.addScaledVector(dir, force * falloff);
-                     }
-                     player.onGround = false; 
-                }
+                applyExplosionForce(pos, range, force, damage, this.type, this);
             }
 
             spawnExplosion(pos, range) {
@@ -5816,10 +6070,9 @@
                     ravenHull.rotation.y += 0.08;
                     ravenHull.rotation.z -= 0.03;
                     
-                    wires.forEach((w, i) => {
+                    wires.forEach((w) => {
                         w.visible = !isInside; // Hide wireframes when player is inside
-                        w.rotation.y += 0.05 + (i * 0.01);
-                        w.rotation.z -= 0.02 + (i * 0.01);
+                        w.rotation.copy(ravenHull.rotation);
                     });
                     
                     requestAnimationFrame(anim);
@@ -5892,6 +6145,128 @@
             }
         }
 
+        class StasisField {
+            constructor(pos, range, color) {
+                this.pos = pos.clone();
+                this.range = range;
+                this.color = color;
+                this.life = 3.0;
+                this.scale = 0.1;
+                this.maxScale = 1.0;
+                this.expanding = true;
+                this.vanishing = false;
+                this.internalTime = 0;
+
+                this.group = new THREE.Group();
+                this.group.position.copy(pos);
+                scene.add(this.group);
+
+                const coreGeo = new THREE.SphereGeometry(range, 32, 32);
+                const coreMat = new THREE.MeshBasicMaterial({ 
+                    color: color,
+                    transparent: true,
+                    opacity: 1.0,
+                    blending: THREE.CustomBlending,
+                    blendEquation: THREE.AddEquation,
+                    blendSrc: THREE.OneMinusDstColorFactor,
+                    blendDst: THREE.OneMinusSrcColorFactor
+                }); 
+                this.core = new THREE.Mesh(coreGeo, coreMat);
+                this.group.add(this.core);
+
+                this.ravenMat = new THREE.ShaderMaterial({
+                    uniforms: {
+                        time: { value: 0 },
+                        color: { value: new THREE.Color(color) },
+                        opacity: { value: 0.80 }
+                    },
+                    vertexShader: SHADERS.ravenMagic.vertex,
+                    fragmentShader: SHADERS.ravenMagic.fragment,
+                    side: THREE.BackSide,
+                    transparent: true
+                });
+                const ravenGeo = new THREE.IcosahedronGeometry(range * 1.05, 3);
+                this.ravenHull = new THREE.Mesh(ravenGeo, this.ravenMat);
+                this.group.add(this.ravenHull);
+                
+                this.wires = [];
+                for (let i = 1; i <= 5; i++) {
+                    const wireMat = new THREE.MeshBasicMaterial({ color: color, wireframe: true, transparent: true, opacity: 0.15 / i });
+                    const wireGeo = new THREE.IcosahedronGeometry(range * (1.0 + (i * 0.01)), 2);
+                    const wire = new THREE.Mesh(wireGeo, wireMat);
+                    wire.rotation.copy(this.ravenHull.rotation); // Match initial rotation
+                    this.group.add(wire);
+                    this.wires.push(wire);
+                }
+            }
+
+            update(dt) {
+                const slowdown = 0.1; 
+
+                if (this.expanding) {
+                    this.scale += dt * 4.0; 
+                    if (this.scale >= this.maxScale) {
+                        this.scale = this.maxScale;
+                        this.expanding = false;
+                    }
+                } else if (!this.vanishing) {
+                    this.life -= dt;
+                    if (this.life <= 0) {
+                        this.vanishing = true;
+                        this.life = 0.4;
+                    }
+                } else {
+                    this.life -= dt;
+                    const progress = Math.max(0, this.life / 0.4);
+                    this.scale = progress * progress * this.maxScale;
+                    this.ravenMat.uniforms.opacity.value = 0.8 * progress;
+                    this.core.material.opacity = progress;
+                    
+                    if (this.life <= 0) {
+                        this.dispose();
+                        return false; 
+                    }
+                }
+
+                this.group.scale.set(this.scale, this.scale, this.scale);
+                this.internalTime += dt * slowdown;
+                this.ravenMat.uniforms.time.value = this.internalTime;
+
+                const isInside = camera.position.distanceTo(this.pos) < this.range * this.scale;
+                this.core.material.side = isInside ? THREE.BackSide : THREE.FrontSide;
+                this.core.material.depthTest = !isInside;
+
+                this.ravenHull.rotation.y -= 0.08 * dt * 60 * slowdown;
+                this.ravenHull.rotation.z += 0.03 * dt * 60 * slowdown;
+
+                this.wires.forEach((w) => {
+                    w.visible = !isInside; 
+                    w.rotation.copy(this.ravenHull.rotation);
+                });
+
+                return true;
+            }
+
+            dispose() {
+                scene.remove(this.group);
+                this.core.geometry.dispose();
+                this.core.material.dispose();
+                this.ravenHull.geometry.dispose();
+                this.ravenMat.dispose();
+                this.wires.forEach(w => { w.geometry.dispose(); w.material.dispose(); });
+            }
+        }
+
+        function getStasisMultiplier(pos) {
+            let multiplier = 1.0;
+            for (const sf of stasisFields) {
+                if (pos.distanceTo(sf.pos) < sf.range * sf.scale) {
+                    multiplier *= 0.1;
+                }
+            }
+            return multiplier;
+        }
+
         class Katana {
             constructor(owner) {
                 this.owner = owner;
@@ -5899,7 +6274,7 @@
 
             update(dt) { }
 
-            use() {
+            use(isClick = false) {
                 const now = performance.now();
                 if (now - lastAttackTime < CONFIG.attackCooldown) return;
                 lastAttackTime = now;
@@ -5936,15 +6311,25 @@
                 let hitType = "NORMAL";
                 let dmgMult = 1.0;
                 
+                // First slash scaling
+                if (isClick) {
+                    dmgMult *= 4.0;
+                }
+                
+                // Universal speed scaling for all slashes
+                const playerSpeed = player.velocity.length();
+                // Exponential but contained scale. Walk=~1.6x, Sprint=2.4x, Slide=3.8x, FastSlide=6.1x
+                dmgMult *= (1.0 + Math.pow(playerSpeed / 15.0, 1.5));
+                
                 if (rng < missChance) {
                     hitType = "MISS";
                     dmgMult = 0;
                 } else if (rng < missChance + grazeChance) {
                     hitType = "GRAZE";
-                    dmgMult = 0.5;
+                    dmgMult *= 0.5;
                 } else if (rng < missChance + grazeChance + baseCritChance + critBonus) {
                     hitType = "CRIT";
-                    dmgMult = 3.0;
+                    dmgMult *= 3.0;
                 }
                 
                 if (hitType === "MISS") {
@@ -5961,6 +6346,7 @@
                 }
 
                 const uniqueHitEnemies = new Set();
+                const uniqueHitProjectiles = new Set();
                 const camDir = new THREE.Vector3();
                 camera.getWorldDirection(camDir);
 
@@ -5969,21 +6355,30 @@
                 
                 const hitObjects = [];
                 enemies.forEach(e => { 
-                    if (!e.isDeadCorpse) e.mesh.traverse(c => hitObjects.push(c)); 
+                    e.mesh.traverse(c => hitObjects.push(c)); 
+                });
+                projectiles.forEach(pj => {
+                    if (pj.active) pj.mesh.traverse(c => hitObjects.push(c));
                 });
                 
                 const hitIntersects = globalRaycaster.intersectObjects(hitObjects);
                 hitIntersects.forEach(hit => {
                     let hitObj = hit.object;
-                    while(hitObj.parent && !enemies.some(e => e.mesh === hitObj)) {
+                    // Drill up to find parent enemy or projectile
+                    while(hitObj.parent && 
+                          !enemies.some(e => e.mesh === hitObj) && 
+                          !projectiles.some(p => p.mesh === hitObj)) {
                         hitObj = hitObj.parent;
                     }
+                    
                     const enemy = enemies.find(e => e.mesh === hitObj);
                     if(enemy) uniqueHitEnemies.add(enemy);
+                    
+                    const proj = projectiles.find(p => p.mesh === hitObj);
+                    if(proj) uniqueHitProjectiles.add(proj);
                 });
 
                 enemies.forEach(e => {
-                    if(e.isDeadCorpse) return;
                     const toEnemy = e.mesh.position.clone().sub(camera.position);
                     const dist = toEnemy.length();
                     if (dist < CONFIG.attackRange) {
@@ -5995,116 +6390,139 @@
                     }
                 });
 
-                if (uniqueHitEnemies.size > 0) {
+                projectiles.forEach(pj => {
+                    if (!pj.active) return;
+                    const toProj = pj.mesh.position.clone().sub(camera.position);
+                    const dist = toProj.length();
+                    if (dist < CONFIG.attackRange) {
+                        toProj.normalize();
+                        const angle = camDir.angleTo(toProj);
+                        if (angle < 0.5) { 
+                            uniqueHitProjectiles.add(pj);
+                        }
+                    }
+                });
+
+                if (uniqueHitEnemies.size > 0 || uniqueHitProjectiles.size > 0) {
                     if (goldenBuffActive) missedSlashesCount = 0;
-                    player.totalHits += uniqueHitEnemies.size; 
-
-                    const hitCount = uniqueHitEnemies.size;
-                    if (hitCount >= 10) GameStats.addAchievement("SLAUGHTERHOUSE", "#ff0000", "PERSISTENT");
-                    else if (hitCount >= 5) GameStats.addAchievement("CROWD CONTROL", "#ff8800", "PERSISTENT");
-                    else if (hitCount >= 3) GameStats.addAchievement("TRIPLE THREAT", "#ffff00", "FEED_ONLY"); 
-
+                    
+                    const validScoringEnemies = Array.from(uniqueHitEnemies).filter(e => e.state !== 'DEAD');
+                    const isScoringHit = validScoringEnemies.length > 0;
+                    
                     let hitScore = 10;
-                    let addedScore = 0;
-                    let comboNames = [];
-
-                    function updateStreak(type, baseBonus) {
-                        if (now - moveStreaks[type].lastTime < STREAK_WINDOW) {
-                            moveStreaks[type].count++;
-                        } else {
-                            moveStreaks[type].count = 0;
-                        }
-                        moveStreaks[type].lastTime = now;
-                        return baseBonus + moveStreaks[type].count;
-                    }
-
-                    if (recentSlide) {
-                        const bonus = updateStreak('slide', 25);
-                        addedScore += bonus;
-                        comboNames.push("SLIDE");
-                        GameStats.moves.slideHit++;
-                        GameStats.checkMoveMilestone('slideHit', "SLIDE", "#00ffff");
-                    }
-                    
-                    const isGroundTeleport = recentTeleport && !player.lastTeleportWasAerial;
-                    
-                    if (!player.onGround && !isGroundTeleport) {
-                         const airDuration = (now - player.airTimeStart) / 1000;
-                         if (airDuration > 0.8) {
-                            const extraTicks = Math.floor((airDuration - 0.8) / 0.2); 
-                            const longAirBonus = 50 + (extraTicks * 10);
-                            addedScore += longAirBonus;
-                            comboNames.push("LONG AERIAL");
-                            GameStats.moves.longAirHit++;
-                            GameStats.checkMoveMilestone('longAirHit', "SKY ASSASSIN", "#ff00aa");
-                         } else {
-                            const bonus = updateStreak('aerial', 25);
-                            addedScore += bonus;
-                            comboNames.push("AERIAL");
-                            GameStats.moves.midAirHit++;
-                            GameStats.checkMoveMilestone('midAirHit', "AERIAL", "#ff00aa");
-                         }
-                    }
-                    
-                    if (recentTeleport) {
-                         let base = 0;
-                         if (!player.hasPhaseStruck) {
-                             base = 50;
-                             player.hasPhaseStruck = true; 
-                         }
-                         const bonus = updateStreak('phase', base);
-                         addedScore += bonus;
-                         comboNames.push("TELEPORT");
-                         GameStats.moves.teleportHit++;
-                         GameStats.checkMoveMilestone('teleportHit', "VOID WALKER", "#aa00ff");
-                    }
-
-                    if (recentWallJump) {
-                        const bonus = updateStreak('wall', 30);
-                        addedScore += bonus;
-                        comboNames.push("WALL");
-                        GameStats.moves.wallJumpHit++;
-                        GameStats.checkMoveMilestone('wallJumpHit', "WALL RUNNER", "#00ffaa");
-                    }
-                    
-                    hitScore += addedScore;
-                    
-                    if (comboNames.length > 0) {
-                        let totalStreak = 0;
-                        for(let k in moveStreaks) {
-                            if(now - moveStreaks[k].lastTime < STREAK_WINDOW) totalStreak += moveStreaks[k].count;
-                        }
-                        
-                        let streakColor = "#" + new THREE.Color(currentSlashColor).getHexString();
-                        if (currentTheme === 0) streakColor = "#001133"; 
-                        if (currentTheme === 1) streakColor = "#00ffff"; 
-                        
-                        let msg = comboNames.join(" ") + " +" + addedScore;
-                        if(totalStreak > 0) {
-                             msg += ` <span class="slick-streak" style="color:${streakColor}">+${totalStreak}</span>`;
-                        }
-                        showKillMessage(msg, "combo");
-                    }
-                    
-                    if(hitType === "CRIT") {
-                         showKillMessage("CRITICAL HIT!", "critical");
-                         spawnParticles(camera.position.clone().add(new THREE.Vector3(0,0,-2)), 0xff0000, 15);
-                         AudioSys.playHit(h.enemy.mesh.position); 
-                    } else if(hitType === "GRAZE") {
-                         showKillMessage("GRAZE", "graze");
-                    }
-
-                    comboCount += uniqueHitEnemies.size;
-                    
                     let isAoEKnockback = false;
-                    const s = comboCount.toString();
-                    if (comboCount >= 100) {
-                        if (comboCount % 100 === 0) isAoEKnockback = true;
-                        else if (/^(\d)\1+$/.test(s) || "123456789".includes(s) || "987654321".includes(s)) isAoEKnockback = true;
-                    }
-                    
-                    if (isAoEKnockback) {
-                        showKillMessage("SHOCKWAVE!", "critical", "#00ffff");
+
+                    if (isScoringHit) {
+                        const hitCount = validScoringEnemies.length;
+                        player.totalHits += hitCount; 
+
+                        if (hitCount >= 10) GameStats.addAchievement("SLAUGHTERHOUSE", "#ff0000", "PERSISTENT");
+                        else if (hitCount >= 5) GameStats.addAchievement("CROWD CONTROL", "#ff8800", "PERSISTENT");
+                        else if (hitCount >= 3) GameStats.addAchievement("TRIPLE THREAT", "#ffff00", "FEED_ONLY"); 
+
+                        let addedScore = 0;
+                        let comboNames = [];
+
+                        function updateStreak(type, baseBonus) {
+                            if (now - moveStreaks[type].lastTime < STREAK_WINDOW) {
+                                moveStreaks[type].count++;
+                            } else {
+                                moveStreaks[type].count = 0;
+                            }
+                            moveStreaks[type].lastTime = now;
+                            return baseBonus + moveStreaks[type].count;
+                        }
+
+                        if (recentSlide) {
+                            const bonus = updateStreak('slide', 25);
+                            addedScore += bonus;
+                            comboNames.push("SLIDE");
+                            GameStats.moves.slideHit++;
+                            GameStats.checkMoveMilestone('slideHit', "SLIDE", "#00ffff");
+                        }
+                        
+                        const isGroundTeleport = recentTeleport && !player.lastTeleportWasAerial;
+                        
+                        if (!player.onGround && !isGroundTeleport) {
+                             const airDuration = (now - player.airTimeStart) / 1000;
+                             if (airDuration > 0.8) {
+                                const extraTicks = Math.floor((airDuration - 0.8) / 0.2); 
+                                const longAirBonus = 50 + (extraTicks * 10);
+                                addedScore += longAirBonus;
+                                comboNames.push("LONG AERIAL");
+                                GameStats.moves.longAirHit++;
+                                GameStats.checkMoveMilestone('longAirHit', "SKY ASSASSIN", "#ff00aa");
+                             } else {
+                                const bonus = updateStreak('aerial', 25);
+                                addedScore += bonus;
+                                comboNames.push("AERIAL");
+                                GameStats.moves.midAirHit++;
+                                GameStats.checkMoveMilestone('midAirHit', "AERIAL", "#ff00aa");
+                             }
+                        }
+                        
+                        if (recentTeleport) {
+                             let base = 0;
+                             if (!player.hasPhaseStruck) {
+                                 base = 50;
+                                 player.hasPhaseStruck = true; 
+                             }
+                             const bonus = updateStreak('phase', base);
+                             addedScore += bonus;
+                             comboNames.push("TELEPORT");
+                             GameStats.moves.teleportHit++;
+                             GameStats.checkMoveMilestone('teleportHit', "VOID WALKER", "#aa00ff");
+                        }
+
+                        if (recentWallJump) {
+                            const bonus = updateStreak('wall', 30);
+                            addedScore += bonus;
+                            comboNames.push("WALL");
+                            GameStats.moves.wallJumpHit++;
+                            GameStats.checkMoveMilestone('wallJumpHit', "WALL RUNNER", "#00ffaa");
+                        }
+                        
+                        hitScore += addedScore;
+                        
+                        if (comboNames.length > 0) {
+                            let totalStreak = 0;
+                            for(let k in moveStreaks) {
+                                if(now - moveStreaks[k].lastTime < STREAK_WINDOW) totalStreak += moveStreaks[k].count;
+                            }
+                            
+                            let streakColor = "#" + new THREE.Color(currentSlashColor).getHexString();
+                            if (currentTheme === 0) streakColor = "#001133"; 
+                            if (currentTheme === 1) streakColor = "#00ffff"; 
+                            
+                            let msg = comboNames.join(" ") + " +" + addedScore;
+                            if(totalStreak > 0) {
+                                 msg += ` <span class="slick-streak" style="color:${streakColor}">+${totalStreak}</span>`;
+                            }
+                            showKillMessage(msg, "combo");
+                        }
+                        
+                        if(hitType === "CRIT") {
+                             showKillMessage("CRITICAL HIT!", "critical");
+                             spawnParticles(camera.position.clone().add(new THREE.Vector3(0,0,-2)), 0xff0000, 15);
+                             AudioSys.playHit(validScoringEnemies[0].mesh.position); 
+                        } else if(hitType === "GRAZE") {
+                             showKillMessage("GRAZE", "graze");
+                        }
+
+                        comboCount += hitCount;
+                        
+                        const s = comboCount.toString();
+                        if (comboCount >= 100) {
+                            if (comboCount % 100 === 0) isAoEKnockback = true;
+                            else if (/^(\d)\1+$/.test(s) || "123456789".includes(s) || "987654321".includes(s)) isAoEKnockback = true;
+                        }
+                        
+                        if (isAoEKnockback) {
+                            showKillMessage("SHOCKWAVE!", "critical", "#00ffff");
+                        }
+
+                        comboTimer = 3.0; 
+                        updateComboUI();
                     }
 
                     const hitList = Array.from(uniqueHitEnemies).map(e => ({
@@ -6114,31 +6532,73 @@
                     hitList.sort((a, b) => a.dist - b.dist);
 
                     hitList.forEach((h, index) => {
-                        if (h.enemy.state === 'CONFUSED') {
+                        if (h.enemy.state === 'DEAD') {
+                            // Only physical interaction for corpses. No scoring or damage execution.
+                            const forceMult = 1.0 + playerSpeed / 60.0;
+                            const knockDir = h.enemy.mesh.position.clone().sub(camera.position).normalize();
+                            knockDir.y = 0.3;
+                            h.enemy.velocity.addScaledVector(knockDir, 10.0 * forceMult);
+                            return; // Stop applying hit variables to this target
+                        }
+
+                        if (h.enemy.state === 'FALLEN') {
                             GameStats.addAchievement("NO REST FOR THE WICKED", "#aa00ff", "PERSISTENT"); 
                         }
                         const distancePenalty = Math.max(0.1, 1.0 - (index * 0.1));
                         addScore(hitScore); 
                         
-                        const finalDamage = CONFIG.playerDamage * distancePenalty * dmgMult;
+                        const baseDamage = CONFIG.playerDamage * distancePenalty * dmgMult;
+                        let predictedDamage = baseDamage;
+                        if (goldenBuffActive && h.enemy.type.name !== 'GOLDEN') {
+                            predictedDamage = h.enemy.maxHealth * 2; 
+                        }
+                        if (h.enemy.state === 'CONFUSED' || h.enemy.state === 'FALLEN' || h.enemy.state === 'RECOVERING') {
+                            predictedDamage *= 2;
+                        }
+                        predictedDamage *= h.enemy.type.dmgRed;
+
+                        const isFatal = (h.enemy.health - predictedDamage) <= 0;
                         
+                        const knockDir = h.enemy.mesh.position.clone().sub(camera.position).normalize();
+                        
+                        // Universal speed scaling for forces
+                        const forceMult = 1.0 + playerSpeed / 60.0;
+
                         if (hitType === "CRIT" || isAoEKnockback) {
-                            const knockDir = h.enemy.mesh.position.clone().sub(camera.position).normalize();
                             knockDir.y = 0.5; 
                             
                             let force = 15;
                             if(isAoEKnockback) force = 30 * (1.0 - (h.dist / CONFIG.attackRange)); 
                             
-                            h.enemy.velocity.addScaledVector(knockDir, force);
+                            h.enemy.velocity.addScaledVector(knockDir, Math.max(force * forceMult, isFatal ? 15 : 0));
                             
                             if (h.enemy.state !== 'CONFUSED' && (Math.random() < 0.2 || isAoEKnockback)) {
-                                h.enemy.state = 'CONFUSED';
-                                h.enemy.confusedTimer = 2.0;
-                                h.enemy.mesh.rotation.x = -Math.PI/2; 
+                                h.enemy.triggerConfused(2.0);
                             }
+                        } else {
+                            knockDir.y = isFatal ? 0.3 : 0.0;
+                            const force = (isFatal ? 15 : 5.0) * forceMult; // Subtler nudge vs fatal blast
+                            h.enemy.velocity.addScaledVector(knockDir, force);
                         }
 
-                        h.enemy.takeHit(finalDamage, true);
+                        if (isFatal) {
+                            // Provide momentum push to corpse
+                            h.enemy.velocity.addScaledVector(player.velocity, 0.5);
+                            
+                            // Explosion impulse pushes player and all nearby physical entities outward
+                            const knockRadius = 8.0;
+                            const corePulseForce = 20.0;
+                            const blastPos = h.enemy.mesh.position.clone();
+                            
+                            // Re-use standard physics tools
+                            applyExplosionForce(blastPos, knockRadius, corePulseForce, 0, 'IMPULSE', null);
+                            
+                            // Spark visual and dampened impulse audio for small force
+                            AudioSys.playImpulse(blastPos, 0.4);
+                            spawnParticles(blastPos, 0xffaa00, 15, 2.0);
+                        }
+
+                        h.enemy.takeHit(baseDamage, true);
                         
                         const pColor = hitType === "CRIT" ? 0xff0000 : 0x00ffff;
                         
@@ -6150,10 +6610,25 @@
                             spawnRipple(h.enemy.mesh.position, toCam, pColor);
                         }
                     });
+
+                    // --- Projectile Parry Logic ---
+                    uniqueHitProjectiles.forEach(pj => {
+                        const forceMult = 1.0 + playerSpeed / 60.0;
+                        const knockDir = pj.mesh.position.clone().sub(camera.position).normalize();
+                        knockDir.y = 0.2; 
+                        
+                        pj.velocity.addScaledVector(knockDir, 8.0 * forceMult);
+                        pj.life -= 1.0; 
+                        
+                        const pCol = pj.mesh.material.color.getHex();
+                        spawnParticles(pj.mesh.position, pCol, 8, 0.6); 
+                        spawnImpact(pj.mesh.position, pCol, 0.8);
+                        
+                        // If parry makes it explode instantly
+                        if (pj.life <= 0) pj.explode();
+                    });
                     
                     AudioSys.playHit();
-                    comboTimer = 3.0; 
-                    updateComboUI();
 
                     if(slashMesh) {
                         slashMesh.material.color.setHex(hitType === "CRIT" ? 0xff0000 : 0xffffff); 
@@ -6304,16 +6779,28 @@
             document.getElementById('tp-mode-btn').addEventListener('click', toggleTeleportMode);
             
             // --- SETTINGS LOGIC ---
-            const modal = document.getElementById('settings-modal');
+            const settingsModal = document.getElementById('settings-modal');
+            const loadoutModal = document.getElementById('loadout-modal');
             
-            const toggleModal = () => {
-                const isHidden = modal.style.display === 'none' || modal.style.display === '';
-                modal.style.display = isHidden ? 'flex' : 'none';
+            const toggleSettings = () => {
+                loadoutModal.style.display = 'none';
+                const isHidden = settingsModal.style.display === 'none' || settingsModal.style.display === '';
+                settingsModal.style.display = isHidden ? 'flex' : 'none';
                 if(isHidden) AudioSys.playUI(true);
             };
 
-            document.getElementById('settings-btn').addEventListener('click', toggleModal);
-            document.getElementById('settings-close').addEventListener('click', toggleModal);
+            const toggleLoadout = () => {
+                settingsModal.style.display = 'none';
+                const isHidden = loadoutModal.style.display === 'none' || loadoutModal.style.display === '';
+                loadoutModal.style.display = isHidden ? 'flex' : 'none';
+                if(isHidden) AudioSys.playUI(true);
+            };
+
+            document.getElementById('settings-btn').addEventListener('click', toggleSettings);
+            document.getElementById('settings-close').addEventListener('click', toggleSettings);
+            
+            document.getElementById('loadout-btn').addEventListener('click', toggleLoadout);
+            document.getElementById('loadout-close').addEventListener('click', toggleLoadout);
             
             // --- ESC KEY HANDLER (State Managed) ---
             let escHandledInKeyDown = false; // Flag to prevent double-action
@@ -6321,8 +6808,9 @@
             // 1. KEYDOWN: Handle Menu Closing
             document.addEventListener('keydown', (e) => {
                 if (e.key === "Escape") {
-                    if (modal.style.display === 'flex') {
-                        modal.style.display = 'none';
+                    if (settingsModal.style.display === 'flex' || loadoutModal.style.display === 'flex') {
+                        settingsModal.style.display = 'none';
+                        loadoutModal.style.display = 'none';
                         escHandledInKeyDown = true; // Signal that we used this key press
                         e.stopPropagation(); 
                     } else {
@@ -7361,7 +7849,7 @@
             
             if (startY !== null) {
                 scanOriginY = startY + 2.0;
-                scanDistance = 10.0;
+                scanDistance = 500.0;
             }
 
             if (spatialGrid) {
@@ -7797,6 +8285,10 @@
         }
 
         class Enemy {
+            get isDeadCorpse() {
+                return this.state === 'DEAD';
+            }
+            
             constructor(posOverride = null, typeOverride = null, initialState = 'ROAM', aggroDelay = 0, ms = null) {
                 this.mesh = new THREE.Group();
                 this.id = Math.random();
@@ -7967,7 +8459,6 @@
                 this.isSprinting = false;
                 this.isSliding = false;
                 this.wasSliding = false;
-                this.isDeadCorpse = false;
                 this.corpseTimer = 0;
                 this.confusedTimer = 0;
                 this.streak = 0;
@@ -7985,6 +8476,10 @@
                 this.dodgeTimer = 0;
                 this.dodgeReactionTimer = 0;
                 this.ledgeTimer = 0;
+                this.angularVelocity = new THREE.Vector3();
+                this.recoveryQuat = new THREE.Quaternion();
+                this.recoveryEase = 0;
+                this.baseFallRotation = 0;
                 this.lastPos = new THREE.Vector2(this.mesh.position.x, this.mesh.position.z);
                 this.maxStamina = this.type.maxStamina || CONFIG.botStaminaMax;
                 this.stamina = this.maxStamina;
@@ -8063,12 +8558,12 @@
             }
 
             canSeePlayer(playerPos) {
-                if (this.isDeadCorpse || this.state === 'CONFUSED') return false;
+                if (this.isDeadCorpse || this.state === 'CONFUSED' || this.state === 'FALLEN' || this.state === 'RECOVERING') return false;
                 return this.canSeePlayerCached;
             }
 
             checkVision(playerPos) {
-                if (this.isDeadCorpse || this.state === 'CONFUSED') return false;
+                if (this.isDeadCorpse || this.state === 'CONFUSED' || this.state === 'FALLEN' || this.state === 'RECOVERING') return false;
                 
                 // Throttle vision checks
                 if (!this.lastVisionCheck || performance.now() - this.lastVisionCheck > 200) {
@@ -8461,12 +8956,18 @@
                 if (this.type.speedMod !== 0 && this.state !== 'SEARCH' && this.state !== 'CONFUSED') {
                     // Reuse _aiFwd as the 'move direction' accumulator
                     _aiFwd.subVectors(dest, this.mesh.position);
-                    _aiFwd.y = 0; _aiFwd.normalize();
+                    _aiFwd.y = 0; 
+                    const fwdLen = _aiFwd.lengthSq();
+                    if (fwdLen > 0.01) _aiFwd.normalize();
                     _aiDir.copy(_aiFwd); // Save clean destination dir
+
+                    let lookLen = fwdLen;
 
                     if (this.state === 'AGGRO' && !this.isRetreating) {
                         _aiDir.subVectors(playerPos, this.mesh.position);
-                        _aiDir.y = 0; _aiDir.normalize();
+                        _aiDir.y = 0; 
+                        lookLen = _aiDir.lengthSq();
+                        if (lookLen > 0.01) _aiDir.normalize();
                     }
 
                     if (this.state === 'AGGRO' && !this.isRetreating && this.canSeePlayer(playerPos)) {
@@ -8524,9 +9025,13 @@
                     this.currentMoveSpeed = speed;
 
                     let lookDir = _aiFwd;
-                    if (this.state === 'AGGRO' && !this.isRetreating) lookDir = _aiDir;
+                    let currentLookLen = fwdLen;
+                    if (this.state === 'AGGRO' && !this.isRetreating) {
+                        lookDir = _aiDir;
+                        currentLookLen = lookLen;
+                    }
                     
-                    if (lookDir.lengthSq() > 0.1) {
+                    if (currentLookLen > 0.01) {
                         this.targetRotation = Math.atan2(lookDir.x, lookDir.z);
                     }
 
@@ -8545,7 +9050,7 @@
                     this.lastPos.set(this.mesh.position.x, this.mesh.position.z);
                 }
 
-                if (this.isSliding && this.state !== 'CONFUSED' && !this.isDeadCorpse) {
+                if (this.isSliding && !['CONFUSED', 'FALLEN', 'RECOVERING', 'DEAD'].includes(this.state)) {
                     const yOffTrail = -(this.type.scale - 0.35);
                     const yOffKick = -(this.type.scale - 0.15);
                     if (Math.random() < 0.3 * intervalMultiplier) spawnSnowTrail(this.mesh.position, this.velocity, yOffTrail);
@@ -8564,131 +9069,482 @@
                 }
             }
 
+            triggerConfused(duration = 2.0) {
+                if (this.isDeadCorpse) return;
+                
+                if (!['CONFUSED', 'FALLEN', 'RECOVERING'].includes(this.state)) {
+                    // Initialize rigid body physics
+                    _vec3_1.copy(this.velocity);
+                    _vec3_1.y = 0;
+                    let speed = _vec3_1.length();
+                    // If moving very slow, artificially bump forward so the ragdoll actually trips over
+                    if (speed < 0.5) {
+                        _vec3_1.set(Math.sin(this.mesh.rotation.y), 0, Math.cos(this.mesh.rotation.y));
+                        speed = 4.0;
+                        this.velocity.addScaledVector(_vec3_1, 2.0); // Physical linear pop
+                    }
+                    _vec3_1.normalize();
+                    
+                    // Initial spin axis (orthogonal to momentum)
+                    this.angularVelocity.copy(_UP).cross(_vec3_1).normalize().multiplyScalar(speed * 0.5 + 4.0); // Stronger fall trip
+                    this.baseFallRotation = this.mesh.rotation.y;
+                    this.recoveryEase = 0;
+                } else if (this.state === 'FALLEN' || this.state === 'RECOVERING') {
+                    // Knocked back into tumble from rest
+                    this.angularVelocity.x += (Math.random() - 0.5) * 5.0;
+                    this.angularVelocity.z += (Math.random() - 0.5) * 5.0;
+                    this.velocity.y += 2.0;
+                }
+
+                this.state = 'CONFUSED';
+                this.confusedTimer = Math.max(this.confusedTimer || 0, duration);
+                this.fallImpact = Math.min(5.0, Math.max(1.0, duration));
+            }
+
+            updateUI() {
+                if (this.isDeadCorpse || !this.hasAggroed) {
+                    this.healthBarGroup.visible = false;
+                    return;
+                }
+                
+                let maxY = -Infinity;
+                const bs = this.type.scale; // box radius scale
+                
+                for (let i = 0; i < 8; i++) {
+                    _vec3_1.copy(_boxVertices[i]).multiplyScalar(bs).applyQuaternion(this.mesh.quaternion).add(this.mesh.position);
+                    if (_vec3_1.y > maxY) maxY = _vec3_1.y;
+                }
+                
+                const dynamicOffset = 0.2 + (this.type.scale * 0.1);
+                this.healthBarGroup.position.set(this.mesh.position.x, maxY + dynamicOffset, this.mesh.position.z);
+                
+                // Keep parallel to ground/camera instead of wild flipping on top/bottom
+                this.healthBarGroup.quaternion.copy(camera.quaternion);
+
+                this.healthBarGroup.visible = true;
+                this.healthBar.scale.x = Math.max(0, this.health / this.maxHealth);
+            }
+
             updatePhysics(dt, distSq) {
                 // Visuals
                 if (this.state === 'AGGRO') this.eyeMat.color.setHex(0xff0000);
                 else if (this.state === 'SEARCH') this.eyeMat.color.setHex(0xffaa00);
                 else this.eyeMat.color.setHex(this.type.eye);
 
-                // Dead State
-                if (this.isDeadCorpse) {
+                // Dead State (Ragdoll Fade Out)
+                if (this.state === 'DEAD') {
                     this.corpseTimer -= dt;
-                    this.mesh.rotation.x = Math.PI / 2;
-                    this.mesh.position.y = this.lastGroundHeight + 0.5;
-                    this.body.material.opacity = this.corpseTimer / 3.0;
+                    this.body.material.opacity = Math.max(0, this.corpseTimer / 3.0);
                     this.body.material.transparent = true;
-                    this.eyeMat.opacity = this.corpseTimer / 3.0;
+                    this.eyeMat.opacity = Math.max(0, this.corpseTimer / 3.0);
                     this.eyeMat.transparent = true;
                     if (this.corpseTimer <= 0) {
                         this.remove();
+                        return;
                     }
-                    return;
                 }
 
-                // Confused State
-                if (this.state === 'CONFUSED') {
-                    this.confusedTimer -= dt;
-                    this.mesh.rotation.x = -Math.PI / 2;
-                    this.mesh.position.y = this.lastGroundHeight + 0.5;
-                    if (this.confusedTimer <= 0) {
+                // Confused/Fallen/Dead State (True Rigid Body Ragdoll Physics)
+                if (this.state === 'CONFUSED' || this.state === 'FALLEN' || this.state === 'DEAD') {
+                    if (this.state !== 'DEAD') this.confusedTimer -= dt;
+                    
+                    let isNaturallyStill = false;
+                    if (this.state === 'FALLEN' || this.state === 'DEAD') {
+                        // Check if it has organically bled off its energy down to a visually negligible level
+                        if (this.velocity.lengthSq() < 0.1 && this.angularVelocity.lengthSq() < 0.1) {
+                            // Ensure it is truly resting on a surface
+                            let testLowestY = Infinity;
+                            for (let i = 0; i < 8; i++) {
+                                _vec3_1.copy(_boxVertices[i]).multiplyScalar(this.type.scale).applyQuaternion(this.mesh.quaternion);
+                                if (_vec3_1.y < testLowestY) testLowestY = _vec3_1.y;
+                            }
+                            const worldLowest = this.mesh.position.y + testLowestY;
+                            if (Math.abs(worldLowest - this.lastGroundHeight) < 0.15) {
+                                isNaturallyStill = true;
+                            }
+                        }
+                    }
+
+                    if (isNaturallyStill) {
+                        // The body has naturally settled entirely.
+                        // Wipe the final macroscopic micro-energy and bypass gravity to prevent eternal floor stuttering.
+                        this.velocity.set(0, 0, 0);
+                        this.angularVelocity.set(0, 0, 0);
+                    } else {
+                        // 1. Free-fall Gravity
+                        this.velocity.y -= CONFIG.gravity * dt;
+                    }
+                    
+                    this.mesh.position.addScaledVector(this.velocity, dt);
+                    
+                    // 2. Spatial Rotation
+                    const av = this.angularVelocity.length();
+                    if (av > 0.0001) {
+                        _quat.setFromAxisAngle(this.angularVelocity.clone().normalize(), av * dt);
+                        this.mesh.quaternion.premultiply(_quat); // Rotate in world space
+                    }
+                    
+                    // 3. True Collision against Floor
+                    const groundY = this.lastGroundHeight;
+                    let lowestY = Infinity;
+                    let contactLocal = null;
+                    const scale = this.type.scale;
+
+                    // Find deepest penetrating vertex
+                    for (let i = 0; i < 8; i++) {
+                        _vec3_1.copy(_boxVertices[i]).multiplyScalar(scale);
+                        _vec3_2.copy(_vec3_1).applyQuaternion(this.mesh.quaternion).add(this.mesh.position);
+                        if (_vec3_2.y < lowestY) {
+                            lowestY = _vec3_2.y;
+                            contactLocal = _boxVertices[i];
+                        }
+                    }
+
+                    if (lowestY < groundY) {
+                        // Anti-clip constraint correction
+                        this.mesh.position.y += (groundY - lowestY);
+
+                        // r = vector from CoM to contact point
+                        _vec3_1.copy(contactLocal).multiplyScalar(scale).applyQuaternion(this.mesh.quaternion);
+                        
+                        // v_contact = velocity + (angularVelocity X r)
+                        _vec3_2.copy(this.angularVelocity).cross(_vec3_1).add(this.velocity);
+
+                        if (_vec3_2.y < 0) {
+                            // Original Impulse Response Math
+                            const isSoftImpact = _vec3_2.y > -2.0;
+                            const restitution = isSoftImpact ? 0.0 : 0.45; // Elastic Bounciness
+                            const inertiaInv = 1.0 / (0.4 * scale * scale); 
+
+                            // denom = 1/m + ( (r X UP)^2 ) / I
+                            _vec3_3.copy(_vec3_1).cross(_UP);
+                            const denom = 1.0 + _vec3_3.lengthSq() * inertiaInv;
+                            let j = -(1.0 + restitution) * _vec3_2.y / denom;
+
+                            this.velocity.y += j; // mass = 1
+                            
+                            // angular velocity impact
+                            _vec3_3.copy(_vec3_1).cross(_UP).multiplyScalar(j * inertiaInv);
+                            this.angularVelocity.add(_vec3_3);
+
+                            // Ground friction / drag
+                            const friction = isSoftImpact ? 0.4 : 0.8;
+                            this.velocity.x *= friction;
+                            this.velocity.z *= friction;
+                            
+                            // Natural angular drag. Constant 0.85 allows smooth tipping.
+                            // The old `0.4` friction aggressively killed spin on soft touches, trapping them upright!
+                            this.angularVelocity.multiplyScalar(0.85); 
+                        }
+                    }
+                    
+                    // Global air drag
+                    this.velocity.multiplyScalar(Math.exp(-0.5 * dt));
+
+                    // Status transitions check based on structural rest
+                    const speedSq = this.velocity.lengthSq();
+                    const angSq = av * av;
+                    const isResting = speedSq < 1.0 && angSq < 1.0 && Math.abs(lowestY - groundY) < 0.2;
+
+                    if (this.state === 'CONFUSED') {
+                        if (isResting) {
+                            // Resting on the ground - check orientation
+                            _vec3_1.set(0, 1, 0).applyQuaternion(this.mesh.quaternion);
+                            const dotY = Math.abs(_vec3_1.dot(_UP));
+                            
+                            if (dotY < 0.5) { // Lying more horizontally than vertically
+                                this.state = 'FALLEN';
+                                this.confusedTimer = this.fallImpact || 2.0; // Last anywhere from 1 to 5s based on original collision
+                            } else if (this.confusedTimer <= 0) { // Timeout and somewhat upright
+                                this.state = 'RECOVERING';
+                                this.recoveryEase = 0;
+                                this.recoveryQuat.copy(this.mesh.quaternion);
+                            }
+                        } else if (this.confusedTimer <= 0) { // Force stand if timer out and not resting yet
+                            this.state = 'RECOVERING';
+                            this.recoveryEase = 0;
+                            this.recoveryQuat.copy(this.mesh.quaternion);
+                        }
+                    } else if (this.state === 'FALLEN') {
+                        if (!isResting && speedSq > 5.0) {
+                            // Massive kinetic collision knocked body out of rest (punts/explosions)
+                            this.state = 'CONFUSED'; 
+                        } else if (this.confusedTimer <= 0) {
+                            this.state = 'RECOVERING';
+                            this.recoveryEase = 0;
+                            this.recoveryQuat.copy(this.mesh.quaternion);
+                        }
+                    }
+                    
+                } else if (this.state === 'RECOVERING') {
+                    // Authentic springing-up motion
+                    this.recoveryEase += dt * 2.0; // Half second to get up
+                    const ease = Math.min(1.0, this.recoveryEase);
+                    
+                    // Simple spring easing (smooth, slightly fast exit)
+                    const t = ease < 0.5 ? 2 * ease * ease : -1 + (4 - 2 * ease) * ease;
+                    
+                    _quat.setFromAxisAngle(_UP, this.baseFallRotation);
+                    this.mesh.quaternion.copy(this.recoveryQuat).slerp(_quat, t);
+                    
+                    // Pin to floor dynamically while rising
+                    let lowestY = Infinity;
+                    const scale = this.type.scale;
+                    for (let i = 0; i < 8; i++) {
+                        _vec3_1.copy(_boxVertices[i]).multiplyScalar(scale).applyQuaternion(this.mesh.quaternion);
+                        if (_vec3_1.y < lowestY) lowestY = _vec3_1.y;
+                    }
+                    this.mesh.position.y = this.lastGroundHeight - lowestY;
+                    
+                    if (ease >= 1.0) {
                         this.state = this.hasAggroed ? 'AGGRO' : 'ROAM';
-                        this.mesh.rotation.x = 0;
+                        this.mesh.quaternion.setFromAxisAngle(_UP, this.baseFallRotation);
+                        this.mesh.rotation.set(0, this.baseFallRotation, 0);
+                        this.targetRotation = this.baseFallRotation;
                     }
-                    this.healthBarGroup.position.copy(this.mesh.position);
-                    this.healthBarGroup.position.y += 1.0 * this.type.scale;
-                    return;
-                }
 
-                // Gravity & Ground Physics
-                const groundY = this.lastGroundHeight;
-                const floorThreshold = groundY + (1 * this.type.scale);
-
-                if (this.mesh.position.y > floorThreshold + 0.1 || this.velocity.y > 0) {
-                    this.velocity.y -= CONFIG.gravity * dt;
-
-                    // Fall Recovery Jump (Double Jump logic)
-                    let jumpChance = 0.05;
-                    if (this.isRetreating && (this.health / this.maxHealth) < 0.3) jumpChance = 0.3;
-                    if (this.velocity.y < -8 && this.jumps < 2 && Math.random() < jumpChance * dt * 60) {
-                        this.performJump(0.9); // Air recovery (approx 18 force)
-                    }
                 } else {
-                    // Fall Damage / Confused Check
-                    if (this.velocity.y < -22) {
-                        let shouldFall = true;
-                        if (this.state === 'AGGRO') {
-                            if (Math.random() < 0.9) shouldFall = false;
+                    // Gravity & Ground Physics (Normal States)
+                    const groundY = this.lastGroundHeight;
+                    const floorThreshold = groundY + 1.0 * this.type.scale;
+
+                    if (this.mesh.position.y > floorThreshold + 0.1 || this.velocity.y > 0) {
+                        this.velocity.y -= CONFIG.gravity * dt;
+                        let jumpChance = 0.05;
+                        if (this.isRetreating && (this.health / this.maxHealth) < 0.3) jumpChance = 0.3;
+                        if (this.velocity.y < -8 && this.jumps < 2 && Math.random() < jumpChance * dt * 60) {
+                            this.performJump(0.9);
                         }
-                        if (shouldFall) {
-                            this.state = 'CONFUSED';
-                            const impactSpeed = Math.abs(this.velocity.y);
-                            this.confusedTimer = 3.0 + Math.min(2.0, (impactSpeed - 22) / 5.0);
-                            this.velocity.y = 0;
-                            return;
+                    } else {
+                        if (this.velocity.y < -12) {
+                            let shouldFall = true;
+                            if (this.state === 'AGGRO' && Math.random() < 0.6) shouldFall = false;
+                            if (shouldFall) {
+                                const impactSpeed = Math.abs(this.velocity.y);
+                                const forceMagnitude = impactSpeed * this.type.scale; // Impact force 
+                                const stunTime = Math.max(1.0, Math.min(5.0, 1.0 + (forceMagnitude - 12) * 0.2));
+                                this.triggerConfused(stunTime);
+                                this.velocity.y = 0;
+                            }
                         }
+                        this.velocity.y = 0;
+                        this.mesh.position.y = floorThreshold;
+                        this.jumps = 0;
                     }
-                    this.velocity.y = 0;
-                    this.mesh.position.y = floorThreshold;
-                    this.jumps = 0;
-                }
 
-                // Rotation Smoothing
-                if (this.state === 'SEARCH') {
-                    const lookTime = performance.now() * 0.002;
-                    this.mesh.rotation.y = Math.sin(lookTime) * Math.PI;
-                } else {
-                    let rotDiff = this.targetRotation - this.mesh.rotation.y;
-                    while (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
-                    while (rotDiff < -Math.PI) rotDiff += Math.PI * 2;
-                    this.mesh.rotation.y += rotDiff * dt * 8;
-                }
+                    // Rotation Smoothing & Swift Dynamic Lean
+                    if (this.state === 'SEARCH') {
+                        const lookTime = performance.now() * 0.002;
+                        this.mesh.rotation.y = Math.sin(lookTime) * Math.PI;
+                        this.mesh.rotation.z += (0 - this.mesh.rotation.z) * dt * 10;
+                        this.mesh.rotation.x += (0 - this.mesh.rotation.x) * dt * 10;
+                    } else {
+                        let rotDiff = this.targetRotation - this.mesh.rotation.y;
+                        while (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
+                        while (rotDiff < -Math.PI) rotDiff += Math.PI * 2;
+                        
+                        // Artificial delay/cap for smooth turning
+                        const maxTurnSpeed = 4.0 * dt;
+                        if (rotDiff > maxTurnSpeed) rotDiff = maxTurnSpeed;
+                        if (rotDiff < -maxTurnSpeed) rotDiff = -maxTurnSpeed;
+                        
+                        this.mesh.rotation.y += rotDiff;
 
-                if (this.isSliding) this.mesh.rotation.x = 0.5;
-                else if (this.state !== 'CONFUSED') this.mesh.rotation.x = 0;
+                        // Physical Direction-Change Leaning (Feature)
+                        // Bots dynamically bank their body into turns like a motorcycle
+                        // Scales up with speed and how sharp the turn is
+                        const speedRatio = Math.min(1.0, this.currentMoveSpeed / 20.0);
+                        const targetRoll = Math.max(-0.6, Math.min(0.6, -rotDiff * speedRatio * 1.5));
+                        this.mesh.rotation.z += (targetRoll - this.mesh.rotation.z) * dt * 10;
 
-                // Move Execution
-                if (this.currentMoveSpeed > 0) {
-                    this.mesh.position.addScaledVector(this.currentMoveDir, this.currentMoveSpeed * dt);
-                }
-                this.mesh.position.addScaledVector(this.velocity, dt);
-
-                // Drag
-                const drag = Math.exp(-2.0 * dt);
-                this.velocity.x *= drag;
-                this.velocity.z *= drag;
-
-                // UI Updates
-                this.healthBarGroup.position.copy(this.mesh.position);
-                this.healthBarGroup.position.y += 1.3 * this.type.scale;
-                this.healthBarGroup.lookAt(camera.position);
-                if (this.hasAggroed) {
-                    this.healthBarGroup.visible = true;
-                    this.healthBar.scale.x = Math.max(0, this.health / this.maxHealth);
-                }
-                
-                if (this.mesh.position.y < -50 && !this.isDeadCorpse) {
-                    // Bot Recycling
-                    let rx, rz;
-                    const spawnRange = MapManager.current ? MapManager.current.config.size * 0.4 : 175;
-                    let found = false;
-                    for(let i=0; i<10; i++) {
-                        rx = (Math.random() - 0.5) * (spawnRange * 2);
-                        rz = (Math.random() - 0.5) * (spawnRange * 2);
-                        const ry = getRandomSpawnY(rx, rz);
-                        if (ry > -999) {
-                            this.mesh.position.set(rx, ry + this.type.scale, rz);
-                            this.velocity.set(0, 0, 0);
-                            found = true;
-                            break;
-                        }
+                        // Smooth pitch transition for sliding or sprinting
+                        const targetPitch = this.isSliding ? 0.5 : (this.currentMoveSpeed > 0 ? 0.1 : 0.0);
+                        this.mesh.rotation.x += (targetPitch - this.mesh.rotation.x) * dt * 10;
                     }
-                    if (!found) {
-                        this.takeHit(this.maxHealth * 10);
+
+                    // Move Execution
+                    if (this.currentMoveSpeed > 0) {
+                        this.mesh.position.addScaledVector(this.currentMoveDir, this.currentMoveSpeed * dt);
+                    }
+                    this.mesh.position.addScaledVector(this.velocity, dt);
+
+                    // Drag
+                    const drag = Math.exp(-2.0 * dt);
+                    this.velocity.x *= drag;
+                    this.velocity.z *= drag;
+                    
+                    if (this.mesh.position.y < -50 && !this.isDeadCorpse) {
+                        // Bot Recycling
+                        let rx, rz;
+                        const spawnRange = MapManager.current ? MapManager.current.config.size * 0.4 : 175;
+                        let found = false;
+                        for(let i=0; i<10; i++) {
+                            rx = (Math.random() - 0.5) * (spawnRange * 2);
+                            rz = (Math.random() - 0.5) * (spawnRange * 2);
+                            const ry = getRandomSpawnY(rx, rz);
+                            if (ry > -999) {
+                                this.mesh.position.set(rx, ry + this.type.scale, rz);
+                                this.velocity.set(0, 0, 0);
+                                found = true;
+                                break;
+                            }
+                        }
+                        if (!found) {
+                            this.takeHit(this.maxHealth * 10);
+                        } else {
+                            spawnParticles(this.mesh.position, 0x00ffff, 30, 2.0);
+                        }
                     }
                 }
 
                 // Collision Bounds & Resolution
                 const isNear = distSq < 2500;
+                
+                // --- KINETIC ENTITY COLLISIONS (Push/Kick Logic) ---
+                // Removed DeadCorpse exclusion so bodies can be kicked around
+                // 1. Velocity Transfer Magic (Perfect Swept Collision + 1D Exact Momentum Exchange)
+                const dy = camera.position.y - this.mesh.position.y;
+                    
+                    // Slightly expand vertical bounds for fallen bots to ensure kicks connect
+                    const verticalPadding = this.state === 'FALLEN' ? -1.0 : -0.5;
+                    
+                    if (dy > verticalPadding && dy < 2.5 * this.type.scale) {
+                        const combinedRad = 0.6 + (this.type.scale * 0.7);
+
+                        // Calculate Player's swept movement segment dynamically
+                        const px = camera.position.x;
+                        const pz = camera.position.z;
+                        const vx = player.velocity.x * dt;
+                        const vz = player.velocity.z * dt;
+                        
+                        // Treat player position in this block as their START position
+                        const oldPx = px - vx; 
+                        const oldPz = pz - vz;
+                        
+                        const bx = this.mesh.position.x;
+                        const bz = this.mesh.position.z;
+                        
+                        // Vector from bot back to old player pos
+                        const dx = oldPx - bx; 
+                        const dz = oldPz - bz;
+                        
+                        const moveSq = vx*vx + vz*vz;
+                        
+                        let isHit = false;
+                        let overlap = 0;
+                        let nX = 0, nZ = 0; // Normal ALWAYS points from Bot TO Player
+
+                        let t = 0;
+                        if (moveSq > 0.0001) {
+                            t = -(dx * vx + dz * vz) / moveSq;
+                            t = Math.max(0, Math.min(1.0, t));
+                        }
+
+                        const closeX = oldPx + vx * t;
+                        const closeZ = oldPz + vz * t;
+                        const cx = closeX - bx;
+                        const cz = closeZ - bz;
+                        const minSq = cx*cx + cz*cz;
+
+                        if (minSq < combinedRad * combinedRad) {
+                            isHit = true;
+                            const minDist = Math.sqrt(minSq) || 0.001;
+                            nX = cx / minDist;
+                            nZ = cz / minDist;
+                            
+                            // Project the actual END position on this infinite tangent plane
+                            const endProj = (px - bx) * nX + (pz - bz) * nZ;
+                            overlap = combinedRad - endProj;
+                            
+                            // Failsafe clamp to ensure we strictly push out, not pull in,
+                            // eliminating the "tunneling through" issue completely
+                            if (overlap < 0.05) overlap = 0.05;
+                        }
+
+                        if (isHit) {
+                            // A: Mass-balanced True Positional Separation (No arbitrary plowing)
+                            const bMass = this.type.scale * (['CONFUSED', 'FALLEN', 'RECOVERING'].includes(this.state) ? 1.5 : 1.0);
+                            const pMass = 1.2; // Player base mass
+                            const totalMass = pMass + bMass;
+                            
+                            const bDisp = pMass / totalMass;
+                            const pDisp = bMass / totalMass;
+
+                            this.mesh.position.x -= nX * overlap * bDisp; // Mesh moves AWAY from player
+                            this.mesh.position.z -= nZ * overlap * bDisp;
+                            camera.position.x += nX * overlap * pDisp;    // Camera moves AWAY from bot
+
+                            // B: Perfect Kinetic Velocity Exchange 
+                            // Classic 1D elastic collision on the normal vector
+                            const playerSpeedSq = player.velocity.x*player.velocity.x + player.velocity.z*player.velocity.z;
+                            if (playerSpeedSq > 0.1) {
+                                const relVx = player.velocity.x - this.velocity.x;
+                                const relVz = player.velocity.z - this.velocity.z;
+
+                                // Impact speed projected ALONG the normal. 
+                                // (Normal points TO player. Player moving INTO bot is negative projection)
+                                const impactSpeed = -(relVx * nX + relVz * nZ);
+
+                                if (impactSpeed > 0) { 
+                                    const restitution = 0.25; // 0 = mud, 1 = bouncy balls
+                                    const impulse = (1 + restitution) * impactSpeed / (1.0/pMass + 1.0/bMass);
+                                    
+                                    // Apply impulses 
+                                    player.velocity.x += nX * (impulse / pMass);
+                                    player.velocity.z += nZ * (impulse / pMass);
+                                    
+                                    this.velocity.x -= nX * (impulse / bMass);
+                                    this.velocity.z -= nZ * (impulse / bMass);
+
+                                    // Dynamic Tumbling thresholds calibrated directly to physical force
+                                    if (impulse > 12.0) { 
+                                        if (['ROAM', 'SEARCH', 'AGGRO'].includes(this.state)) {
+                                            // Knock upright bot completely down
+                                            const stunScale = Math.min(5.0, (impulse - 10.0) * 0.2);
+                                            this.triggerConfused(2.0 + stunScale);
+                                        } else { 
+                                            // Already Ragdolled - Violently tumble relative to the hit!
+                                            // Normal vector points FROM bot TO player. 
+                                            // So hit from behind means normal is negative (-Z). We want positive torque.
+                                            this.velocity.y += Math.min(8.0, impulse * 0.2);
+                                            this.angularVelocity.x -= nZ * impulse * 0.4; 
+                                            this.angularVelocity.z += nX * impulse * 0.4;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 2. Mutual Bot Bumping (Proactive Resolve)
+                    if (isNear) {
+                        for (let other of enemies) {
+                            if (other === this) continue;
+                            const dSq = this.mesh.position.distanceToSquared(other.mesh.position);
+                            const minD = (this.type.scale + other.type.scale) * 0.7;
+                            if (dSq < minD * minD) {
+                                const dist = Math.sqrt(dSq);
+                                if (dist > 0.001) {
+                                    _aiDir.subVectors(this.mesh.position, other.mesh.position).normalize();
+                                    const overlap = minD - dist;
+                                    
+                                    // Resolve displacement
+                                    this.mesh.position.addScaledVector(_aiDir, overlap * 0.5);
+                                    other.mesh.position.addScaledVector(_aiDir, -overlap * 0.5);
+
+                                    // Momentum transfer if one is moving fast
+                                    const relVel = _vec3_1.subVectors(this.velocity, other.velocity);
+                                    const dot = relVel.dot(_aiDir);
+                                    if (dot < 0) {
+                                        const force = -dot * 0.4;
+                                        this.velocity.addScaledVector(_aiDir, force);
+                                        other.velocity.addScaledVector(_aiDir, -force);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                 if (isNear) {
                     _box3_1.setFromObject(this.body);
                 } else {
@@ -8717,13 +9573,17 @@
                             if (xOverlap < zOverlap) {
                                 const sign = (this.mesh.position.x < wallX) ? -1 : 1;
                                 this.mesh.position.x += xOverlap * sign;
+                                if (this.state === 'CONFUSED' || this.state === 'FALLEN') this.velocity.x *= -0.5;
                             } else {
                                 const sign = (this.mesh.position.z < wallZ) ? -1 : 1;
                                 this.mesh.position.z += zOverlap * sign;
+                                if (this.state === 'CONFUSED' || this.state === 'FALLEN') this.velocity.z *= -0.5;
                             }
                         }
                     }
                 }
+
+                this.updateUI();
             }
 
             onGroundSafe(groundY) {
@@ -8731,21 +9591,20 @@
             }
 
             takeHit(amt, isSlash = false) {
+                if (this.state === 'DEAD') return;
+
                 if (goldenBuffActive && this.type.name !== 'GOLDEN' && isSlash) {
                     amt = this.maxHealth * 2;
                 }
                 
-                if (this.isDeadCorpse || this.state === 'CONFUSED') {
-                    if (this.state === 'CONFUSED') {
-                        amt *= 2;
-                        if (this.health < this.maxHealth * 0.3) {
-                            this.state = 'AGGRO';
-                            this.confusedTimer = 0;
-                            this.mesh.rotation.x = 0;
-                            this.isRetreating = true;
-                            this.performJump(0.75); // Stun recovery jump (approx 15 force)
-                            this.jumps = 1;
-                        }
+                if (this.state === 'CONFUSED' || this.state === 'FALLEN' || this.state === 'RECOVERING') {
+                    amt *= 2;
+                    if (this.health < this.maxHealth * 0.3) {
+                        this.state = 'AGGRO';
+                        this.confusedTimer = 0;
+                        this.isRetreating = true;
+                        this.performJump(0.75); // Stun recovery jump (approx 15 force)
+                        this.jumps = 1;
                     }
                 }
                 amt *= this.type.dmgRed;
@@ -8754,7 +9613,7 @@
                 this.body.material.color.setHex(0xffffff);
                 this.body.material.emissiveIntensity = 1.0;
                 setTimeout(() => {
-                    if (!this.isDeadCorpse && this.state !== 'CONFUSED') {
+                    if (this.state !== 'DEAD' && this.state !== 'CONFUSED' && this.state !== 'FALLEN' && this.state !== 'RECOVERING') {
                         if (this.type.name === 'GOLDEN') {
                             this.body.material.color.setHex(this.type.color);
                             this.body.material.emissiveIntensity = this.type.emissiveIntensity || 0;
@@ -8769,10 +9628,12 @@
                         }
                     }
                 }, 100);
-                if (this.state !== 'AGGRO' && this.state !== 'CONFUSED') {
-                    this.state = 'AGGRO';
-                    this.reactionTimer = CONFIG.botAggroDelay;
+                if (this.state !== 'AGGRO') {
                     this.hasAggroed = true;
+                    if (this.state !== 'CONFUSED' && this.state !== 'FALLEN' && this.state !== 'RECOVERING') {
+                        this.state = 'AGGRO';
+                        this.reactionTimer = CONFIG.botAggroDelay;
+                    }
                 }
                 if (this.health <= 0) {
                     if (this.type.name === 'GOLDEN') {
@@ -8807,7 +9668,7 @@
                         }
                     }
                     if (!shouldSplit) {
-                        this.isDeadCorpse = true;
+                        this.state = 'DEAD';
                         this.corpseTimer = 3.0;
                         this.healthBarGroup.visible = false;
                         this.outline.visible = false;
@@ -8833,6 +9694,70 @@
                 }
                 const idx = enemies.indexOf(this);
                 if (idx > -1) enemies.splice(idx, 1);
+            }
+        }
+        
+        function applyExplosionForce(pos, range, force, damage = 0, type = 'IMPULSE', sourceEntity = null) {
+            for (let e of enemies) {
+                const dist = e.mesh.position.distanceTo(pos);
+                
+                if (dist < range) {
+                    const falloff = 1 - (dist / range);
+                    if (damage > 0) e.takeHit(damage * falloff);
+                    const dir = e.mesh.position.clone().sub(pos).normalize();
+                    
+                    if(type === 'VOID') {
+                        const pullStrength = (dist / range); 
+                        e.velocity.addScaledVector(dir, force * pullStrength); 
+                    } else if(type === 'STASIS') {
+                        const pushStrength = 1 - (dist / range);
+                        e.velocity.addScaledVector(dir, force * pushStrength);
+                    } else {
+                         dir.y = 0.3; dir.normalize(); 
+                         e.velocity.addScaledVector(dir, force * falloff);
+                    }
+                }
+            }
+
+            // Apply forces to other active projectiles
+            for (let pj of projectiles) {
+                if (!pj.active || pj === sourceEntity || pj.stuckTo) continue;
+                const pjPos = pj.mesh.position;
+                const dist = pjPos.distanceTo(pos);
+                
+                if (dist < range) {
+                    const dir = pjPos.clone().sub(pos).normalize();
+                    if (type === 'VOID') {
+                        const pullStrength = (dist / range);
+                        pj.velocity.addScaledVector(dir, force * pullStrength);
+                    } else if (type === 'STASIS') {
+                        const pushStrength = 1 - (dist / range);
+                        pj.velocity.addScaledVector(dir, force * pushStrength);
+                    } else {
+                        const falloff = 1 - (dist / range);
+                        dir.y = 0.3; dir.normalize(); 
+                        pj.velocity.addScaledVector(dir, force * falloff);
+                    }
+                }
+            }
+            
+            const pDist = camera.position.distanceTo(pos);
+            if (pDist < range) {
+                 const falloff = 1 - (pDist / range);
+                 const dir = camera.position.clone().sub(pos).normalize();
+                 
+                 if(damage > 0) damagePlayer(damage * 0.1 * falloff);
+                 
+                 if(type === 'VOID') {
+                     const pullStrength = (pDist / range);
+                     player.velocity.addScaledVector(dir, force * pullStrength * 0.5);
+                 } else if(type === 'STASIS') {
+                     const pushStrength = 1 - (pDist / range);
+                     player.velocity.addScaledVector(dir, force * pushStrength * 0.5);
+                 } else {
+                     player.velocity.addScaledVector(dir, force * falloff);
+                 }
+                 player.onGround = false; 
             }
         }
         
@@ -9000,9 +9925,16 @@
                     }
                 }
                 
+                for (let i = stasisFields.length - 1; i >= 0; i--) {
+                    if (!stasisFields[i].update(dt)) {
+                        stasisFields.splice(i, 1);
+                    }
+                }
+
                 // Logic Phase
                 autoplay.update(dt);
-                player.update(dt);
+                const pScale = getStasisMultiplier(camera.position);
+                player.update(dt * pScale);
                 NarrativeSys.update(dt);
 
                 const currentMap = MapManager.current;
@@ -9016,13 +9948,15 @@
                 for(let jp of jumpPads) jp.update(dt);
                 
                 for (let i = projectiles.length - 1; i >= 0; i--) {
-                    projectiles[i].update(dt);
+                    const pjScale = getStasisMultiplier(projectiles[i].mesh.position);
+                    projectiles[i].update(dt * pjScale);
                     if (!projectiles[i].active) projectiles.splice(i, 1);
                 }
                 
                 const playerPos = camera.position;
                 for (let i = enemies.length - 1; i >= 0; i--) {
-                    enemies[i].update(dt, playerPos);
+                    const eScale = getStasisMultiplier(enemies[i].mesh.position);
+                    enemies[i].update(dt * eScale, playerPos);
                 }
 
                 // --- VISUAL POOL UPDATES ---

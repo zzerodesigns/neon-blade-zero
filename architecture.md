@@ -1,5 +1,5 @@
 # neon blade: engine architecture
-**Engine State for: v48.6.2**
+**Engine State for: v48.7.0**
 
 > **ATTENTION FUTURE AGENTS:** This document is the absolute source of truth for the Neon Blade engine. Read this before modifying core systems. The project is a strict **single-file application** (`index.html`). Do not create external scripts or stylesheets.
 
@@ -23,8 +23,11 @@ The master control object containing all "magic numbers" (speed, damage, frictio
 ### C. Physics & Collision (`SpatialHashGrid`, `physicsStep`)
 Custom kinematic physics engine (no external libraries).
 *   `SpatialHashGrid`: A 2D (X/Z) grid using integer keys for zero-allocation spatial queries. The performance backbone.
-*   `physicsStep`: Core movement/collision logic inside `PlayerController`.
-*   **Data Flow:** Entities query the grid to resolve wall/ground interactions.
+*   `physicsStep`: Core movement/collision logic inside `PlayerController` and `Enemy`.
+*   **Continuous Collision Detection (CCD):** Implemented for high velocity player-bot intersections, utilizing swept-sphere lines to prevent tunneling, complete with relative mass displacement and kinetic momentum transfer to bots during slide hits.
+*   **Projectile Kinetic Physics:** Gadgets actively interact with everything. They use Displacement Logic for tactical "kicking/sweeping", reciprocal overlapping to bounce off bots natively, and mutually bump other projectiles to "scatter" piles of settled grenades.
+*   **True Rigid-Body Ragdolls:** When bots receive heavy hits (CONFUSED state), they transition into an impulse-based physics simulation. They inherit angular momentum and tumble reacting accurately to floor vertices, including elastic bouncing and ground damping, cleanly separating visual animations from gameplay state checks via `FALLEN` verification.
+*   **Data Flow:** Entities query the grid for walls; projectiles and players check dynamic structural proximity for kinetic interaction and overlap resolution.
 
 ### D. Player & Input (`PlayerController`, `InputManager`)
 *   `InputManager`: Captures raw keyboard/mouse events.
@@ -42,10 +45,15 @@ Manages bot behavior via a State Machine (`ROAM`, `AGGRO`, `SEARCH`).
 *   **Optimization:** Uses a Logic LOD (Level of Detail) system to reduce update frequency for distant bots.
 *   **Data Flow:** Reacts to `PlayerController` position. Queries `SpatialHashGrid` for pathfinding and physics.
 
-### G. Combat & Effects (`Katana`, `Projectile`)
-*   `Katana`: Melee weapon system using Raycasting for hit detection.
-*   `Projectile`: Gadget system (FRAG, VOID, IMPULSE) with independent ballistic physics.
-*   **Data Flow:** Triggered by Player -> Interacts with Enemy (damage) -> Triggers Audio/Visual spawners.
+### G. Tactile Gadget System (`Projectile` & Loadout)
+A high-fidelity ballistic and kinetic system with dynamically selectable loadouts (FRAG, VOID, IMPULSE, STASIS).
+*   **Loadout UI:** Managed via a customizable UI Modal in the pause menu allowing arbitrary mapping to F, R, and E keys.
+*   **Kinetic Interaction:** Implements reciprocal impulse and momentum transfer. Players and bots can physically "kick" or "shove" low-bouncing grenades; grenades hitting each other will scatter realistically; thrown grenades correctly retain bounciness off live bots.
+*   **Recursive Attachment:** Sticky types (`VOID`, `STASIS`) use dynamic target-radius offset math to attach directly to world-geometry, enemies, players, or even other moving grenades without hovering gaps.
+*   **Temporal Dilation (STASIS):** Re-scales the `timeScale` physics delta parameter for targeted entities (Bots, Player, flying Projectiles) caught in the area of effect, cleanly maintaining global animation rendering while drastically slowing physical gameplay execution natively.
+*   **Cross-System Influence:** Explosion and Implosion forces (`explode()`) physically interact with all other active, flying projectiles—allowing for mid-air juggling or "snatching" of gadgets.
+*   **Safety Buffers:** Uses `launchCooldown` (0.15s) to temporarily ignore player hitboxes and prevent self-collision during rapid deployment mid-air.
+*   **Data Flow:** Triggered by Player -> Interacts with world (Raycasting) and entities (Displacement / CCD) -> Triggers Audio/Visual spawners -> Influences the physical integration loop (`timeScale`, velocity) of nearby entities.
 
 ### H. Visual Engine (Hybrid Object Pools)
 Performance-critical system designed to eliminate memory allocation during gameplay.
