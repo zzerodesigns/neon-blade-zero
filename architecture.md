@@ -1,5 +1,5 @@
 # neon blade: engine architecture
-**Engine State for: v48.7.0**
+**Engine State for: v48.7.1**
 
 > **ATTENTION FUTURE AGENTS:** This document is the absolute source of truth for the Neon Blade engine. Read this before modifying core systems. The project is a strict **single-file application** (`index.html`). Do not create external scripts or stylesheets.
 
@@ -11,7 +11,13 @@
 
 ## 2. Core Systems & Data Flow
 
-### A. Configuration (`CONFIG`)
+### A. Decoupled Threading Architecture (Neural Shadow Core)
+To bypass the **Inter-Process Communication (IPC) bottleneck** triggered by modern Chromium site isolation and security validation, the engine has been decoupled into two distinct threads:
+*   **Main Thread (UI/Input):** Strictly restricted to DOM manipulation, input telemetry collection, and audio triggering. It does not perform any 3D math or physics calculation.
+*   **Worker Thread (Engine/Physics/AI):** The heavy-lifting core. Runs Three.js, the physics simulation, and the AI logic using `OffscreenCanvas`.
+*   **Synchronization (SharedArrayBuffer):** Atomic state sharing via a shared memory map. `Input Registers` are written by the Main thread; `Entity Registers` are written by the Worker. This prevents the CPU spin-locking and micro-stutters caused by synchronous GPU command validation on the main thread.
+
+### B. Configuration (`CONFIG`)
 The master control object containing all "magic numbers" (speed, damage, friction, energy costs). 
 *   **Data Flow:** Read by Player, Enemy, and Projectile classes. Tune game feel here first.
 

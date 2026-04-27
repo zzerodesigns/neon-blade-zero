@@ -20,9 +20,32 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <script>
+        // Conditionally register the service worker ONLY if we are lacking crossOriginIsolation
+        // This is necessary for GitHub Pages to support SharedArrayBuffer.
+        if ('serviceWorker' in navigator && window.crossOriginIsolated === false && window.isSecureContext) {
+            navigator.serviceWorker.register('sw.js').then((registration) => {
+                registration.addEventListener("updatefound", () => {
+                    window.sessionStorage.removeItem('sw_reloaded');
+                });
+                if (registration.active && !navigator.serviceWorker.controller) {
+                    if (!window.sessionStorage.getItem('sw_reloaded')) {
+                        window.sessionStorage.setItem('sw_reloaded', 'true');
+                        window.location.reload();
+                    }
+                }
+                navigator.serviceWorker.addEventListener("controllerchange", () => {
+                    if (!window.sessionStorage.getItem('sw_reloaded')) {
+                        window.sessionStorage.setItem('sw_reloaded', 'true');
+                        window.location.reload();
+                    }
+                });
+            }).catch(e => console.warn("SW Registration Failed", e));
+        }
+    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v48.7.0</title>
+    <title>Neon Blade: Melee Arena v48.7.1</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -612,7 +635,6 @@
             filter: drop-shadow(0 0 6px rgba(248, 113, 113, 0.5));
         }
     </style>
-    <link rel="stylesheet" href="/index.css">
 </head>
 <body>
 
@@ -832,13 +854,18 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.7.0<br>- Tactile Ragdoll Physics & Stasis Gadget Loadout -</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.7.1<br>- Decoupled Engine Architecture -</div>
         </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     
-    <script>
+    <script id="main-game-script">
+        const isWorker = typeof window === 'undefined';
+        if(isWorker) {
+            importScripts("https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js");
+        }
+
         const stasisFields = [];
         const PlayerLoadout = {
             f: 'FRAG',
@@ -875,6 +902,171 @@
             document.getElementById('icon-r').querySelector('.ability-name').innerText = PlayerLoadout.r;
             document.getElementById('icon-e').querySelector('.ability-name').innerText = PlayerLoadout.e;
         }
+
+        // --- NEURAL DATA SYNC ---
+        // Pre-allocate SharedArrayBuffers for background thread execution
+        const MEMORY_LAYOUT = {
+            INPUT_BUFFER_SIZE: 64, // 64 floats for input states (mouse, keys, etc.)
+            ENTITY_BUFFER_SIZE: 1024 * 16, // 16k floats for entity transform/state tracking
+            
+            // Input offsets (Main writes, Worker reads)
+            IN_KEYS: 0,       // Bitmask (W,A,S,D, Space, Shift, C)
+            IN_MOUSE_X: 1,    // Mouse delta X
+            IN_MOUSE_Y: 2,    // Mouse delta Y
+            IN_CLICK: 3,      // Mouse click states
+            
+            // Entity offsets (Worker writes, Main reads for HUD/Audio)
+            OUT_PLAYER_HP: 0,
+            OUT_PLAYER_ENERGY: 1,
+            OUT_SCORE: 2,
+            OUT_COMBO: 3
+        };
+        
+        let sharedInputBuffer, sharedEntityBuffer;
+        let inputFloat32, inputInt32;
+        let entityFloat32;
+        
+        try {
+            if (!isWorker) {
+                // Main thread creates SAB
+                sharedInputBuffer = new SharedArrayBuffer(MEMORY_LAYOUT.INPUT_BUFFER_SIZE * 4);
+                sharedEntityBuffer = new SharedArrayBuffer(MEMORY_LAYOUT.ENTITY_BUFFER_SIZE * 4);
+                
+                inputFloat32 = new Float32Array(sharedInputBuffer);
+                inputInt32 = new Int32Array(sharedInputBuffer);
+                entityFloat32 = new Float32Array(sharedEntityBuffer);
+                console.log("SharedArrayBuffer registers initialized.");
+            }
+        } catch (e) {
+            console.warn("SharedArrayBuffer restricted. Reverting to main-thread execution.");
+        }
+
+        // --- DOM INTERFACE PROXIES ---
+        // Decoupled UI handlers to allow the background engine to trigger visual updates
+        const DOM_UI = {
+            updateHealth: function(hp, maxHp) {
+                if (isWorker) return;
+                const hpPct = Math.max(0, hp / (maxHp/100)); 
+                document.getElementById('health-fill').style.width = hpPct + '%';
+            },
+            updateEnergy: function(en, maxEn) {
+                if (isWorker) return;
+                const enPct = Math.max(0, (en / maxEn) * 100);
+                document.getElementById('energy-fill').style.width = enPct + '%';
+            },
+            setVignette: function(active, opacity="1") {
+                if (isWorker) return;
+                const healthFill = document.getElementById('health-fill');
+                if (active) {
+                    if (healthFill && !healthFill.classList.contains('health-critical')) healthFill.classList.add('health-critical');
+                    const vig = document.getElementById('low-health-vignette');
+                    if(vig) {
+                        vig.style.boxShadow = "inset 0 0 150px rgba(255, 0, 0, 0.5)";
+                        vig.style.opacity = opacity;
+                    }
+                } else {
+                    if (healthFill && healthFill.classList.contains('health-critical')) healthFill.classList.remove('health-critical');
+                    const vig = document.getElementById('low-health-vignette');
+                    if(vig) {
+                        vig.style.opacity = "0";
+                        vig.style.boxShadow = "inset 0 0 100px rgba(255, 0, 0, 0)";
+                    }
+                }
+            },
+            setCrosshair: function(scale, gap, opacity, rotation = 22.5) {
+                if (isWorker) return;
+                const ch = document.getElementById('crosshair');
+                ch.style.transform = `translate(-50%, -50%) scale(${scale}) rotate(${rotation}deg)`;
+                ch.style.gap = `${gap}px`;
+                ch.style.opacity = opacity;
+            },
+            updateScore: function(score) {
+                if (isWorker) return;
+                const sd = document.getElementById('score-display');
+                if (sd) sd.innerText = "SCORE: " + score;
+            },
+            showDamage: function() {
+                if (isWorker) return;
+                const overlay = document.getElementById('damage-overlay');
+                if (overlay) {
+                    overlay.style.background = "radial-gradient(circle, transparent 20%, rgba(255,0,0,0.6) 100%)";
+                    setTimeout(() => {
+                        overlay.style.background = "radial-gradient(circle, transparent 50%, rgba(255,0,0,0.0) 100%)";
+                    }, 200);
+                }
+            },
+            triggerKillFeed: function(text, type="", color=null) {
+                if (isWorker) return;
+                const feed = document.getElementById('kill-feed');
+                const msg = document.createElement('div');
+                msg.className = "kill-msg " + type;
+                msg.innerHTML = text; 
+                if(color) {
+                    msg.style.color = color;
+                    msg.style.borderLeftColor = color;
+                }
+                feed.prepend(msg);
+                if(feed.children.length > 6) feed.removeChild(feed.lastChild);
+                
+                requestAnimationFrame(() => msg.style.opacity = 1);
+                
+                setTimeout(() => {
+                    msg.style.opacity = 0;
+                    msg.style.transform = "translateY(-10px) scale(0.95)";
+                    setTimeout(() => msg.remove(), 400); 
+                }, 2500); 
+            },
+            setStartButtonContext: function() {
+                if (isWorker) return;
+                const btn = document.getElementById('start-btn');
+                if (btn && btn.innerText === "b r e a t h e" && isLocked) {
+                     btn.innerText = "ENTER ARENA";
+                     btn.style.opacity = 1;
+                     btn.style.letterSpacing = "2px";
+                }
+            },
+            updateIcons: function(activeType, qActive) {
+                if (isWorker) return;
+                if (activeType !== undefined) {
+                    if (activeType === null) {
+                        document.getElementById('icon-f').classList.remove('active');
+                        document.getElementById('icon-r').classList.remove('active');
+                        document.getElementById('icon-e').classList.remove('active');
+                    } else {
+                        document.getElementById('icon-f').classList.toggle('active', activeType===PlayerLoadout.f);
+                        document.getElementById('icon-r').classList.toggle('active', activeType===PlayerLoadout.r);
+                        document.getElementById('icon-e').classList.toggle('active', activeType===PlayerLoadout.e);
+                    }
+                }
+                if (qActive !== undefined) {
+                    if (qActive) document.getElementById('icon-q').classList.add('active');
+                    else document.getElementById('icon-q').classList.remove('active');
+                }
+            },
+            updateCombo: function(comboCount, multiplier) {
+                if (isWorker) return;
+                const el = document.getElementById('combo-display');
+                if (!el) return;
+                
+                if (comboCount > 1) {
+                    el.style.opacity = 1;
+                    el.style.transform = `translate(-50%, 0) scale(${1 + (comboCount * 0.05)})`;
+                    const meme = document.getElementById('meme-overlay');
+                    if(comboCount === 5) { meme.innerText = "NICE"; meme.style.opacity = 1; meme.style.fontSize = "5rem"; setTimeout(() => meme.style.opacity = 0, 1000); }
+                    if(comboCount === 10) { meme.innerText = "SICK"; meme.style.opacity = 1; meme.style.fontSize = "6rem"; setTimeout(() => meme.style.opacity = 0, 1000); }
+                    if(comboCount === 20) { meme.innerText = "UNREAL"; meme.style.opacity = 1; meme.style.fontSize = "8rem"; setTimeout(() => meme.style.opacity = 0, 1000); }
+                    
+                    let styleText = "";
+                    if(multiplier > 1) {
+                        styleText = `<span style="color:#00ffff; font-size:0.6em; margin-left: 10px;">x${multiplier} M L T</span>`;
+                    }
+                    el.innerHTML = `${comboCount} <span style="font-size:0.5em">H I T S</span>${styleText}`;
+                } else {
+                    el.style.opacity = 0;
+                    el.style.transform = 'translate(-50%, 20px) scale(0.8)';
+                }
+            }
+        };
 
         // --- CONFIGURATION ---
         const CONFIG = {
@@ -2300,7 +2492,70 @@
         const InputManager = {
             keys: { w: false, a: false, s: false, d: false, space: false, shift: false, c: false, q: false, f: false, r: false, e: false },
             mouseDown: false,
+            pollWorkerInputs: function() {
+                if (!isWorker || typeof inputInt32 === 'undefined') return;
+                
+                const bitmask = Atomics.load(inputInt32, MEMORY_LAYOUT.IN_KEYS);
+                const clickState = Atomics.load(inputInt32, MEMORY_LAYOUT.IN_CLICK);
+                
+                const prevKeys = { ...this.keys };
+                const prevClick = this.mouseDown;
+                
+                this.keys.w = (bitmask & 1) !== 0;
+                this.keys.a = (bitmask & 2) !== 0;
+                this.keys.s = (bitmask & 4) !== 0;
+                this.keys.d = (bitmask & 8) !== 0;
+                this.keys.space = (bitmask & 16) !== 0;
+                this.keys.shift = (bitmask & 32) !== 0;
+                this.keys.c = (bitmask & 64) !== 0;
+                this.keys.q = (bitmask & 128) !== 0;
+                this.keys.f = (bitmask & 256) !== 0;
+                this.keys.r = (bitmask & 512) !== 0;
+                this.keys.e = (bitmask & 1024) !== 0;
+                
+                this.mouseDown = (clickState & 1) !== 0;
+                
+                // Edge detections for jump/attack/teleport
+                if (this.keys.space && !prevKeys.space) {
+                    if (isLocked) player.onJumpInput(false);
+                }
+                if (this.keys.q && !prevKeys.q) {
+                    if (isLocked && !player.isDead) player.onTeleportInput();
+                }
+                if (this.keys.f && !prevKeys.f) {
+                    if (isLocked && !player.isDead) player.beginAim(PlayerLoadout.f);
+                } else if (!this.keys.f && prevKeys.f) {
+                    if (isLocked && !player.isDead) player.endAim();
+                }
+                if (this.keys.r && !prevKeys.r) {
+                    if (isLocked && !player.isDead) player.beginAim(PlayerLoadout.r);
+                } else if (!this.keys.r && prevKeys.r) {
+                    if (isLocked && !player.isDead) player.endAim();
+                }
+                if (this.keys.e && !prevKeys.e) {
+                    if (isLocked && !player.isDead) player.beginAim(PlayerLoadout.e);
+                } else if (!this.keys.e && prevKeys.e) {
+                    if (isLocked && !player.isDead) player.endAim();
+                }
+                if (this.mouseDown && !prevClick) {
+                    if (isLocked) player.onAttackInput();
+                }
+                
+                const mx = inputFloat32[MEMORY_LAYOUT.IN_MOUSE_X];
+                const my = inputFloat32[MEMORY_LAYOUT.IN_MOUSE_Y];
+                if (mx !== 0 || my !== 0) {
+                    if (isLocked && !player.isDead && !autoplay.active) {
+                        camera.rotation.y -= mx * 0.002;
+                        camera.rotation.x -= my * 0.002;
+                        camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
+                    }
+                    // Reset accumulators
+                    inputFloat32[MEMORY_LAYOUT.IN_MOUSE_X] = 0;
+                    inputFloat32[MEMORY_LAYOUT.IN_MOUSE_Y] = 0;
+                }
+            },
             init: function() {
+                if (isWorker) return;
                 document.addEventListener('keydown', (e) => this.onKeyDown(e));
                 document.addEventListener('keyup', (e) => this.onKeyUp(e));
                 
@@ -2317,9 +2572,34 @@
                     if (e.button === 2 && isLocked) {
                         player.onSecondaryInput();
                     }
+                    this.updateBuffer();
                 });
-                document.addEventListener('mouseup', () => { this.mouseDown = false; });
+                document.addEventListener('mouseup', () => { 
+                    this.mouseDown = false; 
+                    this.updateBuffer();
+                });
                 document.addEventListener('mousemove', (e) => this.onMouseMove(e));
+            },
+            updateBuffer: function() {
+                if (typeof inputInt32 !== 'undefined' && inputInt32) {
+                    let bitmask = 0;
+                    if (this.keys.w) bitmask |= 1;
+                    if (this.keys.a) bitmask |= 2;
+                    if (this.keys.s) bitmask |= 4;
+                    if (this.keys.d) bitmask |= 8;
+                    if (this.keys.space) bitmask |= 16;
+                    if (this.keys.shift) bitmask |= 32;
+                    if (this.keys.c) bitmask |= 64;
+                    if (this.keys.q) bitmask |= 128;
+                    if (this.keys.f) bitmask |= 256;
+                    if (this.keys.r) bitmask |= 512;
+                    if (this.keys.e) bitmask |= 1024;
+                    Atomics.store(inputInt32, MEMORY_LAYOUT.IN_KEYS, bitmask);
+                    
+                    let clickState = 0;
+                    if (this.mouseDown) clickState |= 1;
+                    Atomics.store(inputInt32, MEMORY_LAYOUT.IN_CLICK, clickState);
+                }
             },
             onKeyDown: function(e) {
                 const key = e.key.toLowerCase();
@@ -2369,6 +2649,7 @@
                     case 't': if(!e.repeat) toggleTheme(); break;
                     case 'm': Minimap.toggle(); break;
                 }
+                this.updateBuffer();
             },
             onKeyUp: function(e) {
                 switch(e.key.toLowerCase()) {
@@ -2393,6 +2674,7 @@
                         if(isLocked && !player.isDead) player.endAim();
                         break;
                 }
+                this.updateBuffer();
             },
             onMouseMove: function(e) {
                 if (!isLocked || player.isDead) return;
@@ -2400,6 +2682,11 @@
                 camera.rotation.y -= e.movementX * 0.002;
                 camera.rotation.x -= e.movementY * 0.002;
                 camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
+                
+                if (typeof inputFloat32 !== 'undefined' && inputFloat32) {
+                    inputFloat32[MEMORY_LAYOUT.IN_MOUSE_X] += e.movementX;
+                    inputFloat32[MEMORY_LAYOUT.IN_MOUSE_Y] += e.movementY;
+                }
             }
         };
 
@@ -4753,9 +5040,7 @@
 
             beginAim(type) {
                 this.aimingGadget = type;
-                document.getElementById('icon-f').classList.toggle('active', type===PlayerLoadout.f);
-                document.getElementById('icon-r').classList.toggle('active', type===PlayerLoadout.r);
-                document.getElementById('icon-e').classList.toggle('active', type===PlayerLoadout.e);
+                DOM_UI.updateIcons(type);
             }
             
             endAim() {
@@ -4763,9 +5048,7 @@
                     this.throwGadget(this.aimingGadget);
                     this.aimingGadget = null;
                     this.aimLine.visible = false;
-                    document.getElementById('icon-f').classList.remove('active');
-                    document.getElementById('icon-r').classList.remove('active');
-                    document.getElementById('icon-e').classList.remove('active');
+                    DOM_UI.updateIcons(null);
                 }
             }
 
@@ -4773,9 +5056,7 @@
                 if(this.aimingGadget) {
                     this.aimingGadget = null;
                     this.aimLine.visible = false;
-                    document.getElementById('icon-f').classList.remove('active');
-                    document.getElementById('icon-r').classList.remove('active');
-                    document.getElementById('icon-e').classList.remove('active');
+                    DOM_UI.updateIcons(null);
                 }
             }
 
@@ -5132,13 +5413,9 @@
                     }
                 }
                 
-                const vignette = document.getElementById('low-health-vignette');
-                const healthFill = document.getElementById('health-fill');
                 const maxHP = CONFIG.playerMaxHP;
                 
                 if (this.health < maxHP * 0.5) {
-                    if (!healthFill.classList.contains('health-critical')) healthFill.classList.add('health-critical');
-
                     // Calculate Danger Factor
                     const rawFactor = 1 - (this.health / (maxHP * 0.5));
                     const dangerFactor = Math.pow(rawFactor, 1.2); 
@@ -5168,11 +5445,10 @@
                         }
                     }
 
-                    vignette.style.opacity = currentOpacity.toFixed(2);
+                    DOM_UI.setVignette(true, currentOpacity.toFixed(2));
 
                 } else {
-                    if (healthFill.classList.contains('health-critical')) healthFill.classList.remove('health-critical');
-                    vignette.style.opacity = "0";
+                    DOM_UI.setVignette(false);
                 }
             }
 
@@ -5290,14 +5566,14 @@
                         teleportMarker.userData.ravenMat.uniforms.time.value = t * 0.001;
                     }
                     
-                    document.getElementById('icon-q').classList.add('active');
+                    DOM_UI.updateIcons(undefined, true);
 
                 } else {
                     // Inactive State Cleanup
                     if (teleportMarker.parent === camera) scene.add(teleportMarker);
                     teleportMarker.visible = false;
                     this.tpAimStartTime = 0; 
-                    document.getElementById('icon-q').classList.remove('active');
+                    DOM_UI.updateIcons(undefined, false);
                     if (lastHoveredEnemy) { 
                         lastHoveredEnemy.setHighlight(false); 
                         lastHoveredEnemy = null; 
@@ -5305,8 +5581,7 @@
                 }
                 
                 // Crosshair State
-                const ch = document.getElementById('crosshair');
-                ch.style.opacity = (slashActive || isActive) ? 0 : 1;
+                DOM_UI.setCrosshair(1.0, 4, (slashActive || isActive) ? 0 : 1);
             }
         }
 
@@ -6649,10 +6924,19 @@
             }
         }
 
+        function createCanvas(w, h) {
+            if (typeof OffscreenCanvas !== 'undefined' && isWorker) {
+                return new OffscreenCanvas(w, h);
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            return canvas;
+        }
+
         function createBoxBorderTexture() {
             const size = 512;
-            const canvas = document.createElement('canvas');
-            canvas.width = size; canvas.height = size;
+            const canvas = createCanvas(size, size);
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, size, size);
             const thick = 0.5; 
@@ -6667,8 +6951,7 @@
         }
 
         function createGridTexture(type) {
-            const canvas = document.createElement('canvas');
-            canvas.width = 1024; canvas.height = 1024;
+            const canvas = createCanvas(1024, 1024);
             const ctx = canvas.getContext('2d');
             
             if (type === 'solid') {
@@ -6738,8 +7021,7 @@
         }
 
         function createGlowTexture() {
-            const canvas = document.createElement('canvas');
-            canvas.width = 64; canvas.height = 64;
+            const canvas = createCanvas(64, 64);
             const ctx = canvas.getContext('2d');
             const grad = ctx.createRadialGradient(32,32,0, 32,32,32);
             grad.addColorStop(0, 'rgba(255,255,255,1)');
@@ -6915,19 +7197,21 @@
             });
 
             scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera = new THREE.PerspectiveCamera(80, engineWidth / engineHeight, 0.1, 1000);
             camera.rotation.order = 'YXZ'; 
             camera.position.set(0, 2, 0);
             scene.add(camera);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setSize(engineWidth, engineHeight);
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             renderer.outputEncoding = THREE.sRGBEncoding;
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
             renderer.toneMappingExposure = 1.0 * brightnessMultiplier; 
-            document.body.appendChild(renderer.domElement);
+            if (!isWorker) {
+                document.body.appendChild(renderer.domElement);
+            }
 
             textures.gridDefault = createGridTexture('default');
             textures.gridSnow = createGridTexture('snow');
@@ -7647,7 +7931,7 @@
                 s.mesh.rotation.set(0, 0, -Math.PI / 8);
                 camera.add(s.mesh);
                 slashActive = true;
-                document.getElementById('crosshair').style.opacity = 0;
+                DOM_UI.setCrosshair(1.0, 4, 0); // Use proxy to hide crosshair
             } else {
                 s.mesh.position.set(0, 1.5, 1.0);
                 s.mesh.lookAt(camera.position);
@@ -8025,8 +8309,8 @@
         function tryInstantTeleport() {
             const result = getTeleportTarget();
             executeTeleport(result.point, result.normal);
-            document.getElementById('icon-q').classList.add('active');
-            setTimeout(() => document.getElementById('icon-q').classList.remove('active'), 200);
+            DOM_UI.updateIcons(undefined, true);
+            setTimeout(() => DOM_UI.updateIcons(undefined, false), 200);
         }
 
         function resolveTeleportPosition(target, normal) {
@@ -9764,11 +10048,7 @@
         function damagePlayer(amt) {
             player.health -= amt;
             player.lastDamageTime = performance.now();
-            const overlay = document.getElementById('damage-overlay');
-            overlay.style.background = "radial-gradient(circle, transparent 20%, rgba(255,0,0,0.6) 100%)";
-            setTimeout(() => {
-                overlay.style.background = "radial-gradient(circle, transparent 50%, rgba(255,0,0,0.0) 100%)";
-            }, 200);
+            DOM_UI.showDamage();
             if(player.health <= 0) {
                 if (player.extraLives > 0) {
                     player.extraLives--;
@@ -9803,7 +10083,7 @@
         function addScore(amt) {
             const oldScore = player.score;
             player.score += amt;
-            document.getElementById('score-display').innerText = "SCORE: " + player.score;
+            DOM_UI.updateScore(player.score);
             if (Math.floor(player.score / 10000) > Math.floor(oldScore / 10000)) {
                 if (player.extraLives < 3) {
                     player.extraLives++;
@@ -9864,37 +10144,43 @@
             GameStats.reset();
             comboCount = 0;
             updateComboUI();
-            document.getElementById('score-display').innerText = "SCORE: 0";
-            document.getElementById('health-fill').classList.remove('health-critical');
-            document.getElementById('low-health-vignette').style.boxShadow = "inset 0 0 100px rgba(255, 0, 0, 0)";
-
-            // FIX: Remove inline shadow override and use opacity
-            const vig = document.getElementById('low-health-vignette');
-            vig.style.boxShadow = ""; 
-            vig.style.opacity = "0";
+            DOM_UI.updateScore(0);
+            DOM_UI.setVignette(false);
         }
         
         function showKillMessage(text, type="", color=null) {
-            const feed = document.getElementById('kill-feed');
-            const msg = document.createElement('div');
-            msg.className = "kill-msg " + type;
-            msg.innerHTML = text; 
-            if(color) {
-                msg.style.color = color;
-                msg.style.borderLeftColor = color;
-            }
-            feed.prepend(msg);
-            if(feed.children.length > 6) feed.removeChild(feed.lastChild);
+            DOM_UI.triggerKillFeed(text, type, color);
         }
 
+        let engineWidth = typeof window !== 'undefined' ? window.innerWidth : 1024;
+        let engineHeight = typeof window !== 'undefined' ? window.innerHeight : 768;
+        
         function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+            if (!isWorker) {
+                engineWidth = window.innerWidth;
+                engineHeight = window.innerHeight;
+                if (window.workerInstance) {
+                    window.workerInstance.postMessage({ type: 'RESIZE', width: engineWidth, height: engineHeight });
+                }
+            }
+            if (typeof camera !== 'undefined' && camera) {
+                camera.aspect = engineWidth / engineHeight;
+                camera.updateProjectionMatrix();
+                if (typeof renderer !== 'undefined' && renderer) {
+                    renderer.setSize(engineWidth, engineHeight);
+                }
+            }
+        }
+        
+        if (!isWorker) {
+            window.addEventListener('resize', onWindowResize, false);
         }
 
         function animate() {
             requestAnimationFrame(animate);
+            if (isWorker) {
+                InputManager.pollWorkerInputs();
+            }
             const now = performance.now();
             const dt = Math.min((now - lastTime) / 1000, 0.1);
             lastTime = now;
@@ -10034,7 +10320,13 @@
                 }
                 slashActive = isSlashActive;
 
-                
+                // Sync data to SharedArrayBuffer
+                if (typeof entityFloat32 !== 'undefined' && entityFloat32) {
+                    entityFloat32[MEMORY_LAYOUT.OUT_PLAYER_HP] = player.health;
+                    entityFloat32[MEMORY_LAYOUT.OUT_PLAYER_ENERGY] = player.energy;
+                    entityFloat32[MEMORY_LAYOUT.OUT_SCORE] = score;
+                    entityFloat32[MEMORY_LAYOUT.OUT_COMBO] = comboCount;
+                }
 
                 // UI & State Phase
                 if (comboCount > 0) {
@@ -10045,23 +10337,77 @@
                     }
                 }
                 
-                const hpPct = Math.max(0, player.health / (CONFIG.playerMaxHP/100)); 
-                const enPct = Math.max(0, (player.energy / CONFIG.energyMax) * 100);
-                document.getElementById('health-fill').style.width = hpPct + '%';
-                document.getElementById('energy-fill').style.width = enPct + '%';
-                
-                const btn = document.getElementById('start-btn');
-                if (btn.innerText === "b r e a t h e" && isLocked) {
-                     btn.innerText = "ENTER ARENA";
-                     btn.style.opacity = 1;
-                     btn.style.letterSpacing = "2px";
+                // Read from buffer if available, or write if we are the worker
+                let ui_hp, ui_en;
+                if (!isWorker) {
+                    ui_hp = (typeof entityFloat32 !== 'undefined' && entityFloat32) ? entityFloat32[MEMORY_LAYOUT.OUT_PLAYER_HP] : player.health;
+                    ui_en = (typeof entityFloat32 !== 'undefined' && entityFloat32) ? entityFloat32[MEMORY_LAYOUT.OUT_PLAYER_ENERGY] : player.energy;
+                } else {
+                    entityFloat32[MEMORY_LAYOUT.OUT_PLAYER_HP] = player.health;
+                    entityFloat32[MEMORY_LAYOUT.OUT_PLAYER_ENERGY] = player.energy;
+                    entityFloat32[MEMORY_LAYOUT.OUT_SCORE] = score;
+                    entityFloat32[MEMORY_LAYOUT.OUT_COMBO] = comboCount;
+                    ui_hp = player.health;
+                    ui_en = player.energy;
                 }
+ 
+                DOM_UI.updateHealth(ui_hp, CONFIG.playerMaxHP);
+                DOM_UI.updateEnergy(ui_en, CONFIG.energyMax);
+                DOM_UI.setStartButtonContext();
             }
-            Minimap.update();
-            renderer.render(scene, camera);
+            if (!isWorker) {
+                Minimap.update();
+                renderer.render(scene, camera);
+            }
         }
 
-        init();
+        // --- ENGINE BOOTSTRAP ---
+        if (isWorker) {
+            self.onmessage = function(e) {
+                const data = e.data;
+                if (data.type === 'START_ENGINE') {
+                    sharedInputBuffer = data.sharedInputBuffer;
+                    sharedEntityBuffer = data.sharedEntityBuffer;
+                    inputFloat32 = new Float32Array(sharedInputBuffer);
+                    inputInt32 = new Int32Array(sharedInputBuffer);
+                    entityFloat32 = new Float32Array(sharedEntityBuffer);
+                    engineWidth = data.width;
+                    engineHeight = data.height;
+                    console.log("Worker engine synchronized successfully.");
+                    lastTime = performance.now();
+                    animate();
+                }
+                if (data.type === 'RESIZE') {
+                    engineWidth = data.width;
+                    engineHeight = data.height;
+                    onWindowResize();
+                }
+            };
+        } else {
+            // Main Thread Authority
+            init();
+            
+            // Initiate Neural Shadow Core (Background Engine)
+            try {
+                const scriptNode = document.getElementById('main-game-script');
+                if (scriptNode && typeof SharedArrayBuffer !== 'undefined') {
+                    const blob = new Blob([scriptNode.textContent], { type: 'application/javascript' });
+                    window.workerInstance = new Worker(URL.createObjectURL(blob));
+                    
+                    window.workerInstance.postMessage({
+                        type: 'START_ENGINE',
+                        sharedInputBuffer,
+                        sharedEntityBuffer,
+                        width: window.innerWidth,
+                        height: window.innerHeight
+                    });
+                    
+                    console.log("Worker Thread initialized successfully.");
+                }
+            } catch(err) {
+                console.warn("Worker Thread initialization failed:", err.message);
+            }
+        }
     </script>
 </body>
 </html>
