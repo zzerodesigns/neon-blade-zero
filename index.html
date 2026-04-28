@@ -854,7 +854,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.7.1<br>- Decoupled Engine Architecture -</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.7.1a<br>- Decoupled Engine Architecture -</div>
         </div>
     </div>
 
@@ -10324,7 +10324,7 @@
                 if (typeof entityFloat32 !== 'undefined' && entityFloat32) {
                     entityFloat32[MEMORY_LAYOUT.OUT_PLAYER_HP] = player.health;
                     entityFloat32[MEMORY_LAYOUT.OUT_PLAYER_ENERGY] = player.energy;
-                    entityFloat32[MEMORY_LAYOUT.OUT_SCORE] = score;
+                    entityFloat32[MEMORY_LAYOUT.OUT_SCORE] = player.score;
                     entityFloat32[MEMORY_LAYOUT.OUT_COMBO] = comboCount;
                 }
 
@@ -10345,7 +10345,7 @@
                 } else {
                     entityFloat32[MEMORY_LAYOUT.OUT_PLAYER_HP] = player.health;
                     entityFloat32[MEMORY_LAYOUT.OUT_PLAYER_ENERGY] = player.energy;
-                    entityFloat32[MEMORY_LAYOUT.OUT_SCORE] = score;
+                    entityFloat32[MEMORY_LAYOUT.OUT_SCORE] = player.score;
                     entityFloat32[MEMORY_LAYOUT.OUT_COMBO] = comboCount;
                     ui_hp = player.health;
                     ui_en = player.energy;

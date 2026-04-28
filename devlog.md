@@ -68,6 +68,9 @@
 
 ## 📖 version history / patch notes
 
+### v48.7.1a - Score Synchronization Hotfix
+*   **Decoupled Score Sync:** Fixed a minor desynchronization bug where an AI-local `score` evaluation variable accidentally eclipsed the global `player.score` during the SharedArrayBuffer memory copy, preserving true metric continuity.
+
 ### v48.7.1 - Decoupled Engine Architecture & IPC Optimization
 *   **Chromium IPC Optimization:** Addressed severe frame-stuttering caused by modern Chromium site isolation. By decoupling the engine and moving Three.js/Physics to a Dedicated Web Worker (`OffscreenCanvas`), we bypass the main-thread GPU validation bottleneck.
 *   **Atomic Memory Synchronization:** Established a `SharedArrayBuffer` memory map using `Atomics` for zero-latency input/entity state exchange between threads.
