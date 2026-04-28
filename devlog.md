@@ -68,6 +68,11 @@
 
 ## 📖 version history / patch notes
 
+### v48.7.1c - Final Bootstrap & IPC Sync Resolution
+*   **Engine Deadlock Resolution:** Resolved critical bootstrap failure by implementing a SharedArrayBuffer health check and defensive fallback to main-thread execution.
+*   **IPC UI Bridge:** Re-connected start screen map-switching and button labels to the background engine via `SWITCH_MAP` and `updateMapButton` postMessage routing.
+*   **Reference Error & DOM Fixes:** Corrected pause menu variable conflicts and removed illegal DOM access from the background worker context.
+
 ### v48.7.1b - True Sandbox Engine Decoupling
 *   **Cache Line Bouncing Fix:** Resolved Chromium micro-stuttering caused by redundant physics execution. A logic error allowed the background worker and main thread to process the same data simultaneously. This created a race condition on the SharedArrayBuffer, triggering memory contention and rendering lag.
 *   **True Sandbox Migration:** Fully ripped Three.js and physics out of the Main Thread. The worker now natively powers WebGL via `OffscreenCanvas`.

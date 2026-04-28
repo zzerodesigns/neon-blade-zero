@@ -45,7 +45,7 @@
     </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v48.7.1b</title>
+    <title>Neon Blade: Melee Arena v48.7.1c</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -854,7 +854,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.7.1b<br>- Decoupled Engine Architecture -</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.7.1c<br>- Decoupled Engine Architecture -</div>
         </div>
     </div>
 
@@ -1046,6 +1046,11 @@
                     if (qActive) document.getElementById('icon-q').classList.add('active');
                     else document.getElementById('icon-q').classList.remove('active');
                 }
+            },
+            updateMapButton: function(name) {
+                if (isWorker) return;
+                const mapBtn = document.getElementById('map-btn');
+                if (mapBtn) mapBtn.innerText = "MAP: " + name;
             },
             updateCombo: function(comboCount, multiplier) {
                 if (isWorker) return;
@@ -4139,7 +4144,12 @@
                 applyTheme(); 
                 Minimap.preRender();
                 
-                document.getElementById('map-btn').innerText = "MAP: " + name;
+                if (isWorker) {
+                    postMessage({ type: 'UI', method: 'updateMapButton', args: [name] });
+                } else {
+                    const mapBtn = document.getElementById('map-btn');
+                    if (mapBtn) mapBtn.innerText = "MAP: " + name;
+                }
             }
         };
 
@@ -7134,7 +7144,7 @@
                     }
 
                     // Otherwise, Resume Game
-                    if (modal.style.display !== 'flex' && !isLocked && !player.isDead && sessionStartTime > 0) {
+                    if (settingsModal.style.display !== 'flex' && loadoutModal.style.display !== 'flex' && !isLocked && !player.isDead && sessionStartTime > 0) {
                         document.getElementById('start-btn').click();
                     }
                 }
@@ -7216,7 +7226,12 @@
                 let idx = order.indexOf(currentName);
                 if (idx === -1) idx = 0;
                 const next = order[(idx + 1) % order.length];
-                MapManager.switch(next);
+                
+                if (window.workerInstance) {
+                    window.workerInstance.postMessage({ type: 'SWITCH_MAP', name: next });
+                } else {
+                    MapManager.switch(next);
+                }
             });
 
             }
@@ -10429,6 +10444,9 @@
                     engineHeight = data.height;
                     onWindowResize();
                 }
+                if (data.type === 'SWITCH_MAP') {
+                    MapManager.switch(data.name);
+                }
             };
         } else {
             // Main Thread Authority
@@ -10436,24 +10454,27 @@
             
             // Initiate Neural Shadow Core (Background Engine)
             try {
-                // We create a central canvas to transfer to the background thread
-                const canvasEl = document.createElement('canvas');
-                canvasEl.id = "main-game-canvas";
-                canvasEl.style.width = '100vw';
-                canvasEl.style.height = '100vh';
-                canvasEl.style.display = 'block';
-                canvasEl.style.position = 'absolute';
-                canvasEl.style.top = '0';
-                canvasEl.style.left = '0';
-                canvasEl.style.zIndex = '0';
-                document.body.appendChild(canvasEl);
-                let offscreen = null;
-                if (typeof canvasEl.transferControlToOffscreen === 'function') {
-                    offscreen = canvasEl.transferControlToOffscreen();
-                }
-
                 const scriptNode = document.getElementById('main-game-script');
-                if (scriptNode && typeof SharedArrayBuffer !== 'undefined') {
+                const canUseWorker = scriptNode && typeof SharedArrayBuffer !== 'undefined';
+
+                if (canUseWorker) {
+                    // We create a central canvas to transfer to the background thread
+                    const canvasEl = document.createElement('canvas');
+                    canvasEl.id = "main-game-canvas";
+                    canvasEl.style.width = '100vw';
+                    canvasEl.style.height = '100vh';
+                    canvasEl.style.display = 'block';
+                    canvasEl.style.position = 'absolute';
+                    canvasEl.style.top = '0';
+                    canvasEl.style.left = '0';
+                    canvasEl.style.zIndex = '0';
+                    document.body.appendChild(canvasEl);
+                    
+                    let offscreen = null;
+                    if (typeof canvasEl.transferControlToOffscreen === 'function') {
+                        offscreen = canvasEl.transferControlToOffscreen();
+                    }
+
                     const blob = new Blob([scriptNode.textContent], { type: 'application/javascript' });
                     window.workerInstance = new Worker(URL.createObjectURL(blob));
                     
@@ -10473,6 +10494,7 @@
                         } else if (data.type === 'UI') {
                             if (data.method === 'showDamage') DOM_UI.showDamage();
                             if (data.method === 'triggerKillFeed') DOM_UI.triggerKillFeed(data.text, data.colorStr, data.color2);
+                            if (data.method === 'updateMapButton') DOM_UI.updateMapButton(data.args[0]);
                             if (data.method === 'updateLivesDisplay') updateLivesDisplay();
                             if (data.method === 'playerDeath') {
                                 if (document.exitPointerLock) document.exitPointerLock();
@@ -10501,12 +10523,14 @@
                         }
                     }
                     domLoop();
-                } else if (!offscreen) {
+                } else {
+                    // Fallback to Main Thread Engine
                     initEngine(null);
                     animate();
+                    console.log("Main Thread engine initialized (Worker/SAB unavailable).");
                 }
             } catch(err) {
-                console.warn("Worker Thread initialization failed:", err.message);
+                console.warn("Engine initialization failed, forcing main thread fallback:", err.message);
                 initEngine(null);
                 animate();
             }
