@@ -1,6 +1,6 @@
 ### Session: Decoupled Engine Architecture & IPC Optimization (v48.7.1)
 
-#### Development Log
+### Development Log
 **Bypassing the IPC/Security Bottleneck**
 This session tackled a critical performance degradation issue triggered by recent Chromium security updates. Modern strict site isolation turns synchronous WebGL draw calls on the main thread into an Inter-Process Communication (IPC) bottleneck, causing CPU spin-locking and micro-stutters. To resolve this, the overarching strategy was to decouple the monolithic application, migrating the heavy-lifting engine logic (Three.js, physics, AI) into a Dedicated Web Worker using `OffscreenCanvas`, while keeping the main thread dedicated to UI orchestration and input telemetry.
 
@@ -10,7 +10,7 @@ Initially, we explored using `SharedArrayBuffer` for zero-latency atomic state s
 **The Hybrid Worker Fallback & IPC Finalization**
 Realizing the rigid security boundaries of modern hosted iframes, the architecture was refactored into a hybrid resilient model. A dynamic fallback mechanism (`USE_WORKER`) was implemented to seamlessly evaluate the environment at runtime. In fully isolated environments, the engine spawns a "Shadow Core" Blob worker with a direct pipeline to the GPU. In restricted environments where `SharedArrayBuffer` fails to allocate, it gracefully collapses back to a monolithic execution loop. This was paired with a massive structural cleanup, abstracting direct DOM interactions into a centralized `DOM_UI` proxy system, resolving related UI breakages (like crosshair rotational drift), and purging legacy code to solidify the v48.7.1 decoupled engine.
 
-#### Prompt History
+### Prompt History
 #### **[Baseline Analysis]**
 **Establishing the Architecture Constraints**
 *   **Prompt:** "let's start a new session from base v48.7.0. don't make any changes in the code, analyze it then report your full understanding."
@@ -65,22 +65,22 @@ Realizing the rigid security boundaries of modern hosted iframes, the architectu
     *   *Outcome:* The application header, `architecture.md`, and `devlog.md` were accurately updated to reflect the v48.7.1 version. Internal console logs were refined to be functional and transparent regarding the IPC Optimization payload.
 
 ---
-### Commit Description
+## Commit Description
 
-```text
-v48.7.1 - Decoupled Engine Architecture
+**v48.7.1 - Decoupled Engine Architecture**
 
-TL;DR: Migrated the core engine to a Dedicated Web Worker to eliminate IPC rendering bottlenecks while preserving offline single-file portability.
+**TL;DR:** *Migrated the core engine to a Dedicated Web Worker to eliminate IPC rendering bottlenecks while preserving offline single-file portability.*
 
-Summary: This update rectifies a critical performance degradation issue where modern strict site isolation transforms synchronous WebGL draw calls on the main thread into an Inter-Process Communication (IPC) bottleneck. By offloading Three.js rendering, spatial collision logic, and AI handling to a Dedicated Web Worker, the main thread is freed entirely to orchestrate DOM UI and input processing. Memory states are synced between threads effortlessly via a SharedArrayBuffer without serialization overhead.
+**Summary:** 
+This update rectifies a critical performance degradation issue where modern strict site isolation transforms synchronous WebGL draw calls on the main thread into an Inter-Process Communication (IPC) bottleneck. By offloading Three.js rendering, spatial collision logic, and AI handling to a Dedicated Web Worker, the main thread is freed entirely to orchestrate DOM UI and input processing. Memory states are synced between threads effortlessly via a SharedArrayBuffer without serialization overhead.
 
-Specific changes:
-* **Thread Decoupling**: Offloaded Three.js (`OffscreenCanvas`), physics, and AI to a Dedicated Worker to solve main-thread stuttering.
-* **Memory Management**: Established zero-latency synchronization via `SharedArrayBuffer` atomics, eliminating serialization overhead.
-* **Header Proxying**: Implemented an inline `sw.js` proxy to synthetically force COOP/COEP headers, enabling multi-threading on restricted hosts like GitHub Pages.
-* **Single-File Portability**: Developed a `USE_WORKER` detection gate that falls back to monolithic main-thread execution if SAB is unavailable (essential for offline/local file use).
-* **UI/Engine Isolation**: Abstracted DOM events into a `DOM_UI` proxy to prevent restricted engine logic from blocking the main UI thread.
-* **Regression Fix**: Restored crosshair rotation metrics that broke during the initial DOM refactor.
+**Specific changes:**
+* **Thread Decoupling:** Offloaded Three.js (`OffscreenCanvas`), physics, and AI to a Dedicated Worker to solve main-thread stuttering.
+* **Memory Management:** Established zero-latency synchronization via `SharedArrayBuffer` atomics, eliminating serialization overhead.
+* **Header Proxying:** Implemented an inline `sw.js` proxy to synthetically force COOP/COEP headers, enabling multi-threading on restricted hosts like GitHub Pages.
+* **Single-File Portability:** Developed a `USE_WORKER` detection gate that falls back to monolithic main-thread execution if SAB is unavailable (essential for offline/local file use).
+* **UI/Engine Isolation:** Abstracted DOM events into a `DOM_UI` proxy to prevent restricted engine logic from blocking the main UI thread.
+* **Regression Fix:** Restored crosshair rotation metrics that broke during the initial DOM refactor.
 
-This session was a highly technical and structurally dangerous refactor that fundamentally changes the app from a monopolized single-threaded to a hybrid, auto-detecting multi-thread environment. The result is (hopefully) a resilient, highly optimized multi-threaded engine capable of gracefully falling back to a monolith if the environment restricts shared memory access.
+*This session was a highly technical and structurally dangerous refactor that fundamentally changes the app from a monopolized single-threaded to a hybrid, auto-detecting multi-thread environment. The result is (hopefully) a resilient, highly optimized multi-threaded engine capable of gracefully falling back to a monolith if the environment restricts shared memory access.*
 ```

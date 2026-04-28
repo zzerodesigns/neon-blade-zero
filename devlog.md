@@ -68,6 +68,11 @@
 
 ## 📖 version history / patch notes
 
+### v48.7.1b - True Sandbox Engine Decoupling
+*   **Cache Line Bouncing Fix:** Resolved Chromium micro-stuttering caused by redundant physics execution. A logic error allowed the background worker and main thread to process the same data simultaneously. This created a race condition on the SharedArrayBuffer, triggering memory contention and rendering lag.
+*   **True Sandbox Migration:** Fully ripped Three.js and physics out of the Main Thread. The worker now natively powers WebGL via `OffscreenCanvas`.
+*   **Strict I/O Fencing:** Audio and UI calls from the physics/engine layers are now seamlessly abstracted via a proxy, funneling lightweight `postMessage` cues back to the DOM thread.
+
 ### v48.7.1a - Score Synchronization Hotfix
 *   **Decoupled Score Sync:** Fixed a minor desynchronization bug where an AI-local `score` evaluation variable accidentally eclipsed the global `player.score` during the SharedArrayBuffer memory copy, preserving true metric continuity.
 

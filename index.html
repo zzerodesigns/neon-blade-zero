@@ -45,7 +45,7 @@
     </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v48.7.1</title>
+    <title>Neon Blade: Melee Arena v48.7.1b</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -854,7 +854,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.7.1a<br>- Decoupled Engine Architecture -</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.7.1b<br>- Decoupled Engine Architecture -</div>
         </div>
     </div>
 
@@ -864,6 +864,10 @@
         const isWorker = typeof window === 'undefined';
         if(isWorker) {
             importScripts("https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js");
+            self.window = self;
+            if (typeof requestAnimationFrame === 'undefined') {
+                self.requestAnimationFrame = function(cb) { setTimeout(cb, 1000/60); };
+            }
         }
 
         const stasisFields = [];
@@ -986,7 +990,7 @@
                 if (sd) sd.innerText = "SCORE: " + score;
             },
             showDamage: function() {
-                if (isWorker) return;
+                if (isWorker) return postMessage({ type: 'UI', method: 'showDamage' });
                 const overlay = document.getElementById('damage-overlay');
                 if (overlay) {
                     overlay.style.background = "radial-gradient(circle, transparent 20%, rgba(255,0,0,0.6) 100%)";
@@ -996,7 +1000,7 @@
                 }
             },
             triggerKillFeed: function(text, type="", color=null) {
-                if (isWorker) return;
+                if (isWorker) return postMessage({ type: 'UI', method: 'triggerKillFeed', text, colorStr: type, color2: color });
                 const feed = document.getElementById('kill-feed');
                 const msg = document.createElement('div');
                 msg.className = "kill-msg " + type;
@@ -2565,12 +2569,9 @@
                 document.addEventListener('mousedown', (e) => {
                     if (isLocked && autoplay.active) autoplay.cancel();
                     if (e.button === 0) this.mouseDown = true;
-                    if (isLocked && e.button === 0) {
-                        player.onAttackInput();
-                    }
-                    // Right Click Handler
-                    if (e.button === 2 && isLocked) {
-                        player.onSecondaryInput();
+                    if (typeof window.workerInstance === 'undefined') {
+                        if (isLocked && e.button === 0) player.onAttackInput();
+                        if (e.button === 2 && isLocked) player.onSecondaryInput();
                     }
                     this.updateBuffer();
                 });
@@ -2613,32 +2614,32 @@
                     case 'd': this.keys.d = true; break;
                     case ' ': 
                         this.keys.space = true;
-                        if (isLocked) player.onJumpInput(e.repeat);
+                        if (typeof window.workerInstance === 'undefined' && isLocked) player.onJumpInput(e.repeat);
                         break;
                     case 'shift': this.keys.shift = true; break;
                     case 'c': this.keys.c = true; break;
                     case 'q': 
                         if(!this.keys.q) {
                             this.keys.q = true;
-                            if(isLocked && !player.isDead) player.onTeleportInput();
+                            if(typeof window.workerInstance === 'undefined' && isLocked && !player.isDead) player.onTeleportInput();
                         }
                         break;
                     case 'f': 
                         if (!this.keys.f) { 
                             this.keys.f = true; 
-                            if(isLocked && !player.isDead) player.beginAim(PlayerLoadout.f); 
+                            if(typeof window.workerInstance === 'undefined' && isLocked && !player.isDead) player.beginAim(PlayerLoadout.f); 
                         }
                         break;
                     case 'r':
                         if (!this.keys.r) { 
                             this.keys.r = true; 
-                            if(isLocked && !player.isDead) player.beginAim(PlayerLoadout.r); 
+                            if(typeof window.workerInstance === 'undefined' && isLocked && !player.isDead) player.beginAim(PlayerLoadout.r); 
                         }
                         break;
                     case 'e':
                         if (!this.keys.e) { 
                             this.keys.e = true; 
-                            if(isLocked && !player.isDead) player.beginAim(PlayerLoadout.e); 
+                            if(typeof window.workerInstance === 'undefined' && isLocked && !player.isDead) player.beginAim(PlayerLoadout.e); 
                         }
                         break;
                     case 'g':
@@ -2657,21 +2658,21 @@
                     case 'a': this.keys.a = false; break;
                     case 's': this.keys.s = false; break;
                     case 'd': this.keys.d = false; break;
-                    case ' ': this.keys.space = false; player.wantsToJump = false; break;
+                    case ' ': this.keys.space = false; if (typeof window.workerInstance === 'undefined') player.wantsToJump = false; break;
                     case 'shift': this.keys.shift = false; break;
                     case 'c': this.keys.c = false; break;
                     case 'q': this.keys.q = false; break;
                     case 'f': 
                         this.keys.f = false; 
-                        if(isLocked && !player.isDead) player.endAim();
+                        if(typeof window.workerInstance === 'undefined' && isLocked && !player.isDead) player.endAim();
                         break;
                     case 'r': 
                         this.keys.r = false; 
-                        if(isLocked && !player.isDead) player.endAim();
+                        if(typeof window.workerInstance === 'undefined' && isLocked && !player.isDead) player.endAim();
                         break;
                     case 'e': 
                         this.keys.e = false; 
-                        if(isLocked && !player.isDead) player.endAim();
+                        if(typeof window.workerInstance === 'undefined' && isLocked && !player.isDead) player.endAim();
                         break;
                 }
                 this.updateBuffer();
@@ -2796,7 +2797,29 @@
             }
         };
 
-        const AudioSys = {
+        const AudioSys = isWorker ? {
+            playZap: ()=>postMessage({type:'AUDIO', method:'playZap', args:[]}),
+            playHit: (f,t,d,v,p)=>postMessage({type:'AUDIO', method:'playHit', args:[f,t,d,v,p]}),
+            playDeath: ()=>postMessage({type:'AUDIO', method:'playDeath', args:[]}),
+            playDash: ()=>postMessage({type:'AUDIO', method:'playDash', args:[]}),
+            playJump: ()=>postMessage({type:'AUDIO', method:'playJump', args:[]}),
+            playStep: ()=>postMessage({type:'AUDIO', method:'playStep', args:[]}),
+            playShoot: ()=>postMessage({type:'AUDIO', method:'playShoot', args:[]}),
+            playImpact: ()=>postMessage({type:'AUDIO', method:'playImpact', args:[]}),
+            playSwoosh: ()=>postMessage({type:'AUDIO', method:'playSwoosh', args:[]}),
+            playHeavySwoosh: ()=>postMessage({type:'AUDIO', method:'playHeavySwoosh', args:[]}),
+            playThud: ()=>postMessage({type:'AUDIO', method:'playThud', args:[]}),
+            playExplosion: ()=>postMessage({type:'AUDIO', method:'playExplosion', args:[]}),
+            playBassDrop: ()=>postMessage({type:'AUDIO', method:'playBassDrop', args:[]}),
+            playGlitch: ()=>postMessage({type:'AUDIO', method:'playGlitch', args:[]}),
+            playSpawn: ()=>postMessage({type:'AUDIO', method:'playSpawn', args:[]}),
+            playSelect: ()=>postMessage({type:'AUDIO', method:'playSelect', args:[]}),
+            playUI: (p)=>postMessage({type:'AUDIO', method:'playUI', args:[p]}),
+            updateSlide: (i)=>postMessage({type:'AUDIO', method:'updateSlide', args:[i]}),
+            stopAll: ()=>postMessage({type:'AUDIO', method:'stopAll', args:[]}),
+            init: ()=>{},
+            setVolume: ()=>{}
+        } : {
             ctx: null,
             masterGain: null,
             slideOsc: null,
@@ -7033,7 +7056,7 @@
             return tex;
         }
 
-        function init() {
+        function initDOM() {
             lastUnlockTime = performance.now() - 5000;
 
             const btn = document.getElementById('start-btn');
@@ -7196,20 +7219,23 @@
                 MapManager.switch(next);
             });
 
+            }
+
+        function initEngine(canvas) {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(80, engineWidth / engineHeight, 0.1, 1000);
             camera.rotation.order = 'YXZ'; 
             camera.position.set(0, 2, 0);
             scene.add(camera);
 
-            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-            renderer.setSize(engineWidth, engineHeight);
+            renderer = (canvas) ? new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: "high-performance" }) : new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(engineWidth, engineHeight, false);
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             renderer.outputEncoding = THREE.sRGBEncoding;
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
             renderer.toneMappingExposure = 1.0 * brightnessMultiplier; 
-            if (!isWorker) {
+            if (!isWorker && !canvas) {
                 document.body.appendChild(renderer.domElement);
             }
 
@@ -7264,15 +7290,19 @@
             createSlashEffect(); 
             createTeleportMarker();
             initObjectPools(); // Pre-allocate memory pools
-            InputManager.init();
-            NarrativeSys.init();
+            if (!isWorker) {
+                InputManager.init();
+                NarrativeSys.init();
+                Minimap.init();
+                renderStatsContent();
+            }
             player.init();
-            Minimap.init();
-            renderStatsContent();
 
-            window.addEventListener('resize', onWindowResize);
+            if (!isWorker) {
+                window.addEventListener('resize', onWindowResize);
+            }
             
-            document.addEventListener('pointerlockchange', () => {
+            if (!isWorker) document.addEventListener('pointerlockchange', () => {
                 isLocked = document.pointerLockElement === document.body;
                 const screen = document.getElementById('start-screen');
                 
@@ -7300,15 +7330,14 @@
                 }
             });
             
-            document.addEventListener('pointerlockerror', (e) => {
+            if (!isWorker) document.addEventListener('pointerlockerror', (e) => {
                 console.warn("Pointer lock error detected.", e);
                 if(!isLocked) {
                     document.getElementById('start-screen').style.display = 'flex';
                 }
             });
 
-            applyTheme();
-            animate();
+            if (!isWorker) applyTheme();
         }
 
         function generatePlayerTitle() {
@@ -10054,17 +10083,25 @@
                     player.extraLives--;
                     player.health = CONFIG.playerMaxHP; 
                     showKillMessage("EXTRA LIFE USED!", "achievement", "#00ff00");
-                    AudioSys.playTeleport(); 
-                    updateLivesDisplay();
+                    if (typeof AudioSys !== 'undefined') AudioSys.playTeleport(); 
+                    if (isWorker) {
+                        postMessage({ type: 'UI', method: 'updateLivesDisplay' });
+                    } else {
+                        updateLivesDisplay();
+                    }
                 } else {
                     player.health = 0;
                     player.isDead = true;
-                    document.exitPointerLock();
                     showKillMessage("TERMINATED", "achievement");
-                    const diff = Date.now() - sessionStartTime;
-                    const mins = Math.floor(diff / 60000);
-                    const secs = Math.floor((diff % 60000) / 1000);
-                    document.getElementById('session-timer').innerText = `Session Time: ${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+                    if (isWorker) {
+                        postMessage({ type: 'UI', method: 'playerDeath' });
+                    } else {
+                        if (document.exitPointerLock) document.exitPointerLock();
+                        const diff = Date.now() - sessionStartTime;
+                        const mins = Math.floor(diff / 60000);
+                        const secs = Math.floor((diff % 60000) / 1000);
+                        document.getElementById('session-timer').innerText = `Session Time: ${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+                    }
                 }
             }
         }
@@ -10091,7 +10128,10 @@
                     updateLivesDisplay();
                 }
             }
+        
         }
+
+        
 
         function resetGame() {
             goldenBuffActive = false;
@@ -10167,7 +10207,7 @@
                 camera.aspect = engineWidth / engineHeight;
                 camera.updateProjectionMatrix();
                 if (typeof renderer !== 'undefined' && renderer) {
-                    renderer.setSize(engineWidth, engineHeight);
+                    renderer.setSize(engineWidth, engineHeight, false);
                 }
             }
         }
@@ -10189,7 +10229,9 @@
             if(showFPS) {
                 fpsFrames++;
                 if(now > lastFpsTime + 1000) {
-                    document.getElementById('fps-display').innerHTML = '<div class="fps-inner">FPS: ' + fpsFrames + '</div>';
+                    if (!isWorker) {
+                        document.getElementById('fps-display').innerHTML = '<div class="fps-inner">FPS: ' + fpsFrames + '</div>';
+                    }
                     fpsFrames = 0;
                     lastFpsTime = now;
                 }
@@ -10357,6 +10399,8 @@
             }
             if (!isWorker) {
                 Minimap.update();
+            }
+            if (renderer) {
                 renderer.render(scene, camera);
             }
         }
@@ -10373,6 +10417,9 @@
                     entityFloat32 = new Float32Array(sharedEntityBuffer);
                     engineWidth = data.width;
                     engineHeight = data.height;
+
+                    initEngine(data.canvas);
+
                     console.log("Worker engine synchronized successfully.");
                     lastTime = performance.now();
                     animate();
@@ -10385,10 +10432,26 @@
             };
         } else {
             // Main Thread Authority
-            init();
+            initDOM();
             
             // Initiate Neural Shadow Core (Background Engine)
             try {
+                // We create a central canvas to transfer to the background thread
+                const canvasEl = document.createElement('canvas');
+                canvasEl.id = "main-game-canvas";
+                canvasEl.style.width = '100vw';
+                canvasEl.style.height = '100vh';
+                canvasEl.style.display = 'block';
+                canvasEl.style.position = 'absolute';
+                canvasEl.style.top = '0';
+                canvasEl.style.left = '0';
+                canvasEl.style.zIndex = '0';
+                document.body.appendChild(canvasEl);
+                let offscreen = null;
+                if (typeof canvasEl.transferControlToOffscreen === 'function') {
+                    offscreen = canvasEl.transferControlToOffscreen();
+                }
+
                 const scriptNode = document.getElementById('main-game-script');
                 if (scriptNode && typeof SharedArrayBuffer !== 'undefined') {
                     const blob = new Blob([scriptNode.textContent], { type: 'application/javascript' });
@@ -10398,14 +10461,54 @@
                         type: 'START_ENGINE',
                         sharedInputBuffer,
                         sharedEntityBuffer,
+                        canvas: offscreen,
                         width: window.innerWidth,
                         height: window.innerHeight
-                    });
+                    }, offscreen ? [offscreen] : []);
+                    
+                    window.workerInstance.onmessage = function(e) {
+                        const data = e.data;
+                        if (data.type === 'AUDIO') {
+                            if (AudioSys && AudioSys[data.method]) AudioSys[data.method](...data.args);
+                        } else if (data.type === 'UI') {
+                            if (data.method === 'showDamage') DOM_UI.showDamage();
+                            if (data.method === 'triggerKillFeed') DOM_UI.triggerKillFeed(data.text, data.colorStr, data.color2);
+                            if (data.method === 'updateLivesDisplay') updateLivesDisplay();
+                            if (data.method === 'playerDeath') {
+                                if (document.exitPointerLock) document.exitPointerLock();
+                                const diff = Date.now() - sessionStartTime;
+                                const mins = Math.floor(diff / 60000);
+                                const secs = Math.floor((diff % 60000) / 1000);
+                                document.getElementById('session-timer').innerText = `Session Time: ${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+                            }
+                        }
+                    };
                     
                     console.log("Worker Thread initialized successfully.");
+                    
+                    function domLoop() {
+                        requestAnimationFrame(domLoop);
+                        if (typeof entityFloat32 !== 'undefined' && entityFloat32) {
+                            const ui_hp = entityFloat32[MEMORY_LAYOUT.OUT_PLAYER_HP];
+                            const ui_en = entityFloat32[MEMORY_LAYOUT.OUT_PLAYER_ENERGY];
+                            const score = entityFloat32[MEMORY_LAYOUT.OUT_SCORE];
+                            const combo = entityFloat32[MEMORY_LAYOUT.OUT_COMBO];
+                            DOM_UI.updateHealth(ui_hp, CONFIG.playerMaxHP);
+                            DOM_UI.updateEnergy(ui_en, CONFIG.energyMax);
+                            DOM_UI.updateScore(score);
+                            DOM_UI.updateCombo(combo, 1);
+                            DOM_UI.setStartButtonContext();
+                        }
+                    }
+                    domLoop();
+                } else if (!offscreen) {
+                    initEngine(null);
+                    animate();
                 }
             } catch(err) {
                 console.warn("Worker Thread initialization failed:", err.message);
+                initEngine(null);
+                animate();
             }
         }
     </script>
