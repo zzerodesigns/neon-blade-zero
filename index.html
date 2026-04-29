@@ -933,23 +933,27 @@
             OUT_COMBO: 3
         };
         
-        let sharedInputBuffer, sharedEntityBuffer;
+        let sharedInputBuffer = null;
+        let sharedEntityBuffer = null;
         let inputFloat32, inputInt32;
         let entityFloat32;
         
         try {
             if (!isWorker) {
                 // Main thread creates SAB
-                sharedInputBuffer = new SharedArrayBuffer(MEMORY_LAYOUT.INPUT_BUFFER_SIZE * 4);
-                sharedEntityBuffer = new SharedArrayBuffer(MEMORY_LAYOUT.ENTITY_BUFFER_SIZE * 4);
+                const sabIn = new SharedArrayBuffer(MEMORY_LAYOUT.INPUT_BUFFER_SIZE * 4);
+                const sabEn = new SharedArrayBuffer(MEMORY_LAYOUT.ENTITY_BUFFER_SIZE * 4);
+                
+                sharedInputBuffer = sabIn;
+                sharedEntityBuffer = sabEn;
                 
                 inputFloat32 = new Float32Array(sharedInputBuffer);
                 inputInt32 = new Int32Array(sharedInputBuffer);
                 entityFloat32 = new Float32Array(sharedEntityBuffer);
-                console.log("SharedArrayBuffer registers initialized.");
+                console.log("SharedArrayBuffer registers successfully initialized.");
             }
         } catch (e) {
-            console.warn("SharedArrayBuffer restricted. Reverting to main-thread execution.");
+            console.warn("SharedArrayBuffer construction blocked (Expected in some hosted environments). Reverting to main-thread local state.");
         }
 
         // --- DOM INTERFACE PROXIES ---
@@ -7265,7 +7269,7 @@
                 if (idx === -1) idx = 0;
                 const next = order[(idx + 1) % order.length];
                 
-                if (window.workerInstance) {
+                if (sharedInputBuffer && window.workerInstance) {
                     window.workerInstance.postMessage({ type: 'SWITCH_MAP', name: next });
                 } else {
                     MapManager.switch(next);
@@ -10504,7 +10508,8 @@
             // Initiate Neural Shadow Core (Background Engine)
             try {
                 const scriptNode = document.getElementById('main-game-script');
-                const canUseWorker = scriptNode && typeof SharedArrayBuffer !== 'undefined' && typeof HTMLCanvasElement.prototype.transferControlToOffscreen === 'function';
+                // HARDENED CHECK: Must have script content, valid SAB, and Offscreen Support
+                const canUseWorker = !!(scriptNode && sharedInputBuffer && typeof HTMLCanvasElement.prototype.transferControlToOffscreen === 'function');
 
                 if (canUseWorker) {
                     // We create a central canvas to transfer to the background thread
@@ -10527,6 +10532,21 @@
                     const blob = new Blob([scriptNode.textContent], { type: 'application/javascript' });
                     window.workerInstance = new Worker(URL.createObjectURL(blob));
                     
+                    // Critical Error Handler for Worker (Hosted environment panic fallback)
+                    window.workerInstance.onerror = function(err) {
+                        console.error("CRITICAL: Worker Engine crashed during boot.", err);
+                        // Emergency Fallback: Murder the worker and take control locally
+                        window.workerInstance.terminate();
+                        window.workerInstance = null;
+                        sharedInputBuffer = null; // Kill global SAB pointer
+                        
+                        // Clean up the offscreen transfer canvas if it's there
+                        if (canvasEl && canvasEl.parentNode) canvasEl.parentNode.removeChild(canvasEl);
+                        
+                        initEngine(null);
+                        animate();
+                    };
+
                     window.workerInstance.postMessage({
                         type: 'START_ENGINE',
                         sharedInputBuffer,

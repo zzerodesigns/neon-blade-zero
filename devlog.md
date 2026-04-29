@@ -68,6 +68,11 @@
 
 ## 📖 version history / patch notes
 
+### v48.7.1f - Hybrid Engine Resilience & SAB Hardening
+*   **False-Positive SAB Detection Fix:** Updated `canUseWorker` check to require successful `SharedArrayBuffer` instantiation. This ensures that browsers which define `SharedArrayBuffer` but restrict its usage (common in hosted iframes without COOP/COEP headers) correctly fall back to the main-thread engine.
+*   **Worker Panic Fallback:** Implemented a global `window.workerInstance.onerror` handler. If the background physics engine fails to boot for any reason, the main thread now automatically terminates the zombie worker and initializes a local game loop, preventing total application lock-up.
+*   **Map Switch Integrity:** Hardened the map-switching handler to verify both worker existence and memory-buffer validity before delegating work, ensuring the "MAP" button on the pause screen remains functional in main-thread fallback mode.
+
 ### v48.7.1e - Hosted Environment Hardening & Fallback Fixes
 *   **Startup Bypass:** Implemented a `.catch()` hook for Pointer Lock requests. If the browser rejects the lock (common in hosted iframes), the game now manually transitions to the active state, ensuring the "ENTER ARENA" button is never a soft-lock point.
 *   **Fallback Canvas Visibility:** Explicitly styled the renderer's DOM element with absolute positioning and z-index during main-thread initialization. This prevents the game world from being pushed invisibly to the bottom of the page when Web Workers are unavailable.
