@@ -1,4 +1,4 @@
-# neon blade: development log & playtest notes 
+# neon blade: development log & playtest notes
 
 > **Note to AI Agents:** Read this file to understand current bugs, planned features, and user observations. Do not modify the architecture based on this file alone; use it as a task list and context guide.
 
@@ -62,11 +62,17 @@
 *   **Synthesized Melodies:** Integrate procedural Web Audio API melodies as easter eggs or ambient tracks.
 
 ## ✅ recently completed concepts
-- [x] **Started IPC Architecture:** Drafted Service Worker (`sw.js`). Split file into Main Thread (UI logic via `DOM_UI` proxying to SAB/Main) and Worker logic via `isWorker` boundaries.
-- [x] **Input Bridging:** Refactored `InputManager` to read/write hardware input states from the SharedArrayBuffer using `Atomics`, removing DOM `addEventListener` dependencies from the engine tick loop.
-- [x] **Offscreen Texture Allocation:** Modified procedural texture generator functions to use dynamically instantiated `OffscreenCanvas` contexts when triggered by the worker, enabling background asset generation.
+- [x] **Tactile Physics & Stasis Integration:** finalized the v48.7.0 baseline including ragdoll tumbling and temporal dilation.
+
+## 🗄️ shelved / experimental bench
+- [ ] **Decoupled IPC Engine (Neural Shadow Core):** Attempted to split the 3D engine and physics into a Dedicated Web Worker with `SharedArrayBuffer` synchronization. Successfully implemented the logic but encountered insurmountable "silent crashes" in hosted environments lack cross-origin isolation headers. Shelved in v48.7.0 (Restored).
 
 ## 📖 version history / patch notes
+
+### v48.7.0 (Restored Baseline) - Decoupled Architecture Rollback
+*   **Engine Rollback:** Rolled back `index.html` and `architecture.md` to the v48.7.0 baseline. The multi-threaded "Neural Shadow Core" experiment (v48.7.1x) has been shelved due to persistent initialization failures in restricted hosted environments.
+*   **IPC Deprecation:** Removed the Service Worker (`sw.js`), SharedArrayBuffer memory mapping, and OffscreenCanvas delegation. All physics, rendering, and logic are once again handled by the main thread to ensure universal compatibility.
+*   **Documentation Sync:** Cleaned up versioning strings across the application to reflect the return to the stable v48.7.0 feature set.
 
 ### v48.7.1f - Hybrid Engine Resilience & SAB Hardening
 *   **False-Positive SAB Detection Fix:** Updated `canUseWorker` check to require successful `SharedArrayBuffer` instantiation. This ensures that browsers which define `SharedArrayBuffer` but restrict its usage (common in hosted iframes without COOP/COEP headers) correctly fall back to the main-thread engine.
@@ -77,8 +83,6 @@
 *   **Startup Bypass:** Implemented a `.catch()` hook for Pointer Lock requests. If the browser rejects the lock (common in hosted iframes), the game now manually transitions to the active state, ensuring the "ENTER ARENA" button is never a soft-lock point.
 *   **Fallback Canvas Visibility:** Explicitly styled the renderer's DOM element with absolute positioning and z-index during main-thread initialization. This prevents the game world from being pushed invisibly to the bottom of the page when Web Workers are unavailable.
 *   **Worker Crash Prevention:** Hardened `applyTheme()` with `isWorker` guards to prevent the background engine from attempting to access non-existent DOM elements during map switches, resolving a fatal ReferenceError in multi-threaded mode.
-
-### v48.7.1d - State Synchronization & Offscreen Compatibility
 *   **State Buffer Synchronization:** Fixed critical logic desynchronization where `isLocked`, `teleportMode`, `currentTheme`, and `PlayerLoadout` were not being correctly propagated to the background physics engine, ensuring the "Arena" state correctly resumes and maintains the proper visual and mechanical state.
 *   **TransferControl Fallback:** Added a defensive check for `transferControlToOffscreen` support, preventing crashes in legacy environments or specific webview implementations that support `SharedArrayBuffer` but lack OffscreenCanvas transferability.
 

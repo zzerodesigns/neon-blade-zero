@@ -20,32 +20,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <script>
-        // Conditionally register the service worker ONLY if we are lacking crossOriginIsolation
-        // This is necessary for GitHub Pages to support SharedArrayBuffer.
-        if ('serviceWorker' in navigator && window.crossOriginIsolated === false && window.isSecureContext) {
-            navigator.serviceWorker.register('sw.js').then((registration) => {
-                registration.addEventListener("updatefound", () => {
-                    window.sessionStorage.removeItem('sw_reloaded');
-                });
-                if (registration.active && !navigator.serviceWorker.controller) {
-                    if (!window.sessionStorage.getItem('sw_reloaded')) {
-                        window.sessionStorage.setItem('sw_reloaded', 'true');
-                        window.location.reload();
-                    }
-                }
-                navigator.serviceWorker.addEventListener("controllerchange", () => {
-                    if (!window.sessionStorage.getItem('sw_reloaded')) {
-                        window.sessionStorage.setItem('sw_reloaded', 'true');
-                        window.location.reload();
-                    }
-                });
-            }).catch(e => console.warn("SW Registration Failed", e));
-        }
-    </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v48.7.1e</title>
+    <title>Neon Blade: Melee Arena v48.7.0</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -635,6 +612,7 @@
             filter: drop-shadow(0 0 6px rgba(248, 113, 113, 0.5));
         }
     </style>
+    <link rel="stylesheet" href="/index.css">
 </head>
 <body>
 
@@ -854,22 +832,13 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.7.1e<br>- Decoupled Engine Architecture -</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.7.0<br>- Tactile Ragdoll Physics & Stasis Gadget Loadout -</div>
         </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     
-    <script id="main-game-script">
-        const isWorker = typeof window === 'undefined';
-        if(isWorker) {
-            importScripts("https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js");
-            self.window = self;
-            if (typeof requestAnimationFrame === 'undefined') {
-                self.requestAnimationFrame = function(cb) { setTimeout(cb, 1000/60); };
-            }
-        }
-
+    <script>
         const stasisFields = [];
         const PlayerLoadout = {
             f: 'FRAG',
@@ -886,7 +855,6 @@
             if (unmapped.length > 0) {
                 PlayerLoadout[slot] = unmapped[0];
                 updateLoadoutUI();
-                InputManager.updateBuffer();
             }
         }
 
@@ -907,186 +875,6 @@
             document.getElementById('icon-r').querySelector('.ability-name').innerText = PlayerLoadout.r;
             document.getElementById('icon-e').querySelector('.ability-name').innerText = PlayerLoadout.e;
         }
-
-        // --- NEURAL DATA SYNC ---
-        // Pre-allocate SharedArrayBuffers for background thread execution
-        const MEMORY_LAYOUT = {
-            INPUT_BUFFER_SIZE: 64, // 64 floats for input states (mouse, keys, etc.)
-            ENTITY_BUFFER_SIZE: 1024 * 16, // 16k floats for entity transform/state tracking
-            
-            // Input offsets (Main writes, Worker reads)
-            IN_KEYS: 0,       // Bitmask (W,A,S,D, Space, Shift, C)
-            IN_MOUSE_X: 1,    // Mouse delta X
-            IN_MOUSE_Y: 2,    // Mouse delta Y
-            IN_CLICK: 3,      // Mouse click states
-            IN_LOCKED: 4,     // 0 or 1
-            IN_TP_MODE: 5,    // 0: AIM, 1: DASH
-            IN_THEME: 6,      // 0: LIGHT, 1: DARK, 2: NEON
-            IN_LOADOUT_F: 7,  // Index in AvailableGadgets
-            IN_LOADOUT_R: 8,
-            IN_LOADOUT_E: 9,
-            
-            // Entity offsets (Worker writes, Main reads for HUD/Audio)
-            OUT_PLAYER_HP: 0,
-            OUT_PLAYER_ENERGY: 1,
-            OUT_SCORE: 2,
-            OUT_COMBO: 3
-        };
-        
-        let sharedInputBuffer = null;
-        let sharedEntityBuffer = null;
-        let inputFloat32, inputInt32;
-        let entityFloat32;
-        
-        try {
-            if (!isWorker) {
-                // Main thread creates SAB
-                const sabIn = new SharedArrayBuffer(MEMORY_LAYOUT.INPUT_BUFFER_SIZE * 4);
-                const sabEn = new SharedArrayBuffer(MEMORY_LAYOUT.ENTITY_BUFFER_SIZE * 4);
-                
-                sharedInputBuffer = sabIn;
-                sharedEntityBuffer = sabEn;
-                
-                inputFloat32 = new Float32Array(sharedInputBuffer);
-                inputInt32 = new Int32Array(sharedInputBuffer);
-                entityFloat32 = new Float32Array(sharedEntityBuffer);
-                console.log("SharedArrayBuffer registers successfully initialized.");
-            }
-        } catch (e) {
-            console.warn("SharedArrayBuffer construction blocked (Expected in some hosted environments). Reverting to main-thread local state.");
-        }
-
-        // --- DOM INTERFACE PROXIES ---
-        // Decoupled UI handlers to allow the background engine to trigger visual updates
-        const DOM_UI = {
-            updateHealth: function(hp, maxHp) {
-                if (isWorker) return;
-                const hpPct = Math.max(0, hp / (maxHp/100)); 
-                document.getElementById('health-fill').style.width = hpPct + '%';
-            },
-            updateEnergy: function(en, maxEn) {
-                if (isWorker) return;
-                const enPct = Math.max(0, (en / maxEn) * 100);
-                document.getElementById('energy-fill').style.width = enPct + '%';
-            },
-            setVignette: function(active, opacity="1") {
-                if (isWorker) return;
-                const healthFill = document.getElementById('health-fill');
-                if (active) {
-                    if (healthFill && !healthFill.classList.contains('health-critical')) healthFill.classList.add('health-critical');
-                    const vig = document.getElementById('low-health-vignette');
-                    if(vig) {
-                        vig.style.boxShadow = "inset 0 0 150px rgba(255, 0, 0, 0.5)";
-                        vig.style.opacity = opacity;
-                    }
-                } else {
-                    if (healthFill && healthFill.classList.contains('health-critical')) healthFill.classList.remove('health-critical');
-                    const vig = document.getElementById('low-health-vignette');
-                    if(vig) {
-                        vig.style.opacity = "0";
-                        vig.style.boxShadow = "inset 0 0 100px rgba(255, 0, 0, 0)";
-                    }
-                }
-            },
-            setCrosshair: function(scale, gap, opacity, rotation = 22.5) {
-                if (isWorker) return;
-                const ch = document.getElementById('crosshair');
-                ch.style.transform = `translate(-50%, -50%) scale(${scale}) rotate(${rotation}deg)`;
-                ch.style.gap = `${gap}px`;
-                ch.style.opacity = opacity;
-            },
-            updateScore: function(score) {
-                if (isWorker) return;
-                const sd = document.getElementById('score-display');
-                if (sd) sd.innerText = "SCORE: " + score;
-            },
-            showDamage: function() {
-                if (isWorker) return postMessage({ type: 'UI', method: 'showDamage' });
-                const overlay = document.getElementById('damage-overlay');
-                if (overlay) {
-                    overlay.style.background = "radial-gradient(circle, transparent 20%, rgba(255,0,0,0.6) 100%)";
-                    setTimeout(() => {
-                        overlay.style.background = "radial-gradient(circle, transparent 50%, rgba(255,0,0,0.0) 100%)";
-                    }, 200);
-                }
-            },
-            triggerKillFeed: function(text, type="", color=null) {
-                if (isWorker) return postMessage({ type: 'UI', method: 'triggerKillFeed', text, colorStr: type, color2: color });
-                const feed = document.getElementById('kill-feed');
-                const msg = document.createElement('div');
-                msg.className = "kill-msg " + type;
-                msg.innerHTML = text; 
-                if(color) {
-                    msg.style.color = color;
-                    msg.style.borderLeftColor = color;
-                }
-                feed.prepend(msg);
-                if(feed.children.length > 6) feed.removeChild(feed.lastChild);
-                
-                requestAnimationFrame(() => msg.style.opacity = 1);
-                
-                setTimeout(() => {
-                    msg.style.opacity = 0;
-                    msg.style.transform = "translateY(-10px) scale(0.95)";
-                    setTimeout(() => msg.remove(), 400); 
-                }, 2500); 
-            },
-            setStartButtonContext: function() {
-                if (isWorker) return;
-                const btn = document.getElementById('start-btn');
-                if (btn && btn.innerText === "b r e a t h e" && isLocked) {
-                     btn.innerText = "ENTER ARENA";
-                     btn.style.opacity = 1;
-                     btn.style.letterSpacing = "2px";
-                }
-            },
-            updateIcons: function(activeType, qActive) {
-                if (isWorker) return;
-                if (activeType !== undefined) {
-                    if (activeType === null) {
-                        document.getElementById('icon-f').classList.remove('active');
-                        document.getElementById('icon-r').classList.remove('active');
-                        document.getElementById('icon-e').classList.remove('active');
-                    } else {
-                        document.getElementById('icon-f').classList.toggle('active', activeType===PlayerLoadout.f);
-                        document.getElementById('icon-r').classList.toggle('active', activeType===PlayerLoadout.r);
-                        document.getElementById('icon-e').classList.toggle('active', activeType===PlayerLoadout.e);
-                    }
-                }
-                if (qActive !== undefined) {
-                    if (qActive) document.getElementById('icon-q').classList.add('active');
-                    else document.getElementById('icon-q').classList.remove('active');
-                }
-            },
-            updateMapButton: function(name) {
-                if (isWorker) return;
-                const mapBtn = document.getElementById('map-btn');
-                if (mapBtn) mapBtn.innerText = "MAP: " + name;
-            },
-            updateCombo: function(comboCount, multiplier) {
-                if (isWorker) return;
-                const el = document.getElementById('combo-display');
-                if (!el) return;
-                
-                if (comboCount > 1) {
-                    el.style.opacity = 1;
-                    el.style.transform = `translate(-50%, 0) scale(${1 + (comboCount * 0.05)})`;
-                    const meme = document.getElementById('meme-overlay');
-                    if(comboCount === 5) { meme.innerText = "NICE"; meme.style.opacity = 1; meme.style.fontSize = "5rem"; setTimeout(() => meme.style.opacity = 0, 1000); }
-                    if(comboCount === 10) { meme.innerText = "SICK"; meme.style.opacity = 1; meme.style.fontSize = "6rem"; setTimeout(() => meme.style.opacity = 0, 1000); }
-                    if(comboCount === 20) { meme.innerText = "UNREAL"; meme.style.opacity = 1; meme.style.fontSize = "8rem"; setTimeout(() => meme.style.opacity = 0, 1000); }
-                    
-                    let styleText = "";
-                    if(multiplier > 1) {
-                        styleText = `<span style="color:#00ffff; font-size:0.6em; margin-left: 10px;">x${multiplier} M L T</span>`;
-                    }
-                    el.innerHTML = `${comboCount} <span style="font-size:0.5em">H I T S</span>${styleText}`;
-                } else {
-                    el.style.opacity = 0;
-                    el.style.transform = 'translate(-50%, 20px) scale(0.8)';
-                }
-            }
-        };
 
         // --- CONFIGURATION ---
         const CONFIG = {
@@ -2512,83 +2300,7 @@
         const InputManager = {
             keys: { w: false, a: false, s: false, d: false, space: false, shift: false, c: false, q: false, f: false, r: false, e: false },
             mouseDown: false,
-            pollWorkerInputs: function() {
-                if (!isWorker || typeof inputInt32 === 'undefined') return;
-                
-                const bitmask = Atomics.load(inputInt32, MEMORY_LAYOUT.IN_KEYS);
-                const clickState = Atomics.load(inputInt32, MEMORY_LAYOUT.IN_CLICK);
-                
-                // Sync global states from main thread
-                isLocked = Atomics.load(inputInt32, MEMORY_LAYOUT.IN_LOCKED) === 1;
-                teleportMode = Atomics.load(inputInt32, MEMORY_LAYOUT.IN_TP_MODE) === 1 ? 'DASH' : 'AIM';
-                currentTheme = Atomics.load(inputInt32, MEMORY_LAYOUT.IN_THEME);
-                
-                const fIdx = Atomics.load(inputInt32, MEMORY_LAYOUT.IN_LOADOUT_F);
-                const rIdx = Atomics.load(inputInt32, MEMORY_LAYOUT.IN_LOADOUT_R);
-                const eIdx = Atomics.load(inputInt32, MEMORY_LAYOUT.IN_LOADOUT_E);
-                
-                PlayerLoadout.f = AvailableGadgets[fIdx] || 'FRAG';
-                PlayerLoadout.r = AvailableGadgets[rIdx] || 'VOID';
-                PlayerLoadout.e = AvailableGadgets[eIdx] || 'IMPULSE';
-
-                const prevKeys = { ...this.keys };
-                const prevClick = this.mouseDown;
-                
-                this.keys.w = (bitmask & 1) !== 0;
-                this.keys.a = (bitmask & 2) !== 0;
-                this.keys.s = (bitmask & 4) !== 0;
-                this.keys.d = (bitmask & 8) !== 0;
-                this.keys.space = (bitmask & 16) !== 0;
-                this.keys.shift = (bitmask & 32) !== 0;
-                this.keys.c = (bitmask & 64) !== 0;
-                this.keys.q = (bitmask & 128) !== 0;
-                this.keys.f = (bitmask & 256) !== 0;
-                this.keys.r = (bitmask & 512) !== 0;
-                this.keys.e = (bitmask & 1024) !== 0;
-                
-                this.mouseDown = (clickState & 1) !== 0;
-                
-                // Edge detections for jump/attack/teleport
-                if (this.keys.space && !prevKeys.space) {
-                    if (isLocked) player.onJumpInput(false);
-                }
-                if (this.keys.q && !prevKeys.q) {
-                    if (isLocked && !player.isDead) player.onTeleportInput();
-                }
-                if (this.keys.f && !prevKeys.f) {
-                    if (isLocked && !player.isDead) player.beginAim(PlayerLoadout.f);
-                } else if (!this.keys.f && prevKeys.f) {
-                    if (isLocked && !player.isDead) player.endAim();
-                }
-                if (this.keys.r && !prevKeys.r) {
-                    if (isLocked && !player.isDead) player.beginAim(PlayerLoadout.r);
-                } else if (!this.keys.r && prevKeys.r) {
-                    if (isLocked && !player.isDead) player.endAim();
-                }
-                if (this.keys.e && !prevKeys.e) {
-                    if (isLocked && !player.isDead) player.beginAim(PlayerLoadout.e);
-                } else if (!this.keys.e && prevKeys.e) {
-                    if (isLocked && !player.isDead) player.endAim();
-                }
-                if (this.mouseDown && !prevClick) {
-                    if (isLocked) player.onAttackInput();
-                }
-                
-                const mx = inputFloat32[MEMORY_LAYOUT.IN_MOUSE_X];
-                const my = inputFloat32[MEMORY_LAYOUT.IN_MOUSE_Y];
-                if (mx !== 0 || my !== 0) {
-                    if (isLocked && !player.isDead && !autoplay.active) {
-                        camera.rotation.y -= mx * 0.002;
-                        camera.rotation.x -= my * 0.002;
-                        camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
-                    }
-                    // Reset accumulators
-                    inputFloat32[MEMORY_LAYOUT.IN_MOUSE_X] = 0;
-                    inputFloat32[MEMORY_LAYOUT.IN_MOUSE_Y] = 0;
-                }
-            },
             init: function() {
-                if (isWorker) return;
                 document.addEventListener('keydown', (e) => this.onKeyDown(e));
                 document.addEventListener('keyup', (e) => this.onKeyUp(e));
                 
@@ -2598,47 +2310,16 @@
                 document.addEventListener('mousedown', (e) => {
                     if (isLocked && autoplay.active) autoplay.cancel();
                     if (e.button === 0) this.mouseDown = true;
-                    if (typeof window.workerInstance === 'undefined') {
-                        if (isLocked && e.button === 0) player.onAttackInput();
-                        if (e.button === 2 && isLocked) player.onSecondaryInput();
+                    if (isLocked && e.button === 0) {
+                        player.onAttackInput();
                     }
-                    this.updateBuffer();
+                    // Right Click Handler
+                    if (e.button === 2 && isLocked) {
+                        player.onSecondaryInput();
+                    }
                 });
-                document.addEventListener('mouseup', () => { 
-                    this.mouseDown = false; 
-                    this.updateBuffer();
-                });
+                document.addEventListener('mouseup', () => { this.mouseDown = false; });
                 document.addEventListener('mousemove', (e) => this.onMouseMove(e));
-            },
-            updateBuffer: function() {
-                if (typeof inputInt32 !== 'undefined' && inputInt32) {
-                    let bitmask = 0;
-                    if (this.keys.w) bitmask |= 1;
-                    if (this.keys.a) bitmask |= 2;
-                    if (this.keys.s) bitmask |= 4;
-                    if (this.keys.d) bitmask |= 8;
-                    if (this.keys.space) bitmask |= 16;
-                    if (this.keys.shift) bitmask |= 32;
-                    if (this.keys.c) bitmask |= 64;
-                    if (this.keys.q) bitmask |= 128;
-                    if (this.keys.f) bitmask |= 256;
-                    if (this.keys.r) bitmask |= 512;
-                    if (this.keys.e) bitmask |= 1024;
-                    Atomics.store(inputInt32, MEMORY_LAYOUT.IN_KEYS, bitmask);
-                    
-                    let clickState = 0;
-                    if (this.mouseDown) clickState |= 1;
-                    Atomics.store(inputInt32, MEMORY_LAYOUT.IN_CLICK, clickState);
-
-                    // Sync extra states
-                    Atomics.store(inputInt32, MEMORY_LAYOUT.IN_LOCKED, isLocked ? 1 : 0);
-                    Atomics.store(inputInt32, MEMORY_LAYOUT.IN_TP_MODE, teleportMode === 'DASH' ? 1 : 0);
-                    Atomics.store(inputInt32, MEMORY_LAYOUT.IN_THEME, currentTheme);
-                    
-                    Atomics.store(inputInt32, MEMORY_LAYOUT.IN_LOADOUT_F, AvailableGadgets.indexOf(PlayerLoadout.f));
-                    Atomics.store(inputInt32, MEMORY_LAYOUT.IN_LOADOUT_R, AvailableGadgets.indexOf(PlayerLoadout.r));
-                    Atomics.store(inputInt32, MEMORY_LAYOUT.IN_LOADOUT_E, AvailableGadgets.indexOf(PlayerLoadout.e));
-                }
             },
             onKeyDown: function(e) {
                 const key = e.key.toLowerCase();
@@ -2652,32 +2333,32 @@
                     case 'd': this.keys.d = true; break;
                     case ' ': 
                         this.keys.space = true;
-                        if (typeof window.workerInstance === 'undefined' && isLocked) player.onJumpInput(e.repeat);
+                        if (isLocked) player.onJumpInput(e.repeat);
                         break;
                     case 'shift': this.keys.shift = true; break;
                     case 'c': this.keys.c = true; break;
                     case 'q': 
                         if(!this.keys.q) {
                             this.keys.q = true;
-                            if(typeof window.workerInstance === 'undefined' && isLocked && !player.isDead) player.onTeleportInput();
+                            if(isLocked && !player.isDead) player.onTeleportInput();
                         }
                         break;
                     case 'f': 
                         if (!this.keys.f) { 
                             this.keys.f = true; 
-                            if(typeof window.workerInstance === 'undefined' && isLocked && !player.isDead) player.beginAim(PlayerLoadout.f); 
+                            if(isLocked && !player.isDead) player.beginAim(PlayerLoadout.f); 
                         }
                         break;
                     case 'r':
                         if (!this.keys.r) { 
                             this.keys.r = true; 
-                            if(typeof window.workerInstance === 'undefined' && isLocked && !player.isDead) player.beginAim(PlayerLoadout.r); 
+                            if(isLocked && !player.isDead) player.beginAim(PlayerLoadout.r); 
                         }
                         break;
                     case 'e':
                         if (!this.keys.e) { 
                             this.keys.e = true; 
-                            if(typeof window.workerInstance === 'undefined' && isLocked && !player.isDead) player.beginAim(PlayerLoadout.e); 
+                            if(isLocked && !player.isDead) player.beginAim(PlayerLoadout.e); 
                         }
                         break;
                     case 'g':
@@ -2688,7 +2369,6 @@
                     case 't': if(!e.repeat) toggleTheme(); break;
                     case 'm': Minimap.toggle(); break;
                 }
-                this.updateBuffer();
             },
             onKeyUp: function(e) {
                 switch(e.key.toLowerCase()) {
@@ -2696,24 +2376,23 @@
                     case 'a': this.keys.a = false; break;
                     case 's': this.keys.s = false; break;
                     case 'd': this.keys.d = false; break;
-                    case ' ': this.keys.space = false; if (typeof window.workerInstance === 'undefined') player.wantsToJump = false; break;
+                    case ' ': this.keys.space = false; player.wantsToJump = false; break;
                     case 'shift': this.keys.shift = false; break;
                     case 'c': this.keys.c = false; break;
                     case 'q': this.keys.q = false; break;
                     case 'f': 
                         this.keys.f = false; 
-                        if(typeof window.workerInstance === 'undefined' && isLocked && !player.isDead) player.endAim();
+                        if(isLocked && !player.isDead) player.endAim();
                         break;
                     case 'r': 
                         this.keys.r = false; 
-                        if(typeof window.workerInstance === 'undefined' && isLocked && !player.isDead) player.endAim();
+                        if(isLocked && !player.isDead) player.endAim();
                         break;
                     case 'e': 
                         this.keys.e = false; 
-                        if(typeof window.workerInstance === 'undefined' && isLocked && !player.isDead) player.endAim();
+                        if(isLocked && !player.isDead) player.endAim();
                         break;
                 }
-                this.updateBuffer();
             },
             onMouseMove: function(e) {
                 if (!isLocked || player.isDead) return;
@@ -2721,11 +2400,6 @@
                 camera.rotation.y -= e.movementX * 0.002;
                 camera.rotation.x -= e.movementY * 0.002;
                 camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
-                
-                if (typeof inputFloat32 !== 'undefined' && inputFloat32) {
-                    inputFloat32[MEMORY_LAYOUT.IN_MOUSE_X] += e.movementX;
-                    inputFloat32[MEMORY_LAYOUT.IN_MOUSE_Y] += e.movementY;
-                }
             }
         };
 
@@ -2835,29 +2509,7 @@
             }
         };
 
-        const AudioSys = isWorker ? {
-            playZap: ()=>postMessage({type:'AUDIO', method:'playZap', args:[]}),
-            playHit: (f,t,d,v,p)=>postMessage({type:'AUDIO', method:'playHit', args:[f,t,d,v,p]}),
-            playDeath: ()=>postMessage({type:'AUDIO', method:'playDeath', args:[]}),
-            playDash: ()=>postMessage({type:'AUDIO', method:'playDash', args:[]}),
-            playJump: ()=>postMessage({type:'AUDIO', method:'playJump', args:[]}),
-            playStep: ()=>postMessage({type:'AUDIO', method:'playStep', args:[]}),
-            playShoot: ()=>postMessage({type:'AUDIO', method:'playShoot', args:[]}),
-            playImpact: ()=>postMessage({type:'AUDIO', method:'playImpact', args:[]}),
-            playSwoosh: ()=>postMessage({type:'AUDIO', method:'playSwoosh', args:[]}),
-            playHeavySwoosh: ()=>postMessage({type:'AUDIO', method:'playHeavySwoosh', args:[]}),
-            playThud: ()=>postMessage({type:'AUDIO', method:'playThud', args:[]}),
-            playExplosion: ()=>postMessage({type:'AUDIO', method:'playExplosion', args:[]}),
-            playBassDrop: ()=>postMessage({type:'AUDIO', method:'playBassDrop', args:[]}),
-            playGlitch: ()=>postMessage({type:'AUDIO', method:'playGlitch', args:[]}),
-            playSpawn: ()=>postMessage({type:'AUDIO', method:'playSpawn', args:[]}),
-            playSelect: ()=>postMessage({type:'AUDIO', method:'playSelect', args:[]}),
-            playUI: (p)=>postMessage({type:'AUDIO', method:'playUI', args:[p]}),
-            updateSlide: (i)=>postMessage({type:'AUDIO', method:'updateSlide', args:[i]}),
-            stopAll: ()=>postMessage({type:'AUDIO', method:'stopAll', args:[]}),
-            init: ()=>{},
-            setVolume: ()=>{}
-        } : {
+        const AudioSys = {
             ctx: null,
             masterGain: null,
             slideOsc: null,
@@ -4177,12 +3829,7 @@
                 applyTheme(); 
                 Minimap.preRender();
                 
-                if (isWorker) {
-                    postMessage({ type: 'UI', method: 'updateMapButton', args: [name] });
-                } else {
-                    const mapBtn = document.getElementById('map-btn');
-                    if (mapBtn) mapBtn.innerText = "MAP: " + name;
-                }
+                document.getElementById('map-btn').innerText = "MAP: " + name;
             }
         };
 
@@ -5106,7 +4753,9 @@
 
             beginAim(type) {
                 this.aimingGadget = type;
-                DOM_UI.updateIcons(type);
+                document.getElementById('icon-f').classList.toggle('active', type===PlayerLoadout.f);
+                document.getElementById('icon-r').classList.toggle('active', type===PlayerLoadout.r);
+                document.getElementById('icon-e').classList.toggle('active', type===PlayerLoadout.e);
             }
             
             endAim() {
@@ -5114,7 +4763,9 @@
                     this.throwGadget(this.aimingGadget);
                     this.aimingGadget = null;
                     this.aimLine.visible = false;
-                    DOM_UI.updateIcons(null);
+                    document.getElementById('icon-f').classList.remove('active');
+                    document.getElementById('icon-r').classList.remove('active');
+                    document.getElementById('icon-e').classList.remove('active');
                 }
             }
 
@@ -5122,7 +4773,9 @@
                 if(this.aimingGadget) {
                     this.aimingGadget = null;
                     this.aimLine.visible = false;
-                    DOM_UI.updateIcons(null);
+                    document.getElementById('icon-f').classList.remove('active');
+                    document.getElementById('icon-r').classList.remove('active');
+                    document.getElementById('icon-e').classList.remove('active');
                 }
             }
 
@@ -5479,9 +5132,13 @@
                     }
                 }
                 
+                const vignette = document.getElementById('low-health-vignette');
+                const healthFill = document.getElementById('health-fill');
                 const maxHP = CONFIG.playerMaxHP;
                 
                 if (this.health < maxHP * 0.5) {
+                    if (!healthFill.classList.contains('health-critical')) healthFill.classList.add('health-critical');
+
                     // Calculate Danger Factor
                     const rawFactor = 1 - (this.health / (maxHP * 0.5));
                     const dangerFactor = Math.pow(rawFactor, 1.2); 
@@ -5511,10 +5168,11 @@
                         }
                     }
 
-                    DOM_UI.setVignette(true, currentOpacity.toFixed(2));
+                    vignette.style.opacity = currentOpacity.toFixed(2);
 
                 } else {
-                    DOM_UI.setVignette(false);
+                    if (healthFill.classList.contains('health-critical')) healthFill.classList.remove('health-critical');
+                    vignette.style.opacity = "0";
                 }
             }
 
@@ -5632,14 +5290,14 @@
                         teleportMarker.userData.ravenMat.uniforms.time.value = t * 0.001;
                     }
                     
-                    DOM_UI.updateIcons(undefined, true);
+                    document.getElementById('icon-q').classList.add('active');
 
                 } else {
                     // Inactive State Cleanup
                     if (teleportMarker.parent === camera) scene.add(teleportMarker);
                     teleportMarker.visible = false;
                     this.tpAimStartTime = 0; 
-                    DOM_UI.updateIcons(undefined, false);
+                    document.getElementById('icon-q').classList.remove('active');
                     if (lastHoveredEnemy) { 
                         lastHoveredEnemy.setHighlight(false); 
                         lastHoveredEnemy = null; 
@@ -5647,7 +5305,8 @@
                 }
                 
                 // Crosshair State
-                DOM_UI.setCrosshair(1.0, 4, (slashActive || isActive) ? 0 : 1);
+                const ch = document.getElementById('crosshair');
+                ch.style.opacity = (slashActive || isActive) ? 0 : 1;
             }
         }
 
@@ -6990,19 +6649,10 @@
             }
         }
 
-        function createCanvas(w, h) {
-            if (typeof OffscreenCanvas !== 'undefined' && isWorker) {
-                return new OffscreenCanvas(w, h);
-            }
-            const canvas = document.createElement('canvas');
-            canvas.width = w;
-            canvas.height = h;
-            return canvas;
-        }
-
         function createBoxBorderTexture() {
             const size = 512;
-            const canvas = createCanvas(size, size);
+            const canvas = document.createElement('canvas');
+            canvas.width = size; canvas.height = size;
             const ctx = canvas.getContext('2d');
             ctx.clearRect(0, 0, size, size);
             const thick = 0.5; 
@@ -7017,7 +6667,8 @@
         }
 
         function createGridTexture(type) {
-            const canvas = createCanvas(1024, 1024);
+            const canvas = document.createElement('canvas');
+            canvas.width = 1024; canvas.height = 1024;
             const ctx = canvas.getContext('2d');
             
             if (type === 'solid') {
@@ -7087,7 +6738,8 @@
         }
 
         function createGlowTexture() {
-            const canvas = createCanvas(64, 64);
+            const canvas = document.createElement('canvas');
+            canvas.width = 64; canvas.height = 64;
             const ctx = canvas.getContext('2d');
             const grad = ctx.createRadialGradient(32,32,0, 32,32,32);
             grad.addColorStop(0, 'rgba(255,255,255,1)');
@@ -7099,7 +6751,7 @@
             return tex;
         }
 
-        function initDOM() {
+        function init() {
             lastUnlockTime = performance.now() - 5000;
 
             const btn = document.getElementById('start-btn');
@@ -7120,15 +6772,6 @@
                 sessionStartTime = Date.now();
                 document.body.requestPointerLock().catch(e => {
                     console.warn("Pointer lock failed:", e);
-                    // Force start if pointer lock fails (hosted environment bypass)
-                    if (!isLocked) {
-                        isLocked = true;
-                        const screen = document.getElementById('start-screen');
-                        if (screen) screen.style.display = 'none';
-                        segmentStartTime = performance.now();
-                        if(player.isDead) resetGame();
-                        if (typeof InputManager !== 'undefined') InputManager.updateBuffer();
-                    }
                 });
             });
             
@@ -7186,7 +6829,7 @@
                     }
 
                     // Otherwise, Resume Game
-                    if (settingsModal.style.display !== 'flex' && loadoutModal.style.display !== 'flex' && !isLocked && !player.isDead && sessionStartTime > 0) {
+                    if (modal.style.display !== 'flex' && !isLocked && !player.isDead && sessionStartTime > 0) {
                         document.getElementById('start-btn').click();
                     }
                 }
@@ -7268,36 +6911,23 @@
                 let idx = order.indexOf(currentName);
                 if (idx === -1) idx = 0;
                 const next = order[(idx + 1) % order.length];
-                
-                if (sharedInputBuffer && window.workerInstance) {
-                    window.workerInstance.postMessage({ type: 'SWITCH_MAP', name: next });
-                } else {
-                    MapManager.switch(next);
-                }
+                MapManager.switch(next);
             });
 
-            }
-
-        function initEngine(canvas) {
             scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(80, engineWidth / engineHeight, 0.1, 1000);
+            camera = new THREE.PerspectiveCamera(80, window.innerWidth / window.innerHeight, 0.1, 1000);
             camera.rotation.order = 'YXZ'; 
             camera.position.set(0, 2, 0);
             scene.add(camera);
 
-            renderer = (canvas) ? new THREE.WebGLRenderer({ canvas: canvas, antialias: true, powerPreference: "high-performance" }) : new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-            renderer.setSize(engineWidth, engineHeight, false);
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             renderer.outputEncoding = THREE.sRGBEncoding;
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
             renderer.toneMappingExposure = 1.0 * brightnessMultiplier; 
-            if (!isWorker && !canvas) {
-                renderer.domElement.style.position = 'absolute';
-                renderer.domElement.style.top = '0';
-                renderer.domElement.style.zIndex = '0';
-                document.body.appendChild(renderer.domElement);
-            }
+            document.body.appendChild(renderer.domElement);
 
             textures.gridDefault = createGridTexture('default');
             textures.gridSnow = createGridTexture('snow');
@@ -7350,23 +6980,17 @@
             createSlashEffect(); 
             createTeleportMarker();
             initObjectPools(); // Pre-allocate memory pools
-            if (!isWorker) {
-                InputManager.init();
-                NarrativeSys.init();
-                Minimap.init();
-                renderStatsContent();
-            }
+            InputManager.init();
+            NarrativeSys.init();
             player.init();
+            Minimap.init();
+            renderStatsContent();
 
-            if (!isWorker) {
-                window.addEventListener('resize', onWindowResize);
-            }
+            window.addEventListener('resize', onWindowResize);
             
-            if (!isWorker) document.addEventListener('pointerlockchange', () => {
+            document.addEventListener('pointerlockchange', () => {
                 isLocked = document.pointerLockElement === document.body;
                 const screen = document.getElementById('start-screen');
-                
-                InputManager.updateBuffer();
                 
                 if (isLocked) {
                     screen.style.display = 'none';
@@ -7392,14 +7016,15 @@
                 }
             });
             
-            if (!isWorker) document.addEventListener('pointerlockerror', (e) => {
+            document.addEventListener('pointerlockerror', (e) => {
                 console.warn("Pointer lock error detected.", e);
                 if(!isLocked) {
                     document.getElementById('start-screen').style.display = 'flex';
                 }
             });
 
-            if (!isWorker) applyTheme();
+            applyTheme();
+            animate();
         }
 
         function generatePlayerTitle() {
@@ -7566,7 +7191,6 @@
         function toggleTheme() {
             currentTheme = (currentTheme + 1) % 4;
             applyTheme();
-            InputManager.updateBuffer();
         }
 
         function toggleTeleportMode() {
@@ -7578,21 +7202,16 @@
             }
             document.getElementById('tp-mode-btn').innerText = "TP MODE: " + teleportMode;
             document.getElementById('tp-label').innerText = teleportMode;
-            InputManager.updateBuffer();
         }
 
         function applyTheme() {
-            const body = !isWorker ? document.body : null;
-            const ui = !isWorker ? document.getElementById('ui-layer') : null;
-            const crosshair = !isWorker ? document.getElementById('crosshair') : null;
+            const body = document.body;
+            const ui = document.getElementById('ui-layer');
+            const crosshair = document.getElementById('crosshair');
             const names = ["LIGHT", "DARK", "NEON", "HALLOWEEN"];
             
-            if (!isWorker) {
-                const themeBtn = document.getElementById('theme-btn');
-                const modeDisp = document.getElementById('mode-display');
-                if (themeBtn) themeBtn.innerText = "THEME: " + names[currentTheme];
-                if (modeDisp) modeDisp.innerText = names[currentTheme] + " | 'T' TO CYCLE";
-            }
+            document.getElementById('theme-btn').innerText = "THEME: " + names[currentTheme];
+            document.getElementById('mode-display').innerText = names[currentTheme] + " | 'T' TO CYCLE";
 
             materials.floor.roughness = 0.5;
             materials.floor.metalness = 0.1;
@@ -7613,8 +7232,8 @@
                 scene.background = new THREE.Color(bgCol);
                 // Respect World Fog Density
                 scene.fog = new THREE.FogExp2(bgCol, baseFog); 
-                if (body) body.style.backgroundColor = "#667788";
-                if (ui) ui.classList.add('light-theme');
+                body.style.backgroundColor = "#667788";
+                ui.classList.add('light-theme');
                 
                 materials.floor.map = textures.gridSnow;
                 // Adjust UVs based on world scale? For now stick to generic
@@ -7627,7 +7246,7 @@
                 
                 currentSlashColor = 0x0088ff;
                 materials.marker.color.setHex(0x003366); 
-                if (crosshair) crosshair.style.color = "#0088ff";
+                crosshair.style.color = "#0088ff";
                 
                 // Apply Brightness
                 ambientLight.intensity = 0.6 * b; 
@@ -7636,7 +7255,7 @@
                 dirLight.color.setHex(0xffffff);
 
             } else {
-                if (ui) ui.classList.remove('light-theme');
+                ui.classList.remove('light-theme');
                 
                 if (currentTheme === 1) { // DARK
                     const bgCol = 0x20242a; 
@@ -7644,7 +7263,7 @@
                     let fogDensity = baseFog;
                     if (isStandardArena) fogDensity *= 1.5; // slight touch more fog density
                     scene.fog = new THREE.FogExp2(bgCol, fogDensity);
-                    if (body) body.style.backgroundColor = "#20242a";
+                    body.style.backgroundColor = "#20242a";
                     
                     materials.floor.map = textures.solid;
                     materials.floor.color.setHex(0x12151c); 
@@ -7658,7 +7277,7 @@
                     
                     currentSlashColor = 0xffaa00; 
                     materials.marker.color.setHex(0xff8800);
-                    if (crosshair) crosshair.style.color = "#ffaa00";
+                    crosshair.style.color = "#ffaa00";
                     
                     ambientLight.intensity = 2.2 * b; 
                     hemiLight.intensity = 1.2 * b;
@@ -7669,7 +7288,7 @@
                     const bgCol = 0x050505;
                     scene.background = new THREE.Color(bgCol);
                     scene.fog = new THREE.FogExp2(bgCol, baseFog);
-                    if (body) body.style.backgroundColor = "#050505";
+                    body.style.backgroundColor = "#050505";
                     
                     materials.floor.map = textures.gridDefault;
                     materials.floor.map.repeat.set(100, 100);
@@ -7681,7 +7300,7 @@
                     
                     currentSlashColor = 0x00ffff; 
                     materials.marker.color.setHex(0x00ffff);
-                    if (crosshair) crosshair.style.color = "#00ffff";
+                    crosshair.style.color = "#00ffff";
                     
                     ambientLight.intensity = 1.2 * b;
                     hemiLight.intensity = 0.8 * b;
@@ -7694,7 +7313,7 @@
                     let fogDensity = baseFog;
                     if (isStandardArena) fogDensity *= 1.25; // very ever so slight touch of fog
                     scene.fog = new THREE.FogExp2(bgCol, fogDensity);
-                    if (body) body.style.backgroundColor = "#663311";
+                    body.style.backgroundColor = "#663311";
                     
                     materials.floor.map = textures.solid;
                     materials.floor.color.setHex(0x3d1f00); 
@@ -7709,7 +7328,7 @@
                     
                     currentSlashColor = 0xff8800; 
                     materials.marker.color.setHex(0xff4400);
-                    if (crosshair) crosshair.style.color = "#ff8800";
+                    crosshair.style.color = "#ff8800";
                     
                     ambientLight.intensity = 2.0 * b; 
                     hemiLight.intensity = 1.2 * b;
@@ -8028,7 +7647,7 @@
                 s.mesh.rotation.set(0, 0, -Math.PI / 8);
                 camera.add(s.mesh);
                 slashActive = true;
-                DOM_UI.setCrosshair(1.0, 4, 0); // Use proxy to hide crosshair
+                document.getElementById('crosshair').style.opacity = 0;
             } else {
                 s.mesh.position.set(0, 1.5, 1.0);
                 s.mesh.lookAt(camera.position);
@@ -8406,8 +8025,8 @@
         function tryInstantTeleport() {
             const result = getTeleportTarget();
             executeTeleport(result.point, result.normal);
-            DOM_UI.updateIcons(undefined, true);
-            setTimeout(() => DOM_UI.updateIcons(undefined, false), 200);
+            document.getElementById('icon-q').classList.add('active');
+            setTimeout(() => document.getElementById('icon-q').classList.remove('active'), 200);
         }
 
         function resolveTeleportPosition(target, normal) {
@@ -10145,31 +9764,27 @@
         function damagePlayer(amt) {
             player.health -= amt;
             player.lastDamageTime = performance.now();
-            DOM_UI.showDamage();
+            const overlay = document.getElementById('damage-overlay');
+            overlay.style.background = "radial-gradient(circle, transparent 20%, rgba(255,0,0,0.6) 100%)";
+            setTimeout(() => {
+                overlay.style.background = "radial-gradient(circle, transparent 50%, rgba(255,0,0,0.0) 100%)";
+            }, 200);
             if(player.health <= 0) {
                 if (player.extraLives > 0) {
                     player.extraLives--;
                     player.health = CONFIG.playerMaxHP; 
                     showKillMessage("EXTRA LIFE USED!", "achievement", "#00ff00");
-                    if (typeof AudioSys !== 'undefined') AudioSys.playTeleport(); 
-                    if (isWorker) {
-                        postMessage({ type: 'UI', method: 'updateLivesDisplay' });
-                    } else {
-                        updateLivesDisplay();
-                    }
+                    AudioSys.playTeleport(); 
+                    updateLivesDisplay();
                 } else {
                     player.health = 0;
                     player.isDead = true;
+                    document.exitPointerLock();
                     showKillMessage("TERMINATED", "achievement");
-                    if (isWorker) {
-                        postMessage({ type: 'UI', method: 'playerDeath' });
-                    } else {
-                        if (document.exitPointerLock) document.exitPointerLock();
-                        const diff = Date.now() - sessionStartTime;
-                        const mins = Math.floor(diff / 60000);
-                        const secs = Math.floor((diff % 60000) / 1000);
-                        document.getElementById('session-timer').innerText = `Session Time: ${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
-                    }
+                    const diff = Date.now() - sessionStartTime;
+                    const mins = Math.floor(diff / 60000);
+                    const secs = Math.floor((diff % 60000) / 1000);
+                    document.getElementById('session-timer').innerText = `Session Time: ${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
                 }
             }
         }
@@ -10188,7 +9803,7 @@
         function addScore(amt) {
             const oldScore = player.score;
             player.score += amt;
-            DOM_UI.updateScore(player.score);
+            document.getElementById('score-display').innerText = "SCORE: " + player.score;
             if (Math.floor(player.score / 10000) > Math.floor(oldScore / 10000)) {
                 if (player.extraLives < 3) {
                     player.extraLives++;
@@ -10196,10 +9811,7 @@
                     updateLivesDisplay();
                 }
             }
-        
         }
-
-        
 
         function resetGame() {
             goldenBuffActive = false;
@@ -10252,43 +9864,37 @@
             GameStats.reset();
             comboCount = 0;
             updateComboUI();
-            DOM_UI.updateScore(0);
-            DOM_UI.setVignette(false);
+            document.getElementById('score-display').innerText = "SCORE: 0";
+            document.getElementById('health-fill').classList.remove('health-critical');
+            document.getElementById('low-health-vignette').style.boxShadow = "inset 0 0 100px rgba(255, 0, 0, 0)";
+
+            // FIX: Remove inline shadow override and use opacity
+            const vig = document.getElementById('low-health-vignette');
+            vig.style.boxShadow = ""; 
+            vig.style.opacity = "0";
         }
         
         function showKillMessage(text, type="", color=null) {
-            DOM_UI.triggerKillFeed(text, type, color);
+            const feed = document.getElementById('kill-feed');
+            const msg = document.createElement('div');
+            msg.className = "kill-msg " + type;
+            msg.innerHTML = text; 
+            if(color) {
+                msg.style.color = color;
+                msg.style.borderLeftColor = color;
+            }
+            feed.prepend(msg);
+            if(feed.children.length > 6) feed.removeChild(feed.lastChild);
         }
 
-        let engineWidth = typeof window !== 'undefined' ? window.innerWidth : 1024;
-        let engineHeight = typeof window !== 'undefined' ? window.innerHeight : 768;
-        
         function onWindowResize() {
-            if (!isWorker) {
-                engineWidth = window.innerWidth;
-                engineHeight = window.innerHeight;
-                if (window.workerInstance) {
-                    window.workerInstance.postMessage({ type: 'RESIZE', width: engineWidth, height: engineHeight });
-                }
-            }
-            if (typeof camera !== 'undefined' && camera) {
-                camera.aspect = engineWidth / engineHeight;
-                camera.updateProjectionMatrix();
-                if (typeof renderer !== 'undefined' && renderer) {
-                    renderer.setSize(engineWidth, engineHeight, false);
-                }
-            }
-        }
-        
-        if (!isWorker) {
-            window.addEventListener('resize', onWindowResize, false);
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
         function animate() {
             requestAnimationFrame(animate);
-            if (isWorker) {
-                InputManager.pollWorkerInputs();
-            }
             const now = performance.now();
             const dt = Math.min((now - lastTime) / 1000, 0.1);
             lastTime = now;
@@ -10297,9 +9903,7 @@
             if(showFPS) {
                 fpsFrames++;
                 if(now > lastFpsTime + 1000) {
-                    if (!isWorker) {
-                        document.getElementById('fps-display').innerHTML = '<div class="fps-inner">FPS: ' + fpsFrames + '</div>';
-                    }
+                    document.getElementById('fps-display').innerHTML = '<div class="fps-inner">FPS: ' + fpsFrames + '</div>';
                     fpsFrames = 0;
                     lastFpsTime = now;
                 }
@@ -10430,13 +10034,7 @@
                 }
                 slashActive = isSlashActive;
 
-                // Sync data to SharedArrayBuffer
-                if (typeof entityFloat32 !== 'undefined' && entityFloat32) {
-                    entityFloat32[MEMORY_LAYOUT.OUT_PLAYER_HP] = player.health;
-                    entityFloat32[MEMORY_LAYOUT.OUT_PLAYER_ENERGY] = player.energy;
-                    entityFloat32[MEMORY_LAYOUT.OUT_SCORE] = player.score;
-                    entityFloat32[MEMORY_LAYOUT.OUT_COMBO] = comboCount;
-                }
+                
 
                 // UI & State Phase
                 if (comboCount > 0) {
@@ -10447,163 +10045,23 @@
                     }
                 }
                 
-                // Read from buffer if available, or write if we are the worker
-                let ui_hp, ui_en;
-                if (!isWorker) {
-                    ui_hp = (typeof entityFloat32 !== 'undefined' && entityFloat32) ? entityFloat32[MEMORY_LAYOUT.OUT_PLAYER_HP] : player.health;
-                    ui_en = (typeof entityFloat32 !== 'undefined' && entityFloat32) ? entityFloat32[MEMORY_LAYOUT.OUT_PLAYER_ENERGY] : player.energy;
-                } else {
-                    entityFloat32[MEMORY_LAYOUT.OUT_PLAYER_HP] = player.health;
-                    entityFloat32[MEMORY_LAYOUT.OUT_PLAYER_ENERGY] = player.energy;
-                    entityFloat32[MEMORY_LAYOUT.OUT_SCORE] = player.score;
-                    entityFloat32[MEMORY_LAYOUT.OUT_COMBO] = comboCount;
-                    ui_hp = player.health;
-                    ui_en = player.energy;
+                const hpPct = Math.max(0, player.health / (CONFIG.playerMaxHP/100)); 
+                const enPct = Math.max(0, (player.energy / CONFIG.energyMax) * 100);
+                document.getElementById('health-fill').style.width = hpPct + '%';
+                document.getElementById('energy-fill').style.width = enPct + '%';
+                
+                const btn = document.getElementById('start-btn');
+                if (btn.innerText === "b r e a t h e" && isLocked) {
+                     btn.innerText = "ENTER ARENA";
+                     btn.style.opacity = 1;
+                     btn.style.letterSpacing = "2px";
                 }
- 
-                DOM_UI.updateHealth(ui_hp, CONFIG.playerMaxHP);
-                DOM_UI.updateEnergy(ui_en, CONFIG.energyMax);
-                DOM_UI.setStartButtonContext();
             }
-            if (!isWorker) {
-                Minimap.update();
-            }
-            if (renderer) {
-                renderer.render(scene, camera);
-            }
+            Minimap.update();
+            renderer.render(scene, camera);
         }
 
-        // --- ENGINE BOOTSTRAP ---
-        if (isWorker) {
-            self.onmessage = function(e) {
-                const data = e.data;
-                if (data.type === 'START_ENGINE') {
-                    sharedInputBuffer = data.sharedInputBuffer;
-                    sharedEntityBuffer = data.sharedEntityBuffer;
-                    inputFloat32 = new Float32Array(sharedInputBuffer);
-                    inputInt32 = new Int32Array(sharedInputBuffer);
-                    entityFloat32 = new Float32Array(sharedEntityBuffer);
-                    engineWidth = data.width;
-                    engineHeight = data.height;
-
-                    initEngine(data.canvas);
-
-                    console.log("Worker engine synchronized successfully.");
-                    lastTime = performance.now();
-                    animate();
-                }
-                if (data.type === 'RESIZE') {
-                    engineWidth = data.width;
-                    engineHeight = data.height;
-                    onWindowResize();
-                }
-                if (data.type === 'SWITCH_MAP') {
-                    MapManager.switch(data.name);
-                }
-            };
-        } else {
-            // Main Thread Authority
-            initDOM();
-            
-            // Initiate Neural Shadow Core (Background Engine)
-            try {
-                const scriptNode = document.getElementById('main-game-script');
-                // HARDENED CHECK: Must have script content, valid SAB, and Offscreen Support
-                const canUseWorker = !!(scriptNode && sharedInputBuffer && typeof HTMLCanvasElement.prototype.transferControlToOffscreen === 'function');
-
-                if (canUseWorker) {
-                    // We create a central canvas to transfer to the background thread
-                    const canvasEl = document.createElement('canvas');
-                    canvasEl.id = "main-game-canvas";
-                    canvasEl.style.width = '100vw';
-                    canvasEl.style.height = '100vh';
-                    canvasEl.style.display = 'block';
-                    canvasEl.style.position = 'absolute';
-                    canvasEl.style.top = '0';
-                    canvasEl.style.left = '0';
-                    canvasEl.style.zIndex = '0';
-                    document.body.appendChild(canvasEl);
-                    
-                    let offscreen = null;
-                    if (typeof canvasEl.transferControlToOffscreen === 'function') {
-                        offscreen = canvasEl.transferControlToOffscreen();
-                    }
-
-                    const blob = new Blob([scriptNode.textContent], { type: 'application/javascript' });
-                    window.workerInstance = new Worker(URL.createObjectURL(blob));
-                    
-                    // Critical Error Handler for Worker (Hosted environment panic fallback)
-                    window.workerInstance.onerror = function(err) {
-                        console.error("CRITICAL: Worker Engine crashed during boot.", err);
-                        // Emergency Fallback: Murder the worker and take control locally
-                        window.workerInstance.terminate();
-                        window.workerInstance = null;
-                        sharedInputBuffer = null; // Kill global SAB pointer
-                        
-                        // Clean up the offscreen transfer canvas if it's there
-                        if (canvasEl && canvasEl.parentNode) canvasEl.parentNode.removeChild(canvasEl);
-                        
-                        initEngine(null);
-                        animate();
-                    };
-
-                    window.workerInstance.postMessage({
-                        type: 'START_ENGINE',
-                        sharedInputBuffer,
-                        sharedEntityBuffer,
-                        canvas: offscreen,
-                        width: window.innerWidth,
-                        height: window.innerHeight
-                    }, offscreen ? [offscreen] : []);
-                    
-                    window.workerInstance.onmessage = function(e) {
-                        const data = e.data;
-                        if (data.type === 'AUDIO') {
-                            if (AudioSys && AudioSys[data.method]) AudioSys[data.method](...data.args);
-                        } else if (data.type === 'UI') {
-                            if (data.method === 'showDamage') DOM_UI.showDamage();
-                            if (data.method === 'triggerKillFeed') DOM_UI.triggerKillFeed(data.text, data.colorStr, data.color2);
-                            if (data.method === 'updateMapButton') DOM_UI.updateMapButton(data.args[0]);
-                            if (data.method === 'updateLivesDisplay') updateLivesDisplay();
-                            if (data.method === 'playerDeath') {
-                                if (document.exitPointerLock) document.exitPointerLock();
-                                const diff = Date.now() - sessionStartTime;
-                                const mins = Math.floor(diff / 60000);
-                                const secs = Math.floor((diff % 60000) / 1000);
-                                document.getElementById('session-timer').innerText = `Session Time: ${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
-                            }
-                        }
-                    };
-                    
-                    console.log("Worker Thread initialized successfully.");
-                    
-                    function domLoop() {
-                        requestAnimationFrame(domLoop);
-                        if (typeof entityFloat32 !== 'undefined' && entityFloat32) {
-                            const ui_hp = entityFloat32[MEMORY_LAYOUT.OUT_PLAYER_HP];
-                            const ui_en = entityFloat32[MEMORY_LAYOUT.OUT_PLAYER_ENERGY];
-                            const score = entityFloat32[MEMORY_LAYOUT.OUT_SCORE];
-                            const combo = entityFloat32[MEMORY_LAYOUT.OUT_COMBO];
-                            DOM_UI.updateHealth(ui_hp, CONFIG.playerMaxHP);
-                            DOM_UI.updateEnergy(ui_en, CONFIG.energyMax);
-                            DOM_UI.updateScore(score);
-                            DOM_UI.updateCombo(combo, 1);
-                            DOM_UI.setStartButtonContext();
-                        }
-                    }
-                    domLoop();
-                } else {
-                    // Fallback to Main Thread Engine
-                    initEngine(null);
-                    animate();
-                    console.log("Main Thread engine initialized (Worker/SAB unavailable).");
-                }
-            } catch(err) {
-                console.warn("Engine initialization failed, forcing main thread fallback:", err.message);
-                initEngine(null);
-                animate();
-            }
-        }
+        init();
     </script>
 </body>
 </html>
