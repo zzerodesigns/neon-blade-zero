@@ -1,0 +1,6 @@
+#### **[State Synchronization & Offscreen Compatibility]**
+**Resolving Hosted Environment Freezes and State Sync**
+*   **Prompt:** "although it runs file on the preview, it freezes up the same way as before when trying to enter arena on the hosted version. cannot switch map or initialize arena at all. pressing esc returns you to the start screen (unfreezes it), not the pause screen, meaning the game could never be started."
+    *   *Context/Intent:* The user discovered that while the local preview worked, the hosted version of the app was freezing when attempting to enter the game arena. This suggested a failure in the Web Worker initialization or a desynchronization where the background engine never realized the game had been "unpaused" by the UI.
+*   **Result:** Identified that critical UI-driven states (`isLocked`, `teleportMode`, `currentTheme`, and `PlayerLoadout`) were local to the main thread and never updated in the background worker's memory registers.
+    *   *Outcome:* Expanded the `MEMORY_LAYOUT` to include six new registers (`IN_LOCKED`, etc.). Implemented `InputManager.updateBuffer()` to flush these states into the `SharedArrayBuffer` using `Atomics.store` during critical UI events. Added an environment capability check for `transferControlToOffscreen` to the `canUseWorker` logic to prevent crashes in partially-supported environments.

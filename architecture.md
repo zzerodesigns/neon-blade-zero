@@ -1,5 +1,5 @@
 # neon blade: engine architecture
-**Engine State for: v48.7.1b**
+**Engine State for: v48.7.1d**
 
 > **ATTENTION FUTURE AGENTS:** This document is the absolute source of truth for the Neon Blade engine. Read this before modifying core systems. The project is a strict **single-file application** (`index.html`). Do not create external scripts or stylesheets.
 

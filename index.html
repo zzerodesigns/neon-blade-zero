@@ -45,7 +45,7 @@
     </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v48.7.1c</title>
+    <title>Neon Blade: Melee Arena v48.7.1d</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -854,7 +854,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.7.1c<br>- Decoupled Engine Architecture -</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.7.1d<br>- Decoupled Engine Architecture -</div>
         </div>
     </div>
 
@@ -886,6 +886,7 @@
             if (unmapped.length > 0) {
                 PlayerLoadout[slot] = unmapped[0];
                 updateLoadoutUI();
+                InputManager.updateBuffer();
             }
         }
 
@@ -918,6 +919,12 @@
             IN_MOUSE_X: 1,    // Mouse delta X
             IN_MOUSE_Y: 2,    // Mouse delta Y
             IN_CLICK: 3,      // Mouse click states
+            IN_LOCKED: 4,     // 0 or 1
+            IN_TP_MODE: 5,    // 0: AIM, 1: DASH
+            IN_THEME: 6,      // 0: LIGHT, 1: DARK, 2: NEON
+            IN_LOADOUT_F: 7,  // Index in AvailableGadgets
+            IN_LOADOUT_R: 8,
+            IN_LOADOUT_E: 9,
             
             // Entity offsets (Worker writes, Main reads for HUD/Audio)
             OUT_PLAYER_HP: 0,
@@ -2507,6 +2514,19 @@
                 const bitmask = Atomics.load(inputInt32, MEMORY_LAYOUT.IN_KEYS);
                 const clickState = Atomics.load(inputInt32, MEMORY_LAYOUT.IN_CLICK);
                 
+                // Sync global states from main thread
+                isLocked = Atomics.load(inputInt32, MEMORY_LAYOUT.IN_LOCKED) === 1;
+                teleportMode = Atomics.load(inputInt32, MEMORY_LAYOUT.IN_TP_MODE) === 1 ? 'DASH' : 'AIM';
+                currentTheme = Atomics.load(inputInt32, MEMORY_LAYOUT.IN_THEME);
+                
+                const fIdx = Atomics.load(inputInt32, MEMORY_LAYOUT.IN_LOADOUT_F);
+                const rIdx = Atomics.load(inputInt32, MEMORY_LAYOUT.IN_LOADOUT_R);
+                const eIdx = Atomics.load(inputInt32, MEMORY_LAYOUT.IN_LOADOUT_E);
+                
+                PlayerLoadout.f = AvailableGadgets[fIdx] || 'FRAG';
+                PlayerLoadout.r = AvailableGadgets[rIdx] || 'VOID';
+                PlayerLoadout.e = AvailableGadgets[eIdx] || 'IMPULSE';
+
                 const prevKeys = { ...this.keys };
                 const prevClick = this.mouseDown;
                 
@@ -2605,6 +2625,15 @@
                     let clickState = 0;
                     if (this.mouseDown) clickState |= 1;
                     Atomics.store(inputInt32, MEMORY_LAYOUT.IN_CLICK, clickState);
+
+                    // Sync extra states
+                    Atomics.store(inputInt32, MEMORY_LAYOUT.IN_LOCKED, isLocked ? 1 : 0);
+                    Atomics.store(inputInt32, MEMORY_LAYOUT.IN_TP_MODE, teleportMode === 'DASH' ? 1 : 0);
+                    Atomics.store(inputInt32, MEMORY_LAYOUT.IN_THEME, currentTheme);
+                    
+                    Atomics.store(inputInt32, MEMORY_LAYOUT.IN_LOADOUT_F, AvailableGadgets.indexOf(PlayerLoadout.f));
+                    Atomics.store(inputInt32, MEMORY_LAYOUT.IN_LOADOUT_R, AvailableGadgets.indexOf(PlayerLoadout.r));
+                    Atomics.store(inputInt32, MEMORY_LAYOUT.IN_LOADOUT_E, AvailableGadgets.indexOf(PlayerLoadout.e));
                 }
             },
             onKeyDown: function(e) {
@@ -7321,6 +7350,8 @@
                 isLocked = document.pointerLockElement === document.body;
                 const screen = document.getElementById('start-screen');
                 
+                InputManager.updateBuffer();
+                
                 if (isLocked) {
                     screen.style.display = 'none';
                     if (breakStartTime > 0) {
@@ -7519,6 +7550,7 @@
         function toggleTheme() {
             currentTheme = (currentTheme + 1) % 4;
             applyTheme();
+            InputManager.updateBuffer();
         }
 
         function toggleTeleportMode() {
@@ -7530,6 +7562,7 @@
             }
             document.getElementById('tp-mode-btn').innerText = "TP MODE: " + teleportMode;
             document.getElementById('tp-label').innerText = teleportMode;
+            InputManager.updateBuffer();
         }
 
         function applyTheme() {
@@ -10455,7 +10488,7 @@
             // Initiate Neural Shadow Core (Background Engine)
             try {
                 const scriptNode = document.getElementById('main-game-script');
-                const canUseWorker = scriptNode && typeof SharedArrayBuffer !== 'undefined';
+                const canUseWorker = scriptNode && typeof SharedArrayBuffer !== 'undefined' && typeof HTMLCanvasElement.prototype.transferControlToOffscreen === 'function';
 
                 if (canUseWorker) {
                     // We create a central canvas to transfer to the background thread

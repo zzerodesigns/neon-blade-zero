@@ -68,6 +68,10 @@
 
 ## 📖 version history / patch notes
 
+### v48.7.1d - State Synchronization & Offscreen Compatibility
+*   **State Buffer Synchronization:** Fixed critical logic desynchronization where `isLocked`, `teleportMode`, `currentTheme`, and `PlayerLoadout` were not being correctly propagated to the background physics engine, ensuring the "Arena" state correctly resumes and maintains the proper visual and mechanical state.
+*   **TransferControl Fallback:** Added a defensive check for `transferControlToOffscreen` support, preventing crashes in legacy environments or specific webview implementations that support `SharedArrayBuffer` but lack OffscreenCanvas transferability.
+
 ### v48.7.1c - Final Bootstrap & IPC Sync Resolution
 *   **Engine Deadlock Resolution:** Resolved critical bootstrap failure by implementing a SharedArrayBuffer health check and defensive fallback to main-thread execution.
 *   **IPC UI Bridge:** Re-connected start screen map-switching and button labels to the background engine via `SWITCH_MAP` and `updateMapButton` postMessage routing.
