@@ -45,7 +45,7 @@
     </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v48.7.1d</title>
+    <title>Neon Blade: Melee Arena v48.7.1e</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -854,7 +854,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.7.1d<br>- Decoupled Engine Architecture -</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.7.1e<br>- Decoupled Engine Architecture -</div>
         </div>
     </div>
 
@@ -7116,6 +7116,15 @@
                 sessionStartTime = Date.now();
                 document.body.requestPointerLock().catch(e => {
                     console.warn("Pointer lock failed:", e);
+                    // Force start if pointer lock fails (hosted environment bypass)
+                    if (!isLocked) {
+                        isLocked = true;
+                        const screen = document.getElementById('start-screen');
+                        if (screen) screen.style.display = 'none';
+                        segmentStartTime = performance.now();
+                        if(player.isDead) resetGame();
+                        if (typeof InputManager !== 'undefined') InputManager.updateBuffer();
+                    }
                 });
             });
             
@@ -7280,6 +7289,9 @@
             renderer.toneMapping = THREE.ACESFilmicToneMapping;
             renderer.toneMappingExposure = 1.0 * brightnessMultiplier; 
             if (!isWorker && !canvas) {
+                renderer.domElement.style.position = 'absolute';
+                renderer.domElement.style.top = '0';
+                renderer.domElement.style.zIndex = '0';
                 document.body.appendChild(renderer.domElement);
             }
 
@@ -7566,13 +7578,17 @@
         }
 
         function applyTheme() {
-            const body = document.body;
-            const ui = document.getElementById('ui-layer');
-            const crosshair = document.getElementById('crosshair');
+            const body = !isWorker ? document.body : null;
+            const ui = !isWorker ? document.getElementById('ui-layer') : null;
+            const crosshair = !isWorker ? document.getElementById('crosshair') : null;
             const names = ["LIGHT", "DARK", "NEON", "HALLOWEEN"];
             
-            document.getElementById('theme-btn').innerText = "THEME: " + names[currentTheme];
-            document.getElementById('mode-display').innerText = names[currentTheme] + " | 'T' TO CYCLE";
+            if (!isWorker) {
+                const themeBtn = document.getElementById('theme-btn');
+                const modeDisp = document.getElementById('mode-display');
+                if (themeBtn) themeBtn.innerText = "THEME: " + names[currentTheme];
+                if (modeDisp) modeDisp.innerText = names[currentTheme] + " | 'T' TO CYCLE";
+            }
 
             materials.floor.roughness = 0.5;
             materials.floor.metalness = 0.1;
@@ -7593,8 +7609,8 @@
                 scene.background = new THREE.Color(bgCol);
                 // Respect World Fog Density
                 scene.fog = new THREE.FogExp2(bgCol, baseFog); 
-                body.style.backgroundColor = "#667788";
-                ui.classList.add('light-theme');
+                if (body) body.style.backgroundColor = "#667788";
+                if (ui) ui.classList.add('light-theme');
                 
                 materials.floor.map = textures.gridSnow;
                 // Adjust UVs based on world scale? For now stick to generic
@@ -7607,7 +7623,7 @@
                 
                 currentSlashColor = 0x0088ff;
                 materials.marker.color.setHex(0x003366); 
-                crosshair.style.color = "#0088ff";
+                if (crosshair) crosshair.style.color = "#0088ff";
                 
                 // Apply Brightness
                 ambientLight.intensity = 0.6 * b; 
@@ -7616,7 +7632,7 @@
                 dirLight.color.setHex(0xffffff);
 
             } else {
-                ui.classList.remove('light-theme');
+                if (ui) ui.classList.remove('light-theme');
                 
                 if (currentTheme === 1) { // DARK
                     const bgCol = 0x20242a; 
@@ -7624,7 +7640,7 @@
                     let fogDensity = baseFog;
                     if (isStandardArena) fogDensity *= 1.5; // slight touch more fog density
                     scene.fog = new THREE.FogExp2(bgCol, fogDensity);
-                    body.style.backgroundColor = "#20242a";
+                    if (body) body.style.backgroundColor = "#20242a";
                     
                     materials.floor.map = textures.solid;
                     materials.floor.color.setHex(0x12151c); 
@@ -7638,7 +7654,7 @@
                     
                     currentSlashColor = 0xffaa00; 
                     materials.marker.color.setHex(0xff8800);
-                    crosshair.style.color = "#ffaa00";
+                    if (crosshair) crosshair.style.color = "#ffaa00";
                     
                     ambientLight.intensity = 2.2 * b; 
                     hemiLight.intensity = 1.2 * b;
@@ -7649,7 +7665,7 @@
                     const bgCol = 0x050505;
                     scene.background = new THREE.Color(bgCol);
                     scene.fog = new THREE.FogExp2(bgCol, baseFog);
-                    body.style.backgroundColor = "#050505";
+                    if (body) body.style.backgroundColor = "#050505";
                     
                     materials.floor.map = textures.gridDefault;
                     materials.floor.map.repeat.set(100, 100);
@@ -7661,7 +7677,7 @@
                     
                     currentSlashColor = 0x00ffff; 
                     materials.marker.color.setHex(0x00ffff);
-                    crosshair.style.color = "#00ffff";
+                    if (crosshair) crosshair.style.color = "#00ffff";
                     
                     ambientLight.intensity = 1.2 * b;
                     hemiLight.intensity = 0.8 * b;
@@ -7674,7 +7690,7 @@
                     let fogDensity = baseFog;
                     if (isStandardArena) fogDensity *= 1.25; // very ever so slight touch of fog
                     scene.fog = new THREE.FogExp2(bgCol, fogDensity);
-                    body.style.backgroundColor = "#663311";
+                    if (body) body.style.backgroundColor = "#663311";
                     
                     materials.floor.map = textures.solid;
                     materials.floor.color.setHex(0x3d1f00); 
@@ -7689,7 +7705,7 @@
                     
                     currentSlashColor = 0xff8800; 
                     materials.marker.color.setHex(0xff4400);
-                    crosshair.style.color = "#ff8800";
+                    if (crosshair) crosshair.style.color = "#ff8800";
                     
                     ambientLight.intensity = 2.0 * b; 
                     hemiLight.intensity = 1.2 * b;

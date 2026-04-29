@@ -1,4 +1,4 @@
-# neon blade: development log & playtest notes
+# neon blade: development log & playtest notes 
 
 > **Note to AI Agents:** Read this file to understand current bugs, planned features, and user observations. Do not modify the architecture based on this file alone; use it as a task list and context guide.
 
@@ -67,6 +67,11 @@
 - [x] **Offscreen Texture Allocation:** Modified procedural texture generator functions to use dynamically instantiated `OffscreenCanvas` contexts when triggered by the worker, enabling background asset generation.
 
 ## 📖 version history / patch notes
+
+### v48.7.1e - Hosted Environment Hardening & Fallback Fixes
+*   **Startup Bypass:** Implemented a `.catch()` hook for Pointer Lock requests. If the browser rejects the lock (common in hosted iframes), the game now manually transitions to the active state, ensuring the "ENTER ARENA" button is never a soft-lock point.
+*   **Fallback Canvas Visibility:** Explicitly styled the renderer's DOM element with absolute positioning and z-index during main-thread initialization. This prevents the game world from being pushed invisibly to the bottom of the page when Web Workers are unavailable.
+*   **Worker Crash Prevention:** Hardened `applyTheme()` with `isWorker` guards to prevent the background engine from attempting to access non-existent DOM elements during map switches, resolving a fatal ReferenceError in multi-threaded mode.
 
 ### v48.7.1d - State Synchronization & Offscreen Compatibility
 *   **State Buffer Synchronization:** Fixed critical logic desynchronization where `isLocked`, `teleportMode`, `currentTheme`, and `PlayerLoadout` were not being correctly propagated to the background physics engine, ensuring the "Arena" state correctly resumes and maintains the proper visual and mechanical state.
