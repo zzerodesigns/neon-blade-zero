@@ -1,5 +1,5 @@
 # neon blade: engine architecture
-**Engine State for: v48.7.0**
+**Engine State for: v48.7.2**
 
 > **ATTENTION FUTURE AGENTS:** This document is the absolute source of truth for the Neon Blade engine. Read this before modifying core systems. The project is a strict **single-file application** (`index.html`). Do not create external scripts or stylesheets.
 
@@ -25,6 +25,7 @@ Custom kinematic physics engine (no external libraries).
 *   `SpatialHashGrid`: A 2D (X/Z) grid using integer keys for zero-allocation spatial queries. The performance backbone.
 *   `physicsStep`: Core movement/collision logic inside `PlayerController` and `Enemy`.
 *   **Continuous Collision Detection (CCD):** Implemented for high velocity player-bot intersections, utilizing swept-sphere lines to prevent tunneling, complete with relative mass displacement and kinetic momentum transfer to bots during slide hits.
+*   **Unified Horizontal Resolution:** Consolidates horizontal movement checks into a single pass to ensure consistent collision response on oriented geometry.
 *   **Projectile Kinetic Physics:** Gadgets actively interact with everything. They use Displacement Logic for tactical "kicking/sweeping", reciprocal overlapping to bounce off bots natively, and mutually bump other projectiles to "scatter" piles of settled grenades.
 *   **True Rigid-Body Ragdolls:** When bots receive heavy hits (CONFUSED state), they transition into an impulse-based physics simulation. They inherit angular momentum and tumble reacting accurately to floor vertices, including elastic bouncing and ground damping, cleanly separating visual animations from gameplay state checks via `FALLEN` verification.
 *   **Data Flow:** Entities query the grid for walls; projectiles and players check dynamic structural proximity for kinetic interaction and overlap resolution.
@@ -32,6 +33,7 @@ Custom kinematic physics engine (no external libraries).
 ### D. Player & Input (`PlayerController`, `InputManager`)
 *   `InputManager`: Captures raw keyboard/mouse events.
 *   `PlayerController`: The central entity. Consumes input to update velocity, trigger jumps, slashes, and gadgets.
+*   **Universal Dynamic Tilt:** Procedural camera banking based on surface normals during sliding states.
 
 ### E. Neural Override System (`AutoplaySystem`)
 A high-performance autonomous agent that simulates pro-player behavior.

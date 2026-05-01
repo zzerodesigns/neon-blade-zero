@@ -22,7 +22,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v48.7.0</title>
+    <title>Neon Blade: Melee Arena v48.7.2</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -610,9 +610,7 @@
             font-weight: 600;
             letter-spacing: 1px;
             filter: drop-shadow(0 0 6px rgba(248, 113, 113, 0.5));
-        }
     </style>
-    <link rel="stylesheet" href="/index.css">
 </head>
 <body>
 
@@ -796,7 +794,10 @@
                     <input type="range" min="0.1" max="0.8" step="0.05" value="0.45" class="cyber-range" id="set-tilt-amt">
                 </div>
 
-                <div class="close-btn" id="settings-close">CLOSE</div>
+                <div style="display:flex; justify-content:center; gap:20px; margin-top:40px; margin-bottom:0; width:100%;">
+                    <button class="btn-secondary" onclick="resetSettings()" style="padding:10px 20px; font-size:1rem; flex:1;">RESET DEFAULT</button>
+                    <div class="close-btn" id="settings-close" style="margin:0; padding:15px; flex:1; display:flex; align-items:center; justify-content:center;">CLOSE</div>
+                </div>
             </div>
 
             <!-- NEW LOADOUT MODAL -->
@@ -832,7 +833,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.7.0<br>- Tactile Ragdoll Physics & Stasis Gadget Loadout -</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.7.2<br>- Smooth Sliding -<br>"let it slide"</div>
         </div>
     </div>
 
@@ -864,6 +865,31 @@
             PlayerLoadout.r = 'VOID';
             PlayerLoadout.e = 'IMPULSE';
             updateLoadoutUI();
+        }
+
+        function resetSettings() {
+            if (typeof AudioSys !== 'undefined') AudioSys.playUI(true);
+            
+            // 1. Reset Global State
+            brightnessMultiplier = 1.2;
+            showFPS = true;
+            enableWallTilt = true;
+            wallTiltAmount = 0.45;
+            
+            // 2. Sync HTML Elements
+            document.getElementById('set-bright').value = 1.2;
+            document.getElementById('set-vol').value = 0.5;
+            document.getElementById('set-fps').checked = true;
+            document.getElementById('set-tilt').checked = true;
+            document.getElementById('set-tilt-amt').value = 0.45;
+            
+            // 3. Apply changes
+            applyTheme();
+            document.getElementById('fps-display').style.display = "block";
+            const tiltRow = document.getElementById('tilt-slider-row');
+            tiltRow.style.opacity = '1';
+            tiltRow.style.pointerEvents = 'auto';
+            AudioSys.setVolume(0.5 * 3.0);
         }
 
         function updateLoadoutUI() {
@@ -3398,6 +3424,8 @@
         const _ZERO = new THREE.Vector3(0, 0, 0);
         const _quat = new THREE.Quaternion();
         const _quat2 = new THREE.Quaternion();
+        const _mat3 = new THREE.Matrix3();
+        const _obbAxes = [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()];
         
         const _boxVertices = [
             new THREE.Vector3(-0.5, -1, -0.5), new THREE.Vector3(0.5, -1, -0.5),
@@ -3411,6 +3439,8 @@
         const _pRight = new THREE.Vector3();
         const _pInput = new THREE.Vector3();
         const _pTemp = new THREE.Vector3();
+        const _obbNormal = new THREE.Vector3();
+        const _obbDepth = { value: 0 };
 
         // AI Scratchpad
         const _aiFwd = new THREE.Vector3();
@@ -3563,13 +3593,11 @@
 
             applyMatrix4(matrix) {
                 const e = matrix.elements;
-                // Use global pool _vec3_1/2/3 to extract scale, avoiding new Vector3()
                 let sx = _vec3_1.set(e[0], e[1], e[2]).length();
                 let sy = _vec3_2.set(e[4], e[5], e[6]).length();
                 let sz = _vec3_3.set(e[8], e[9], e[10]).length();
 
-                const rot = new THREE.Matrix3().setFromMatrix4(matrix);
-                this.rotation.multiply(rot);
+                this.rotation.multiply(_mat3.setFromMatrix4(matrix));
                 this.halfSize.x *= sx; this.halfSize.y *= sy; this.halfSize.z *= sz;
                 this.center.applyMatrix4(matrix);
                 return this;
@@ -3577,31 +3605,24 @@
 
             // Separating Axis Theorem (SAT) for AABB (Player) vs OBB (Wall)
             intersectsBox3(box3, resultNormal, resultDepth) {
-                // Use global scratchpad vectors to prevent memory allocation
                 const pCenter = box3.getCenter(_vec3_1);
                 const pHalf = box3.getSize(_vec3_2).multiplyScalar(0.5);
-                
                 const v = _vec3_3.copy(pCenter).sub(this.center);
                 
-                const axisO_1 = new THREE.Vector3(); 
-                const axisO_2 = new THREE.Vector3(); 
-                const axisO_3 = new THREE.Vector3();
-                this.rotation.extractBasis(axisO_1, axisO_2, axisO_3);
-                
-                const axes = [
-                    axisO_1, axisO_2, axisO_3,
-                    new THREE.Vector3(1,0,0), new THREE.Vector3(0,1,0), new THREE.Vector3(0,0,1)
-                ];
+                // Get basis vectors into pre-allocated _obbAxes
+                this.rotation.extractBasis(_obbAxes[0], _obbAxes[1], _obbAxes[2]);
+                _obbAxes[3].set(1,0,0);
+                _obbAxes[4].set(0,1,0);
+                _obbAxes[5].set(0,0,1);
 
                 let minOverlap = Infinity;
-                let bestAxis = null;
+                let bestAxisIndex = -1;
 
                 for (let i = 0; i < 6; i++) {
-                    const axis = axes[i];
-                    
-                    const rA = Math.abs(this.halfSize.x * axis.dot(axisO_1)) +
-                               Math.abs(this.halfSize.y * axis.dot(axisO_2)) +
-                               Math.abs(this.halfSize.z * axis.dot(axisO_3));
+                    const axis = _obbAxes[i];
+                    const rA = Math.abs(this.halfSize.x * axis.dot(_obbAxes[0])) +
+                               Math.abs(this.halfSize.y * axis.dot(_obbAxes[1])) +
+                               Math.abs(this.halfSize.z * axis.dot(_obbAxes[2]));
                     
                     const rB = Math.abs(pHalf.x * axis.x) +
                                Math.abs(pHalf.y * axis.y) +
@@ -3614,13 +3635,13 @@
 
                     if (overlap < minOverlap) {
                         minOverlap = overlap;
-                        bestAxis = axis;
+                        bestAxisIndex = i;
                     }
                 }
 
-                if (bestAxis && resultNormal) {
-                    if (v.dot(bestAxis) < 0) bestAxis.negate();
-                    resultNormal.copy(bestAxis);
+                if (bestAxisIndex !== -1 && resultNormal) {
+                    resultNormal.copy(_obbAxes[bestAxisIndex]);
+                    if (v.dot(resultNormal) < 0) resultNormal.negate();
                     if (resultDepth) resultDepth.value = minOverlap;
                 }
                 return true;
@@ -4829,12 +4850,12 @@
                 // --- WALL SLIDE: RESET & GRAVITY ---
                 const wasWallSliding = this.isWallSliding;
                 this.isWallSliding = false; 
+                this.wallSlideTilt = 0; // Fix persisting tilt on flat surfaces
 
                 // Apply Gravity (Reduced by 80% if sliding down a wall)
                 const appliedGravity = (wasWallSliding && this.velocity.y < 0) ? CONFIG.gravity * 0.2 : CONFIG.gravity;
                 this.velocity.y -= appliedGravity * dt;
                 
-                camera.position.y += this.velocity.y * dt;
                 // -----------------------------------
 
                 if (this.aimingGadget) {
@@ -4874,7 +4895,7 @@
                 const subDt = dt / timeSteps;
                 
                 for(let i=0; i<timeSteps; i++) {
-                    this.physicsStep(subDt);
+                    this.physicsStep(subDt, wasOnGroundFrame);
                 }
 
                 // --- LANDING LOGIC (Post-Physics) ---
@@ -4898,7 +4919,8 @@
                 }
                 
                 const tiltEnabled = (typeof enableWallTilt !== 'undefined') ? enableWallTilt : false;
-                const tiltTarget = (this.isWallSliding && tiltEnabled) ? this.wallSlideTilt : 0;
+                const isTiltActive = (this.isWallSliding || this.isSliding) && tiltEnabled;
+                const tiltTarget = isTiltActive ? this.wallSlideTilt : 0;
                 camera.rotation.z = THREE.MathUtils.lerp(camera.rotation.z, tiltTarget, dt * 2.5);
                 
                 // Recalculate speed BEFORE slide logic (base speed)
@@ -4963,14 +4985,10 @@
                 }
             }
             
-            physicsStep(dt) {
+            physicsStep(dt, wasOnGround) {
                 const keys = InputManager.keys;
                 const isMoving = (keys.w || keys.a || keys.s || keys.d);
                 this.isSprinting = keys.shift && this.energy > 0 && isMoving && !this.isCrouching;
-
-                // OBB Scratchpad
-                const _obbNormal = new THREE.Vector3();
-                const _obbDepth = { value: 0 };
 
                 // --- 1. Zero-Allocation Direction Logic (Original) ---
                 _pFwd.set(0, 0, 0); _pRight.set(0, 0, 0); _pInput.set(0, 0, 0);
@@ -5012,31 +5030,24 @@
                 this.velocity.x *= damping;
                 this.velocity.z *= damping;
 
+                camera.position.x += this.velocity.x * dt;
+                camera.position.y += this.velocity.y * dt;
+                camera.position.z += this.velocity.z * dt;
+
                 this.updatePlayerBox();
                 
                 // --- Y-AXIS COLLISION (Original + OBB Branch) ---
                 if (spatialGrid) {
                     let collisions = spatialGrid.query(this.playerBox);
                     for(const wall of collisions) {
-                        if (wall.mesh.userData.obb) {
-                            if (wall.mesh.userData.obb.intersectsBox3(this.playerBox, _obbNormal, _obbDepth)) {
-                                if (Math.abs(_obbNormal.y) > 0.5) { // Only handle vertical-ish normals
-                                    camera.position.addScaledVector(_obbNormal, _obbDepth.value);
-                                    const dot = this.velocity.dot(_obbNormal);
-                                    if (dot < 0) this.velocity.sub(_obbNormal.clone().multiplyScalar(dot));
-                                    
-                                    if (_obbNormal.y > 0.7) { this.onGround = true; if (this.velocity.y < 0) this.velocity.y = 0; } 
-                                    else if (_obbNormal.y < -0.7) { this.velocity.y = -0.1; }
-                                }
-                            }
-                        } else if (this.playerBox.intersectsBox(wall.box)) {
+                        if (!wall.mesh.userData.obb && this.playerBox.intersectsBox(wall.box)) {
                             const overlapY = Math.min(this.playerBox.max.y - wall.box.min.y, wall.box.max.y - this.playerBox.min.y);
                             const overlapX = Math.min(this.playerBox.max.x - wall.box.min.x, wall.box.max.x - this.playerBox.min.x);
                             const overlapZ = Math.min(this.playerBox.max.z - wall.box.min.z, wall.box.max.z - this.playerBox.min.z);
                             if (overlapX > 0 && overlapZ > 0 && overlapY < overlapX && overlapY < overlapZ) {
                                 if (this.velocity.y < 0) {
                                     if (this.playerBox.min.y < wall.box.max.y && this.playerBox.min.y > wall.box.min.y) {
-                                        camera.position.y += overlapY; this.velocity.y = 0; this.onGround = true; 
+                                        camera.position.y += overlapY; this.onGround = true; if (this.velocity.y < 0) this.velocity.y = 0;
                                     }
                                 } else if (this.velocity.y > 0) {
                                     if (this.playerBox.max.y > wall.box.min.y && this.playerBox.max.y < wall.box.max.y) {
@@ -5053,68 +5064,88 @@
                     else { performWallJump(); }
                 }
 
-                // --- X-AXIS COLLISION (Original + OBB Branch) ---
-                camera.position.x += this.velocity.x * dt;
+                // --- UNIFIED COLLISION RESOLUTION ---
                 if (!this.isPhasing && spatialGrid) {
                     this.updatePlayerBox();
                     let collisions = spatialGrid.query(this.playerBox);
                     for(const wall of collisions) {
                         if (wall.mesh.userData.obb) {
                             if (wall.mesh.userData.obb.intersectsBox3(this.playerBox, _obbNormal, _obbDepth)) {
+                                if (this.velocity.dot(_obbNormal) > 0) _obbNormal.negate();
+                                
+                                // Resolve all OBB collisions (walls and slopes) in one pass to prevent "delayed" resolution bounciness
                                 camera.position.addScaledVector(_obbNormal, _obbDepth.value);
                                 const dot = this.velocity.dot(_obbNormal);
-                                if (dot < 0) this.velocity.sub(_obbNormal.clone().multiplyScalar(dot));
+                                if (dot < 0) this.velocity.addScaledVector(_obbNormal, -dot);
                                 
-                                if (!this.onGround && InputManager.keys.c) {
-                                    this.isWallSliding = true; const dotTilt = _pTemp.dot(_obbNormal); this.wallSlideTilt = (dotTilt > 0) ? -wallTiltAmount : wallTiltAmount;
+                                const bank = _pRight.dot(_obbNormal);
+
+                                if (_obbNormal.y > 0.7) {
+                                    this.onGround = true;
+                                    // Add subtle ground banking tilt
+                                    if (this.isSliding) {
+                                        this.wallSlideTilt = -bank * (wallTiltAmount * 0.5);
+                                    }
+                                } else if (_obbNormal.y < -0.7) { 
+                                    this.velocity.y = Math.min(this.velocity.y, -0.1); 
+                                } else if (Math.abs(_obbNormal.y) < 0.7) { // Handle wall sliding on all steep surfaces
+                                    if (!this.onGround && InputManager.keys.c) {
+                                        this.isWallSliding = true; 
+                                        this.wallSlideTilt = -bank * wallTiltAmount;
+                                    }
                                 }
                             }
                         } else if (this.playerBox.intersectsBox(wall.box)) {
                             const overlapX = Math.min(this.playerBox.max.x - wall.box.min.x, wall.box.max.x - this.playerBox.min.x);
                             const overlapY = Math.min(this.playerBox.max.y - wall.box.min.y, wall.box.max.y - this.playerBox.min.y);
                             const overlapZ = Math.min(this.playerBox.max.z - wall.box.min.z, wall.box.max.z - this.playerBox.min.z);
-                            if (overlapY > 0.1 && overlapZ > 0 && overlapX < overlapZ) {
-                                const wallCenterX = (wall.box.min.x + wall.box.max.x) / 2;
-                                if (camera.position.x < wallCenterX) camera.position.x -= overlapX; else camera.position.x += overlapX;
-                                this.wallImpactVelocity = Math.abs(this.velocity.x); this.velocity.x = 0;
-                                if (!this.onGround && InputManager.keys.c) {
-                                    this.isWallSliding = true; const normalX = (camera.position.x < wallCenterX) ? -1 : 1; const dot = _pTemp.x * normalX; this.wallSlideTilt = (dot > 0) ? -wallTiltAmount : wallTiltAmount;
+                            
+                            if (overlapY > 0.1) { // Avoid catching feet
+                                if (overlapX < overlapZ) {
+                                    const wallCenterX = (wall.box.min.x + wall.box.max.x) / 2;
+                                    const normalX = (camera.position.x < wallCenterX) ? -1 : 1;
+                                    camera.position.x += normalX * overlapX;
+                                    this.wallImpactVelocity = Math.abs(this.velocity.x); 
+                                    this.velocity.x = 0;
+                                    if (!this.onGround && InputManager.keys.c) {
+                                        this.isWallSliding = true; 
+                                        const bank = _pRight.x * normalX;
+                                        this.wallSlideTilt = -bank * wallTiltAmount;
+                                    }
+                                } else {
+                                    const wallCenterZ = (wall.box.min.z + wall.box.max.z) / 2;
+                                    const normalZ = (camera.position.z < wallCenterZ) ? -1 : 1;
+                                    camera.position.z += normalZ * overlapZ;
+                                    this.wallImpactVelocity = Math.abs(this.velocity.z); 
+                                    this.velocity.z = 0;
+                                    if (!this.onGround && InputManager.keys.c) {
+                                        this.isWallSliding = true; 
+                                        const bank = _pRight.z * normalZ;
+                                        this.wallSlideTilt = -bank * wallTiltAmount;
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
-                // --- Z-AXIS COLLISION (Original + OBB Branch) ---
-                camera.position.z += this.velocity.z * dt;
-                if (!this.isPhasing && spatialGrid) {
+                // --- GROUND SNAPPING ---
+                if (wasOnGround && !this.onGround && this.velocity.y <= 0 && !this.wantsToJump) {
+                    _pTemp.copy(camera.position);
+                    camera.position.y -= 0.5; 
                     this.updatePlayerBox();
-                    let collisions = spatialGrid.query(this.playerBox);
-                    for(const wall of collisions) {
-                        if (wall.mesh.userData.obb) {
-                            if (wall.mesh.userData.obb.intersectsBox3(this.playerBox, _obbNormal, _obbDepth)) {
+                    let snapCols = spatialGrid.query(this.playerBox);
+                    for(const wall of snapCols) {
+                        if (wall.mesh.userData.obb && wall.mesh.userData.obb.intersectsBox3(this.playerBox, _obbNormal, _obbDepth)) {
+                            if (_obbNormal.y > 0.7) {
                                 camera.position.addScaledVector(_obbNormal, _obbDepth.value);
-                                const dot = this.velocity.dot(_obbNormal);
-                                if (dot < 0) this.velocity.sub(_obbNormal.clone().multiplyScalar(dot));
-
-                                if (!this.onGround && InputManager.keys.c) {
-                                    this.isWallSliding = true; const dotTilt = _pTemp.dot(_obbNormal); this.wallSlideTilt = (dotTilt > 0) ? -wallTiltAmount : wallTiltAmount;
-                                }
-                            }
-                        } else if (this.playerBox.intersectsBox(wall.box)) {
-                            const overlapX = Math.min(this.playerBox.max.x - wall.box.min.x, wall.box.max.x - this.playerBox.min.x);
-                            const overlapY = Math.min(this.playerBox.max.y - wall.box.min.y, wall.box.max.y - this.playerBox.min.y);
-                            const overlapZ = Math.min(this.playerBox.max.z - wall.box.min.z, wall.box.max.z - this.playerBox.min.z);
-                            if (overlapY > 0.1 && overlapX > 0 && overlapZ < overlapX) {
-                                const wallCenterZ = (wall.box.min.z + wall.box.max.z) / 2;
-                                if (camera.position.z < wallCenterZ) camera.position.z -= overlapZ; else camera.position.z += overlapZ;
-                                this.wallImpactVelocity = Math.abs(this.velocity.z); this.velocity.z = 0;
-                                if (!this.onGround && InputManager.keys.c) {
-                                    this.isWallSliding = true; const normalZ = (camera.position.z < wallCenterZ) ? -1 : 1; const dot = _pTemp.z * normalZ; this.wallSlideTilt = (dot > 0) ? -wallTiltAmount : wallTiltAmount;
-                                }
+                                this.onGround = true; this.velocity.y = 0;
+                                break;
                             }
                         }
                     }
+                    if (!this.onGround) camera.position.copy(_pTemp);
+                    this.updatePlayerBox();
                 }
             }
 
@@ -5647,6 +5678,7 @@
                 this.velocity = vel.clone();
                 this.radius = 0.2;
                 this.stuckTo = null;
+                this.stuckOffset = new THREE.Vector3(); // Prevent set() exception on world objects
                 
                 const phys = CONFIG.gadgetPhysics[type.toLowerCase()];
                 this.life = phys ? phys.life : 5.0;
@@ -5813,19 +5845,19 @@
                         if (this.type === 'IMPULSE') { this.active = false; this.explode(); return; }
                         if (this.type === 'VOID' || this.type === 'STASIS') { 
                             this.stuckTo = hitObject; 
-                            this.stuckOffset = _projPos.clone().sub(targetPos); 
+                            this.stuckOffset = _vec3_1.copy(_projPos).sub(targetPos).clone(); 
                             return; 
                         }
                         if (this.type === 'FRAG') {
                             const fragPhys = CONFIG.gadgetPhysics.frag;
-                            const relVel = this.velocity.clone().sub(targetVel || _vec3_1.set(0,0,0));
+                            const relVel = _vec3_1.subVectors(this.velocity, targetVel || _ZERO);
                             const dot = relVel.dot(n);
                             if (dot < 0) {
                                 this.velocity.copy(relVel.reflect(n).multiplyScalar(fragPhys.bounciness));
                                 // Transfer momentum (The Kick)
                                 if (targetVel) {
                                     // Make kick more consistent even at low speeds
-                                    const shove = targetVel.length() > 0.1 ? targetVel.clone().multiplyScalar(1.2) : n.clone().multiplyScalar(2.0);
+                                    const shove = _vec3_2.copy(targetVel.length() > 0.1 ? targetVel : n).multiplyScalar(targetVel.length() > 0.1 ? 1.2 : 2.0);
                                     this.velocity.add(shove);
                                     this.velocity.y += 2.0; // Guaranteed hop to clear friction
                                 }
@@ -5870,7 +5902,7 @@
                             this.velocity.set(0,0,0);
                             this.active = true; 
                             this.stuckTo = { mesh: { position: hits[0].point.clone() }, isDeadCorpse: false, health: 1 };
-                            this.stuckOffset = new THREE.Vector3(0,0,0); 
+                            this.stuckOffset.set(0,0,0); 
                             return;
                         }
                         if (this.type === 'FRAG') {
@@ -9180,7 +9212,7 @@
                     // 2. Spatial Rotation
                     const av = this.angularVelocity.length();
                     if (av > 0.0001) {
-                        _quat.setFromAxisAngle(this.angularVelocity.clone().normalize(), av * dt);
+                        _quat.setFromAxisAngle(_vec3_1.copy(this.angularVelocity).normalize(), av * dt);
                         this.mesh.quaternion.premultiply(_quat); // Rotate in world space
                     }
                     
@@ -9563,7 +9595,13 @@
                         if (wb.mesh.userData.isFloor) continue;
                         if (this.mesh.position.y >= wb.box.max.y - 0.5) continue;
 
-                        if (botBox.intersectsBox(wb.box)) {
+                        if (wb.mesh.userData.obb) {
+                            if (wb.mesh.userData.obb.intersectsBox3(botBox, _obbNormal, _obbDepth)) {
+                                this.mesh.position.addScaledVector(_obbNormal, _obbDepth.value);
+                                const dot = this.velocity.dot(_obbNormal);
+                                if (dot < 0) this.velocity.addScaledVector(_obbNormal, -dot * 0.5); // Bot friction bounce
+                            }
+                        } else if (botBox.intersectsBox(wb.box)) {
                             const xOverlap = Math.min(botBox.max.x - wb.box.min.x, wb.box.max.x - botBox.min.x);
                             const zOverlap = Math.min(botBox.max.z - wb.box.min.z, wb.box.max.z - botBox.min.z);
 

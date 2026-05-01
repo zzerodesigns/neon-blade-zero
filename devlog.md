@@ -3,6 +3,8 @@
 > **Note to AI Agents:** Read this file to understand current bugs, planned features, and user observations. Do not modify the architecture based on this file alone; use it as a task list and context guide.
 
 ## 🐛 active bugs
+*   **Ramp Snapping (Under-mesh Glitch):** Sliding on long OBB ramps sometimes incorrectly resolves collision downward, trapping the player underneath.
+*   **TP Ceiling/Floor Snap:** Teleporting under the map snaps the player to outer edges instead of correctly treating the underside of the floor as a valid ceiling.
 *   **AI Aiming Logic:** Neural Override occasionally aims gadgets or teleports into the sky or walls when no valid floor is found in the immediate radius.
 *   **Phantom Slashing:** AI sometimes performs attack inputs when the target is technically out of range or behind thin cover, leading to "slashing at nothing."
 *   **Survival Instincts:** AI doesn't prioritize `ESCAPE` state aggressively enough when health is low, often getting caught in a `COMBAT` loop until death.
@@ -14,15 +16,15 @@
 *   **Spatial Awareness Success:** The addition of `checkGapForward` and `checkWallForward` has significantly reduced the AI's tendency to fall off platforms or run mindlessly into walls.
 *   **Gadget Utility:** Impulse is now a core part of AI traversal, used effectively to launch away from danger or toward targets, though frequency could still be higher.
 *   **UI Aesthetic Standard:** The "liquid glass" style (backdrop-filter blur, semi-transparent backgrounds, rounded corners, subtle drop shadows) is now the established standard for all UI elements (settings, messages, buttons) to ensure readability against bright backgrounds without visual clutter.
-*   **Collision Edge Cases:** The recent slope sliding bug revealed that SAT collision with OBBs can return downward-pointing normals if the player hits the underground flat faces of a ramp. Ground-checks (`_obbNormal.y < -0.1`) are necessary to force the physics engine to resolve upward along the slope.
-*   **OBB Sliding Friction & Slopes:** Sliding against any rotated surface (OBB walls, slopes) feels rough, like sliding on sandpaper. Slopes specifically suffer from a very obvious micro-bounce, and sliding downwards on them currently doesn't work at all.
+*   **Collision Edge Cases (Resolved):** High-speed sliding into OBB ramps no longer pushes the player through the floor. Ground-checks reliably ignore downward-pointing normals from the "underground" faces of ramps, forcing the physics engine to resolve movement upward along the slope.
+*   **OBB Sliding Friction & Slopes (Optimized):** The "sandpaper" friction effect against rotated objects has been completely resolved via Unified Horizontal Resolution. Sliding across angled surfaces and walls is now smooth in all directions, and the new ground-snapping mechanic reliably prevents bouncing on steep downhill descents.
 *   **Zero-Allocation Performance:** The migration to global scratchpads has effectively eliminated garbage collection spikes during high-frequency combat, maintaining a stable 60 FPS even with multiple active entities.
 
 ## 🎯 current priorities
+*   [ ] **Address Ramp Snapping & Teleport Logic:** Fix the Under-mesh logic trapping players in OBB ramps, and refine teleport raycasting to handle floor undersides as ceilings.
 *   [ ] **AI Survival & Tactical Retreat:** Refine the `ESCAPE` intention to be more dominant at low health and improve the AI's ability to use cover or rapid teleportation to disengage.
 *   [ ] **Gadget Saturation:** Increase the frequency and variety of gadget usage in the `GADGET` state, especially for area denial (Frag/Void).
 *   [ ] **Wall Traversal Polish:** Implement dedicated "Wall Slide" and "Wall Run" logic for the AI to chain vertical movements more fluidly.
-*   [ ] **Sandpaper Physics & OBB Sliding:** Resolve friction issues against rotated objects (walls and slopes) and implement ground-sticking logic to prevent micro-bouncing on downward slopes.
 *   [ ] **Intention Refinement:** Further tune the intention scoring weights to prevent "indecisive" state switching during rapid combat transitions.
 
 ## 💡 future ideas & roadmap
@@ -62,6 +64,7 @@
 *   **Synthesized Melodies:** Integrate procedural Web Audio API melodies as easter eggs or ambient tracks.
 
 ## ✅ recently completed concepts
+- [x] **Smooth Sliding & Physics Optimization (v48.7.2):** Consolidated OBB physics via Unified Horizontal Resolution, implemented ground-snapping for slope stability, and added universal dynamic camera tilt alongside critical UI and projectile fixes.
 - [x] **Tactile Physics & Stasis Integration:** finalized the v48.7.0 baseline including ragdoll tumbling and temporal dilation.
 
 ## 🗄️ shelved / experimental bench
@@ -69,40 +72,25 @@
 
 ## 📖 version history / patch notes
 
+### v48.7.2 - Smooth Sliding & Physics Optimization
+*   **Unified Horizontal Resolution:** Refactored oriented bounding box (OBB) physics into a single horizontal pass. This completely eliminated "sandpaper" directional friction on rotated obstacles, allowing smooth multidirectional sliding on all slanted surfaces.
+*   **Downward Slope Drift & Snapping:** Removed aggressive downhill vertical velocity zeroing. Implemented a sub-step ground-snapping probe so players securely drift and stick to steep drop-offs at high speeds without bouncy, bouncy gravity stutters.
+*   **Universal Dynamic Tilt:** Modernized the camera banking system. Tilt intensity now mathematically scales via a dot product intersection calculating view vectors against surface normals, triggering flawless lean transitions on steep slopes/walls and auto-zeroing safely on flat floors.
+*   **Settings UI & Freeze Patches:** Upgraded the system settings modal with matching "RESET DEFAULT" and "CLOSE" buttons. Resolved a critical initialization bug causing hard main-thread lockups when grenades hit static map geometry.
+
 ### v48.7.0 (Restored Baseline) - Decoupled Architecture Rollback
 *   **Engine Rollback:** Rolled back `index.html` and `architecture.md` to the v48.7.0 baseline. The multi-threaded "Neural Shadow Core" experiment (v48.7.1x) has been shelved due to persistent initialization failures in restricted hosted environments.
 *   **IPC Deprecation:** Removed the Service Worker (`sw.js`), SharedArrayBuffer memory mapping, and OffscreenCanvas delegation. All physics, rendering, and logic are once again handled by the main thread to ensure universal compatibility.
 *   **Documentation Sync:** Cleaned up versioning strings across the application to reflect the return to the stable v48.7.0 feature set.
 
-### v48.7.1f - Hybrid Engine Resilience & SAB Hardening
-*   **False-Positive SAB Detection Fix:** Updated `canUseWorker` check to require successful `SharedArrayBuffer` instantiation. This ensures that browsers which define `SharedArrayBuffer` but restrict its usage (common in hosted iframes without COOP/COEP headers) correctly fall back to the main-thread engine.
-*   **Worker Panic Fallback:** Implemented a global `window.workerInstance.onerror` handler. If the background physics engine fails to boot for any reason, the main thread now automatically terminates the zombie worker and initializes a local game loop, preventing total application lock-up.
-*   **Map Switch Integrity:** Hardened the map-switching handler to verify both worker existence and memory-buffer validity before delegating work, ensuring the "MAP" button on the pause screen remains functional in main-thread fallback mode.
-
-### v48.7.1e - Hosted Environment Hardening & Fallback Fixes
-*   **Startup Bypass:** Implemented a `.catch()` hook for Pointer Lock requests. If the browser rejects the lock (common in hosted iframes), the game now manually transitions to the active state, ensuring the "ENTER ARENA" button is never a soft-lock point.
-*   **Fallback Canvas Visibility:** Explicitly styled the renderer's DOM element with absolute positioning and z-index during main-thread initialization. This prevents the game world from being pushed invisibly to the bottom of the page when Web Workers are unavailable.
-*   **Worker Crash Prevention:** Hardened `applyTheme()` with `isWorker` guards to prevent the background engine from attempting to access non-existent DOM elements during map switches, resolving a fatal ReferenceError in multi-threaded mode.
-*   **State Buffer Synchronization:** Fixed critical logic desynchronization where `isLocked`, `teleportMode`, `currentTheme`, and `PlayerLoadout` were not being correctly propagated to the background physics engine, ensuring the "Arena" state correctly resumes and maintains the proper visual and mechanical state.
-*   **TransferControl Fallback:** Added a defensive check for `transferControlToOffscreen` support, preventing crashes in legacy environments or specific webview implementations that support `SharedArrayBuffer` but lack OffscreenCanvas transferability.
-
-### v48.7.1c - Final Bootstrap & IPC Sync Resolution
-*   **Engine Deadlock Resolution:** Resolved critical bootstrap failure by implementing a SharedArrayBuffer health check and defensive fallback to main-thread execution.
-*   **IPC UI Bridge:** Re-connected start screen map-switching and button labels to the background engine via `SWITCH_MAP` and `updateMapButton` postMessage routing.
-*   **Reference Error & DOM Fixes:** Corrected pause menu variable conflicts and removed illegal DOM access from the background worker context.
-
-### v48.7.1b - True Sandbox Engine Decoupling
-*   **Cache Line Bouncing Fix:** Resolved Chromium micro-stuttering caused by redundant physics execution. A logic error allowed the background worker and main thread to process the same data simultaneously. This created a race condition on the SharedArrayBuffer, triggering memory contention and rendering lag.
-*   **True Sandbox Migration:** Fully ripped Three.js and physics out of the Main Thread. The worker now natively powers WebGL via `OffscreenCanvas`.
-*   **Strict I/O Fencing:** Audio and UI calls from the physics/engine layers are now seamlessly abstracted via a proxy, funneling lightweight `postMessage` cues back to the DOM thread.
-
-### v48.7.1a - Score Synchronization Hotfix
-*   **Decoupled Score Sync:** Fixed a minor desynchronization bug where an AI-local `score` evaluation variable accidentally eclipsed the global `player.score` during the SharedArrayBuffer memory copy, preserving true metric continuity.
-
-### v48.7.1 - Decoupled Engine Architecture & IPC Optimization
-*   **Chromium IPC Optimization:** Addressed severe frame-stuttering caused by modern Chromium site isolation. By decoupling the engine and moving Three.js/Physics to a Dedicated Web Worker (`OffscreenCanvas`), we bypass the main-thread GPU validation bottleneck.
-*   **Atomic Memory Synchronization:** Established a `SharedArrayBuffer` memory map using `Atomics` for zero-latency input/entity state exchange between threads.
-*   **Architectural Cleanup:** Enforced strict single-file integrity by pruning legacy external references.
+### v48.7.1 - v48.7.1f: Experimental Decoupled Engine (Neural Shadow Core) - [SHELVED/FAILED]
+*   **The Experiment:** An ambitious architectural attempt to decouple the Three.js renderer and physics engine into a Dedicated Web Worker using `OffscreenCanvas` and `SharedArrayBuffer` (SAB) memory mapping. The goal was to bypass Chromium's main-thread IPC bottlenecks and achieve true multi-threaded performance.
+*   **The Failure:** Encountered insurmountable security restrictions in hosted environments. Modern browsers block `SharedArrayBuffer` initialization in iframes (like the AI Studio preview) unless specific Cross-Origin Isolation headers (COOP/COEP) are present.
+*   **Iteration Polish (a through f):**
+    *   **IPC & Sync:** Implemented atomic memory synchronization and strict I/O fencing (v48.7.1 - v48.7.1b).
+    *   **Hosted Hardening:** Added "SAB Ghost" detection, worker panic fallbacks, and automatic main-thread takeover logic to prevent soft-locks in restricted environments (v48.7.1c - v48.7.1f).
+    *   **UI Bridging:** Abstracted DOM interactions into a centralized `DOM_UI` proxy to work around worker-thread limitations.
+*   **Outcome:** Despite technical successes in local/isolated environments, the complexity and fragility of the fallback systems compromised the project's "Single-File Offline" portability. The experiment was fully shelved in favor of the v48.7.0 monolithic baseline.
 
 ### v48.7.0 - Tactile Ragdoll Physics & Stasis Gadget Loadout
 *   **Gadget Loadouts:** Expanded the fixed keybind system to support a dynamic UI Loadout system, letting users map F,R,E to any available gadget via the Pause menu, featuring symmetrical geometric neon-blue designs and tactile audio feedback loops.
