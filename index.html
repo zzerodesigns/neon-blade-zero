@@ -22,7 +22,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Blade: Melee Arena v48.7.2</title>
+    <title>Neon Blade: Melee Arena v48.8.0</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Zen+Dots&display=swap" rel="stylesheet">
@@ -165,6 +165,7 @@
         /* Ability Icon */
         .ability-group { margin-left: auto; transform: skewX(-10deg); display: flex; gap: 10px; }
         .ability-icon { 
+            box-sizing: border-box;
             width: 50px; height: 50px;
             border: 1px solid #fff; 
             background: rgba(0,0,0,0.6);
@@ -193,7 +194,7 @@
         }
 
         .ability-key { font-size: 1.2rem; font-family: 'Arial Black', sans-serif; }
-        .ability-name { font-size: 0.5rem; letter-spacing: 1px; opacity: 0.8; }
+        .ability-name { font-size: 0.45rem; letter-spacing: 0.25px; opacity: 0.8; font-family: system-ui, -apple-system, sans-serif; font-weight: 700; }
         
         #icon-q { width: 60px; height: 60px; border-color: #33ccff; }
 
@@ -442,6 +443,13 @@
             box-shadow: 0 0 20px rgba(0,255,255,0.2);
             line-height: 1.5;
             min-width: 150px;
+            text-transform: none;
+            pointer-events: none;
+        }
+        .tooltip-center:hover::after {
+            right: 50%;
+            transform: translateX(50%);
+            text-align: center;
         }
 
         /* --- SETTINGS & UI SPARKS (Refined v5) --- */
@@ -610,6 +618,7 @@
             font-weight: 600;
             letter-spacing: 1px;
             filter: drop-shadow(0 0 6px rgba(248, 113, 113, 0.5));
+        }
     </style>
 </head>
 <body>
@@ -668,29 +677,38 @@
                 <span class="stat-label">ENERGY</span>
                 <div class="bar-frame"><div id="energy-fill" class="bar-fill"></div></div>
             </div>
-            <div class="ability-group">
-                <div class="ability-icon" id="icon-q">
+            <div class="ability-group" style="align-items: flex-end;">
+                <div class="ability-icon" id="icon-q" style="width: 70px; height: 73px;">
                     <div class="ability-icon-inner">
                         <div class="ability-key">Q</div>
                         <div class="ability-name" id="tp-label">AIM</div>
                     </div>
                 </div>
-                 <div class="ability-icon" id="icon-f">
-                    <div class="ability-icon-inner">
-                        <div class="ability-key">F</div>
-                        <div class="ability-name">FRAG</div>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; gap: 8px;">
+                        <div class="ability-icon" id="icon-f">
+                            <div class="ability-icon-inner">
+                                <div class="ability-key">F</div>
+                                <div class="ability-name">FRAG</div>
+                            </div>
+                        </div>
+                        <div class="ability-icon" id="icon-r">
+                            <div class="ability-icon-inner">
+                                <div class="ability-key">R</div>
+                                <div class="ability-name">VOID</div>
+                            </div>
+                        </div>
+                        <div class="ability-icon" id="icon-e">
+                            <div class="ability-icon-inner">
+                                <div class="ability-key">E</div>
+                                <div class="ability-name">IMPULSE</div>
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <div class="ability-icon" id="icon-r">
-                    <div class="ability-icon-inner">
-                        <div class="ability-key">R</div>
-                        <div class="ability-name">VOID</div>
-                    </div>
-                </div>
-                 <div class="ability-icon" id="icon-e">
-                    <div class="ability-icon-inner">
-                        <div class="ability-key">E</div>
-                        <div class="ability-name">IMPULSE</div>
+                    <div class="ability-icon" id="icon-passive" style="width: 166px; height: 15px; min-height: 15px; flex-direction: row; justify-content: center; align-items: center;">
+                        <div class="ability-icon-inner" style="display: flex; gap: 10px; align-items: center; transform: skewX(10deg);">
+                            <div class="ability-name" id="hud-passive-name">BLAZE</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -803,25 +821,33 @@
             <!-- NEW LOADOUT MODAL -->
             <div id="loadout-modal">
                 <h2>GADGET LOADOUT</h2>
-                <div style="text-align:center; font-size:0.8rem; color:#8899aa; font-family:'Segoe UI', sans-serif; text-transform:uppercase; font-weight:600; letter-spacing:2px; margin-bottom:25px; text-shadow: 0 2px 4px rgba(0,0,0,0.8);">CLICK TO CYCLE GADGET</div>
+                <div class="session-info tooltip-center" data-details="Hold [TAB] + [F/R/E]&#10;To swap gadgets during combat" style="text-align:center; font-size:0.8rem; color:#8899aa; font-family:'Segoe UI', sans-serif; text-transform:uppercase; font-weight:600; letter-spacing:2px; margin-bottom:25px; text-shadow: 0 2px 4px rgba(0,0,0,0.8); display: block; width: fit-content; margin-left: auto; margin-right: auto;">CLICK TO CYCLE GADGET</div>
 
-                <div class="ability-group" style="margin: 0 auto 0 auto; transform: skewX(-10deg) scale(1.4); transform-origin: center;">
-                    <div class="ability-icon loadout-gadget-btn" style="cursor:pointer;" onclick="cycleGadget('f')">
-                        <div class="ability-icon-inner">
-                            <div class="ability-key">F</div>
-                            <div class="ability-name" id="menu-loadout-f">FRAG</div>
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; margin: 0 auto; transform: skewX(-10deg) scale(1.4); transform-origin: center;">
+                    <div class="ability-group" style="margin: 0; transform: none; display: flex; gap: 8px;">
+                        <div class="ability-icon loadout-gadget-btn" style="cursor:pointer;" onclick="cycleGadget('f')">
+                            <div class="ability-icon-inner">
+                                <div class="ability-key">F</div>
+                                <div class="ability-name" id="menu-loadout-f">FRAG</div>
+                            </div>
+                        </div>
+                        <div class="ability-icon loadout-gadget-btn" style="cursor:pointer;" onclick="cycleGadget('r')">
+                            <div class="ability-icon-inner">
+                                <div class="ability-key">R</div>
+                                <div class="ability-name" id="menu-loadout-r">VOID</div>
+                            </div>
+                        </div>
+                        <div class="ability-icon loadout-gadget-btn" style="cursor:pointer;" onclick="cycleGadget('e')">
+                            <div class="ability-icon-inner">
+                                <div class="ability-key">E</div>
+                                <div class="ability-name" id="menu-loadout-e">IMPULSE</div>
+                            </div>
                         </div>
                     </div>
-                    <div class="ability-icon loadout-gadget-btn" style="cursor:pointer;" onclick="cycleGadget('r')">
-                        <div class="ability-icon-inner">
-                            <div class="ability-key">R</div>
-                            <div class="ability-name" id="menu-loadout-r">VOID</div>
-                        </div>
-                    </div>
-                    <div class="ability-icon loadout-gadget-btn" style="cursor:pointer;" onclick="cycleGadget('e')">
-                        <div class="ability-icon-inner">
-                            <div class="ability-key">E</div>
-                            <div class="ability-name" id="menu-loadout-e">IMPULSE</div>
+                    <div class="ability-icon loadout-gadget-btn" style="cursor:pointer; width: 166px; height: 25px; flex-direction: row; justify-content: center; align-items: center;" onclick="cycleGadget('passive')">
+                        <div class="ability-icon-inner" style="display: flex; gap: 8px; justify-content: center; align-items: baseline; transform: skewX(10deg);">
+                            <div class="ability-key" id="menu-loadout-passive" style="font-size: 0.7rem;">BLAZE</div>
+                            <div class="ability-name">CAPSLOCK</div>
                         </div>
                     </div>
                 </div>
@@ -833,7 +859,7 @@
             </div>
 
             <p style="font-size: 0.8rem; margin-top: 30px; opacity: 0.5;">PRESS ESC TO PAUSE</p>
-            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.7.2<br>- Smooth Sliding -<br>"let it slide"</div>
+            <div style="margin-top: 8px; font-size: 0.65rem; color: #555; font-family: monospace; letter-spacing: 1px; text-align: center;">NEON BLADE: MELEE ARENA v48.8.0<br>- Thermal Dynamics & Kinetic Flow -<br>"Blaze it"</div>
         </div>
     </div>
 
@@ -844,19 +870,28 @@
         const PlayerLoadout = {
             f: 'FRAG',
             r: 'VOID',
-            e: 'IMPULSE'
+            e: 'IMPULSE',
+            passive: 'BLAZE'
         };
         const AvailableGadgets = ['FRAG', 'VOID', 'IMPULSE', 'STASIS'];
+        const AvailablePassives = ['BLAZE'];
 
         function cycleGadget(slot) {
             if (typeof AudioSys !== 'undefined') AudioSys.playUI(true);
             const current = PlayerLoadout[slot];
-            const mapped = Object.values(PlayerLoadout);
-            const unmapped = AvailableGadgets.filter(g => !mapped.includes(g));
-            if (unmapped.length > 0) {
-                PlayerLoadout[slot] = unmapped[0];
+            if (slot === 'passive') {
+                const idx = AvailablePassives.indexOf(current);
+                PlayerLoadout[slot] = AvailablePassives[(idx + 1) % AvailablePassives.length];
                 updateLoadoutUI();
+                return;
             }
+            const otherGadgets = Object.entries(PlayerLoadout)
+                .filter(([s]) => s !== slot && s !== 'passive')
+                .map(([, v]) => v);
+            const pool = AvailableGadgets.filter(g => !otherGadgets.includes(g));
+            const idx = pool.indexOf(current);
+            PlayerLoadout[slot] = pool[(idx + 1) % pool.length];
+            updateLoadoutUI();
         }
 
         function resetLoadout() {
@@ -864,6 +899,7 @@
             PlayerLoadout.f = 'FRAG';
             PlayerLoadout.r = 'VOID';
             PlayerLoadout.e = 'IMPULSE';
+            PlayerLoadout.passive = 'BLAZE';
             updateLoadoutUI();
         }
 
@@ -897,9 +933,18 @@
             document.getElementById('menu-loadout-r').innerText = PlayerLoadout.r;
             document.getElementById('menu-loadout-e').innerText = PlayerLoadout.e;
             
+            const pLabel = document.getElementById('menu-loadout-passive');
+            if (pLabel) pLabel.innerText = PlayerLoadout.passive;
+            const hudPLabel = document.getElementById('hud-passive-name');
+            if (hudPLabel) hudPLabel.innerText = PlayerLoadout.passive;
+            
             document.getElementById('icon-f').querySelector('.ability-name').innerText = PlayerLoadout.f;
             document.getElementById('icon-r').querySelector('.ability-name').innerText = PlayerLoadout.r;
             document.getElementById('icon-e').querySelector('.ability-name').innerText = PlayerLoadout.e;
+            
+            if (typeof player !== 'undefined' && player) {
+                player.updateGadgetHUD();
+            }
         }
 
         // --- CONFIGURATION ---
@@ -927,6 +972,7 @@
             attackRange: 8,
             attackCooldown: 250,
             playerDamage: 40, 
+            playerDamageTakenMult: 0.1, // General nerf applied to all damage inflicted on player
             teleportRange: 20,
             playerMaxHP: 250, 
             gadgetPhysics: {
@@ -934,6 +980,31 @@
                 void: { throwSpeed: 60, life: 1.5 },
                 impulse: { throwSpeed: 50, life: 10.0 },
                 stasis: { throwSpeed: 60, life: 1.5 }
+            },
+            blaze: {
+                drainRate: 10,             // Energy consumed per second while Blaze is active
+                trailLife: 6.0,            // Duration of the fire trail on the ground
+                trailScale: 2.4,           // Width of the fire trail
+                trailOpacity: 0.4,         // Visual intensity of the ground fire
+                riseSpeed: 0.05,            // Vertical movement speed of the fire trail meshes
+                burnHeat: 1.5,             // Rate of enemy ignition from trail (reaches 1.0 to set on fire)
+                emberLife: 1.5,            // Duration of floating fire sparks
+                emberSpawnRate: 15.0,      // Number of floating embers spawned per second per trail section
+                emberFloatSpeed: 2.0,      // Upward floating speed of embers
+                ignitionRadiusSq: 16.0,    // Detection radius for trail ignition (distance squared)
+                burnDuration: 3.0,         // Duration of the burning status effect on enemies
+                burnDps: 40.0,             // Damage per second while an enemy is burning
+                slashBonusDamage: 25,
+                slashBurnHeat: 1.8,
+                slashCost: 4.0,
+                projectileCost: 2.5,
+                projectileBurnHeat: 1.2
+            },
+            trail: {
+                slideLife: 3.0,            // Duration of the player's standard slide trail
+                slideScale: 1.6,           // Width of the slide trail
+                slideOpacity: 0.3,         // Visual intensity of the slide trail
+                emberLife: 0.75,           // Duration of static sparks spawned during slides
             },
             botBaseHP: 200, 
             botDamage: 2,   
@@ -1202,6 +1273,13 @@
                 this.ctx.save();
                 this.ctx.translate(center, center);
                 this.ctx.rotate(camera.rotation.y); 
+
+                // 3.5 Draw North Indicator (Static HUD space, before world scale)
+                this.ctx.fillStyle = '#ffcc00';
+                this.ctx.font = "bold 11px Arial"; 
+                this.ctx.textAlign = "center";
+                this.ctx.fillText("N", 0, -(center - 14));
+
                 this.ctx.scale(this.zoom, this.zoom);
                 this.ctx.translate(-camera.position.x, -camera.position.z); 
 
@@ -1272,13 +1350,8 @@
                     }
                 });
 
-                // 7. Draw North
-                this.ctx.fillStyle = '#ffcc00';
-                this.ctx.font = "bold 5px Arial"; 
-                this.ctx.textAlign = "center";
-                // Adjust North offset based on new size (sz/2 minus padding)
-                this.ctx.fillText("N", camera.position.x, camera.position.z - ( (center - 15) / this.zoom));
-
+                // 7. Draw North (REMOVED: Moved to stable section 3.5)
+                
                 this.ctx.restore();
 
                 // 8. Draw Player
@@ -1333,6 +1406,8 @@
                 this.aggressionBias = 0.5; // Influenced by health/energy
                 this.lastPos = new THREE.Vector3();
                 this.stuckTimer = 0;
+                this.activatedThisSession = false;
+                this.activeSessionTime = 0;
             }
 
             handleKey(key) {
@@ -1362,6 +1437,7 @@
 
             start() {
                 this.active = true;
+                this.activatedThisSession = true;
                 this.savedTeleportMode = teleportMode;
                 teleportMode = 'AIM';
                 NarrativeSys.show("<span class='neural-text-enabled'>Neural Override Enabled</span>", 3);
@@ -1442,6 +1518,7 @@
 
             update(dt) {
                 if (!this.active || player.isDead) return;
+                this.activeSessionTime += dt;
 
                 // Clear AI-controlled keys at start of frame
                 InputManager.keys.w = false;
@@ -2324,7 +2401,8 @@
         const autoplay = new AutoplaySystem();
 
         const InputManager = {
-            keys: { w: false, a: false, s: false, d: false, space: false, shift: false, c: false, q: false, f: false, r: false, e: false },
+            keys: { w: false, a: false, s: false, d: false, space: false, shift: false, c: false, q: false, f: false, r: false, e: false, tab: false },
+            capsLock: false,
             mouseDown: false,
             init: function() {
                 document.addEventListener('keydown', (e) => this.onKeyDown(e));
@@ -2348,10 +2426,20 @@
                 document.addEventListener('mousemove', (e) => this.onMouseMove(e));
             },
             onKeyDown: function(e) {
+                this.capsLock = e.getModifierState("CapsLock");
                 const key = e.key.toLowerCase();
-                const controlKeys = ['w', 'a', 's', 'd', ' ', 'shift', 'c', 'q', 'f', 'r', 'e'];
+                const controlKeys = ['w', 'a', 's', 'd', ' ', 'shift', 'c', 'q', 'f', 'r', 'e', 'tab'];
+                if (key === 'tab') { e.preventDefault(); this.keys.tab = true; }
                 if (autoplay.active && controlKeys.includes(key)) autoplay.cancel();
                 autoplay.handleKey(e.key);
+
+                // --- TAB + Key for Skill Switching ---
+                if (this.keys.tab) {
+                    if (key === 'f') { cycleGadget('f'); return; }
+                    if (key === 'r') { cycleGadget('r'); return; }
+                    if (key === 'e') { cycleGadget('e'); return; }
+                }
+
                 switch(key) {
                     case 'w': this.keys.w = true; break;
                     case 'a': this.keys.a = true; break;
@@ -2397,6 +2485,7 @@
                 }
             },
             onKeyUp: function(e) {
+                this.capsLock = e.getModifierState("CapsLock");
                 switch(e.key.toLowerCase()) {
                     case 'w': this.keys.w = false; break;
                     case 'a': this.keys.a = false; break;
@@ -2406,6 +2495,7 @@
                     case 'shift': this.keys.shift = false; break;
                     case 'c': this.keys.c = false; break;
                     case 'q': this.keys.q = false; break;
+                    case 'tab': this.keys.tab = false; break;
                     case 'f': 
                         this.keys.f = false; 
                         if(isLocked && !player.isDead) player.endAim();
@@ -3456,21 +3546,35 @@
         // --- HYBRID OBJECT POOLS ---
         const _particlePool = [];
         let _particleIdx = 0;
+        const _trailPool = [];
+        let _trailIdx = 0;
         const _ripplePool = [];
         let _rippleIdx = 0;
         const _slashPool = [];
         let _slashIdx = 0;
 
         function initObjectPools() {
-            // Particle Pool: 800 sprites for sparks, smoke, and explosions
             const baseSpriteMat = new THREE.SpriteMaterial({ map: textures.glow, transparent: true, depthWrite: false });
+            
+            // General Particle Pool: 800 sprites for sparks, smoke, and explosions
             for(let i=0; i<800; i++) {
                 const mesh = new THREE.Sprite(baseSpriteMat.clone());
                 mesh.visible = false;
                 scene.add(mesh);
                 _particlePool.push({
-                    mesh: mesh, active: false, life: 0, maxLife: 1, targetOpacity: 1.0,
+                    mesh: mesh, active: false, life: 0, maxLife: 1, targetOpacity: 1.0, priority: 0,
                     velocity: new THREE.Vector3(), gravity: 0, scaleStart: 1, scaleEnd: 0, type: 'spark'
+                });
+            }
+
+            // Dedicated Trail Pool: 400 sprites for slide/blaze trails (isolated from explosions)
+            for(let i=0; i<400; i++) {
+                const mesh = new THREE.Sprite(baseSpriteMat.clone());
+                mesh.visible = false;
+                scene.add(mesh);
+                _trailPool.push({
+                    mesh: mesh, active: false, life: 0, maxLife: 1, targetOpacity: 1.0, priority: 0,
+                    velocity: new THREE.Vector3(), gravity: 0, scaleStart: 1, scaleEnd: 0, type: 'trail'
                 });
             }
             // Ripple Pool: 50 rings for ground impacts and jumps
@@ -4655,7 +4759,18 @@
                 this.aimingGadget = null; 
                 this.aimLine = null;
                 this.lastGadgetTime = 0;
+                this.blazeActive = false;
+                this.blazeTimer = 0;
                 this.currentWeapon = null;
+                this.burnTimer = 0;
+                this.burnPower = 0;
+                this.burnActiveDuration = 0;
+            }
+
+            ignite(power) {
+                if (this.isDead) return;
+                this.burnPower = Math.max(this.burnPower || 0, power);
+                this.burnTimer = CONFIG.blaze.burnDuration;
             }
 
             init() {
@@ -4772,11 +4887,20 @@
                 }
             }
 
+            updateGadgetHUD() {
+                document.getElementById('icon-f').classList.toggle('active', this.aimingGadget === PlayerLoadout.f);
+                document.getElementById('icon-r').classList.toggle('active', this.aimingGadget === PlayerLoadout.r);
+                document.getElementById('icon-e').classList.toggle('active', this.aimingGadget === PlayerLoadout.e);
+                
+                const pSlot = document.getElementById('icon-passive');
+                if (pSlot) {
+                    pSlot.classList.toggle('active', PlayerLoadout.passive === 'BLAZE' && this.blazeActive);
+                }
+            }
+
             beginAim(type) {
                 this.aimingGadget = type;
-                document.getElementById('icon-f').classList.toggle('active', type===PlayerLoadout.f);
-                document.getElementById('icon-r').classList.toggle('active', type===PlayerLoadout.r);
-                document.getElementById('icon-e').classList.toggle('active', type===PlayerLoadout.e);
+                this.updateGadgetHUD();
             }
             
             endAim() {
@@ -4784,9 +4908,7 @@
                     this.throwGadget(this.aimingGadget);
                     this.aimingGadget = null;
                     this.aimLine.visible = false;
-                    document.getElementById('icon-f').classList.remove('active');
-                    document.getElementById('icon-r').classList.remove('active');
-                    document.getElementById('icon-e').classList.remove('active');
+                    this.updateGadgetHUD();
                 }
             }
 
@@ -4794,9 +4916,7 @@
                 if(this.aimingGadget) {
                     this.aimingGadget = null;
                     this.aimLine.visible = false;
-                    document.getElementById('icon-f').classList.remove('active');
-                    document.getElementById('icon-r').classList.remove('active');
-                    document.getElementById('icon-e').classList.remove('active');
+                    this.updateGadgetHUD();
                 }
             }
 
@@ -4809,12 +4929,19 @@
                 if (type === 'IMPULSE') cost = CONFIG.gadgetCost.impulse;
                 if (type === 'STASIS') cost = CONFIG.gadgetCost.stasis;
 
-                if (this.energy < cost) {
+                let extraBlazeCost = 0;
+                let blazeTriggered = false;
+                if (this.blazeActive && !this.energyExhausted && this.energy >= cost + CONFIG.blaze.projectileCost) {
+                    extraBlazeCost = CONFIG.blaze.projectileCost;
+                    blazeTriggered = true;
+                }
+
+                if (this.energy < cost + extraBlazeCost) {
                     AudioSys.playMiss();
                     return;
                 }
 
-                this.energy -= cost;
+                this.energy -= (cost + extraBlazeCost);
                 this.lastGadgetTime = now;
 
                 const dir = new THREE.Vector3();
@@ -4823,12 +4950,24 @@
                 
                 const phys = CONFIG.gadgetPhysics[type.toLowerCase()];
                 const vel = dir.multiplyScalar(phys.throwSpeed).add(this.velocity);
-                projectiles.push(new Projectile(type, spawnPos, vel));
+                const p = new Projectile(type, spawnPos, vel);
+                if (blazeTriggered) p.setBlazing(true);
+                projectiles.push(p);
                 AudioSys.playThrow();
             }
 
             update(dt) {
                 if (this.isDead) return;
+                
+                if (PlayerLoadout.passive === 'BLAZE') {
+                    const wasBlazing = this.blazeActive;
+                    this.blazeActive = InputManager.capsLock;
+                    if (wasBlazing !== this.blazeActive) this.updateGadgetHUD();
+                } else {
+                    const wasBlazing = this.blazeActive;
+                    this.blazeActive = false;
+                    if (wasBlazing !== this.blazeActive) this.updateGadgetHUD();
+                }
                 
                 if(this.currentWeapon) this.currentWeapon.update(dt);
                 if (this.portalCooldown > 0) this.portalCooldown -= dt;
@@ -4843,6 +4982,21 @@
                 }
 
                 camera.position.y -= this.cameraHeightOffset;
+
+                if (this.burnTimer > 0) {
+                    this.burnTimer -= dt;
+                    this.burnActiveDuration += dt;
+                    // Subtle Native scaling: +15% per second
+                    const ramp = 1.0 + (this.burnActiveDuration * 0.15);
+                    const burnDmg = this.burnPower * CONFIG.blaze.burnDps * ramp * dt;
+                    damagePlayer(burnDmg, true);
+                    if (Math.random() < 0.1) {
+                        spawnSlideEmbers(camera.position, this.velocity, -0.5, true, false);
+                    }
+                } else {
+                    this.burnActiveDuration = 0;
+                }
+
                 this.handleHealthRegen(dt);
                 this.handleEnergy(dt);
                 this.handleTeleport(dt);
@@ -4859,11 +5013,14 @@
                 // -----------------------------------
 
                 if (this.aimingGadget) {
-                    this.aimLine.visible = true;
-                    const posAttr = this.aimLine.geometry.attributes.position;
-                    const positions = posAttr.array;
-                    
-                    const phys = CONFIG.gadgetPhysics[this.aimingGadget.toLowerCase()];
+                    if (this.aimingGadget === 'BLAZE') {
+                        this.aimLine.visible = false;
+                    } else {
+                        this.aimLine.visible = true;
+                        const posAttr = this.aimLine.geometry.attributes.position;
+                        const positions = posAttr.array;
+                        
+                        const phys = CONFIG.gadgetPhysics[this.aimingGadget.toLowerCase()];
                     let p = new THREE.Vector3(1.25, -1, -8); 
                     let v = new THREE.Vector3(0, 0, -phys.throwSpeed);
                     const invRot = camera.quaternion.clone().invert();
@@ -4884,6 +5041,9 @@
                     const tip = lastP.clone().addScaledVector(tipDir, 5);
                     positions[idx++] = tip.x; positions[idx++] = tip.y; positions[idx++] = tip.z;
                     posAttr.needsUpdate = true;
+                    }
+                } else {
+                    this.aimLine.visible = false;
                 }
 
                 // --- PHYSICS LOOP ---
@@ -4948,8 +5108,8 @@
                 speed = new THREE.Vector2(this.velocity.x, this.velocity.z).length();
 
                 if (this.isSliding) {
-                    if (Math.random() < 0.3) spawnSnowTrail(camera.position);
-                    if (Math.random() < 0.5) spawnSnowKickup(camera.position);
+                    if (Math.random() < 0.6) spawnSlideTrail(camera.position, this.velocity, -1.25, this.effectivelyBlazing, true);
+                    if (Math.random() < 0.5) spawnSlideEmbers(camera.position, this.velocity, -1.45, this.effectivelyBlazing, true);
                 }
                 
                 AudioSys.toggleSlideSound(this.isSliding && speed > 5);
@@ -5171,7 +5331,7 @@
                     if (!healthFill.classList.contains('health-critical')) healthFill.classList.add('health-critical');
 
                     // Calculate Danger Factor
-                    const rawFactor = 1 - (this.health / (maxHP * 0.5));
+                    const rawFactor = Math.max(0, Math.min(1, 1 - (this.health / (maxHP * 0.5))));
                     const dangerFactor = Math.pow(rawFactor, 1.2); 
                     
                     // Base opacity: 0.2 to 0.6 based on health
@@ -5208,7 +5368,15 @@
             }
 
             handleEnergy(dt) {
-                if (this.isSprinting) {
+                if (this.energy <= 0) this.energyExhausted = true;
+                else if (this.energy > 25) this.energyExhausted = false;
+
+                this.effectivelyBlazing = this.blazeActive && this.isSliding && !this.energyExhausted && this.energy > 0;
+
+                if (this.effectivelyBlazing) {
+                    this.energy -= CONFIG.blaze.drainRate * dt;
+                    if (this.energy < 0) this.energy = 0;
+                } else if (this.isSprinting) {
                     this.energy -= CONFIG.energyDrain * dt;
                     if (this.energy < 0) this.energy = 0;
                 } else {
@@ -5431,6 +5599,7 @@
                 this.mesh.add(this.core);
 
                 this.cooldown = 0;
+                this.charges = 5;
 
                 if (ms) {
                     ms.group.add(this.mesh);
@@ -5455,13 +5624,13 @@
                     
                     // Floating particles (sliding kickup effect)
                     if (Math.random() < 0.2) {
-                        const p = _particlePool[_particleIdx];
-                        _particleIdx = (_particleIdx + 1) % 800;
+                        const p = getParticle();
                         p.active = true;
                         p.type = 'static'; 
                         p.life = 0.8 + Math.random() * 0.4;
                         p.maxLife = p.life;
                         p.targetOpacity = 0.8;
+                        p.scaleStart = 1.0;
                         p.mesh.visible = true;
                         p.mesh.material.color.setHex(this.color);
                         p.mesh.material.opacity = 0.8;
@@ -5514,12 +5683,19 @@
 
             trigger(entityPos, isPlayer, entity = null, projectile = null) {
                 if (this.cooldown > 0) return;
-                this.cooldown = 2.0;
+                
+                this.charges--;
+                if (this.charges <= 0) {
+                    this.cooldown = 4.0; // big cooldown between charge cycles
+                    this.charges = 5;
+                } else {
+                    this.cooldown = 0.05; // mini cooldown between activations
+                }
 
                 // Explosion spawns slightly behind the contact point (along the normal)
                 const explosionPos = entityPos.clone().sub(this.normal.clone().multiplyScalar(1.0));
                 
-                let range = 4.0; // Small range, only affects the entity that stepped on it
+                let range = 4.0; 
                 let force = 100;
                 let color = this.color;
 
@@ -5540,12 +5716,12 @@
                     }
                 };
 
-                if (isPlayer) {
-                    applyForce(camera.position, player.velocity, true);
-                } else if (entity) {
-                    applyForce(entity.mesh.position, entity.velocity, false);
-                } else if (projectile) {
-                    applyForce(projectile.mesh.position, projectile.velocity, false);
+                applyForce(camera.position, player.velocity, true);
+                for (let e of enemies) {
+                    if (e.state !== 'DEAD') applyForce(e.mesh.position, e.velocity, false);
+                }
+                for (let p of projectiles) {
+                    if (p.active && !p.stuckTo) applyForce(p.mesh.position, p.velocity, false);
                 }
             }
         }
@@ -5762,13 +5938,40 @@
                 this.mesh.position.copy(this.meshPos);
                 scene.add(this.mesh);
                 this.active = true;
+                this.isBlazing = false;
                 this.portalCooldown = 0;
                 this.launchCooldown = 0.15; // Safeguard against self-hit on spawn
+            }
+
+            setBlazing(val) {
+                this.isBlazing = val;
+                if(val && this.mesh && this.wire) {
+                    this.wire.material.color.setHex(0xff8800);
+                    this.wire.material.opacity = 0.8;
+                }
             }
 
             update(dt) {
                 if (!this.active) return;
                 this.life -= dt;
+                
+                if (this.isBlazing) {
+                    if (Math.random() < 0.3) {
+                        const scaleMod = this.type === 'FRAG' ? 0.8 : 0.6; 
+                        spawnSlideEmbers(this.mesh.position, this.velocity.clone().multiplyScalar(0.2), 0, true, true, scaleMod, 1);
+                    }
+                } else {
+                    if (Math.random() < 0.15) {
+                        let eCol = 0xffffff;
+                        if (this.type === 'FRAG') eCol = 0xff3300;
+                        else if (this.type === 'VOID') eCol = 0x8A2BE2;
+                        else if (this.type === 'STASIS') eCol = 0x00BFFF;
+                        else if (this.type === 'IMPULSE') eCol = 0x00ffff;
+                        // Use true for isBlaze to get the "ember" look (fade-in, specific animation) but with matching color
+                        spawnSlideEmbers(this.mesh.position, this.velocity.clone().multiplyScalar(0.2), 0, true, false, 0.4, 1, eCol);
+                    }
+                }
+
                 if (this.life < 1.0) this.wire.material.opacity = Math.random() > 0.5 ? 0.8 : 0.2;
                 if (this.life <= 0) { this.explode(); return; }
                 if (this.portalCooldown > 0) this.portalCooldown -= dt;
@@ -5835,6 +6038,11 @@
                 }
 
                 if (hitObject) {
+                    if (this.isBlazing) {
+                        if (hitObject.ignite) hitObject.ignite(CONFIG.blaze.projectileBurnHeat);
+                        else if (hitObject.isPlayer) player.ignite(CONFIG.blaze.projectileBurnHeat);
+                    }
+
                     const dHit = _projPos.distanceTo(targetPos);
                     if (dHit > 0.001) {
                         const n = _projPos.clone().sub(targetPos).normalize();
@@ -5924,9 +6132,8 @@
 
                 // Pooled trail updates
                 if (Math.random() < (this.type === 'VOID' || this.type === 'STASIS' ? 0.4 : this.type === 'FRAG' ? 0.3 : 0.2)) {
-                    const p = _particlePool[_particleIdx];
-                    _particleIdx = (_particleIdx + 1) % 800;
-                    p.active = true; p.type = 'static';
+                    const p = getParticle();
+                    p.active = true; p.type = 'static'; p.scaleStart = 1.0;
                     p.mesh.visible = true; p.mesh.position.copy(this.mesh.position);
                     
                     if (this.type === 'VOID' || this.type === 'STASIS') {
@@ -5957,20 +6164,20 @@
                 let color = 0x00ff00;
 
                 if (this.type === 'FRAG') { 
-                    range = 30; damage = 300; force = 45; color = 0xff3300; 
-                    this.spawnExplosion(pos, range);
+                    range = 30; damage = 300; force = 45; color = this.isBlazing ? 0xffaa00 : 0xff3300; 
+                    this.spawnExplosion(pos, range, this.isBlazing);
                 } 
                 else if (this.type === 'VOID') { 
-                    range = 25; damage = 150; force = -100; color = 0x8A2BE2; 
+                    range = 25; damage = 150; force = -100; color = this.isBlazing ? 0xffaa00 : 0x8A2BE2; 
                     this.spawnImplosion(pos, range, color);
                 } 
                 else if (this.type === 'IMPULSE') { 
-                    range = 20; damage = 0; force = 60; color = 0x00ffff; 
+                    range = 20; damage = 0; force = 60; color = this.isBlazing ? 0xffaa00 : 0x00ffff; 
                     this.spawnShockwave(pos, range, color);
                 }
                 else if (this.type === 'STASIS') {
-                    range = 25; damage = 50; force = 100; color = 0x00BFFF; 
-                    stasisFields.push(new StasisField(pos, range, color));
+                    range = 25; damage = 50; force = 100; color = this.isBlazing ? 0xffaa00 : 0x00BFFF; 
+                    stasisFields.push(new StasisField(pos, range, color, this.isBlazing));
                 }
                 
                 if(this.type !== 'VOID' && this.type !== 'IMPULSE' && this.type !== 'STASIS') {
@@ -5988,32 +6195,43 @@
                 applyExplosionForce(pos, range, force, damage, this.type, this);
             }
 
-            spawnExplosion(pos, range) {
-                spawnImpact(pos, 0xff4400, 5.0); 
-                for(let i=0; i<16; i++) {
-                    const p = _particlePool[_particleIdx];
-                    _particleIdx = (_particleIdx + 1) % 800;
-                    p.active = true; 
-                    p.type = 'static'; 
-                    p.life = 0.6 + Math.random() * 0.4; 
-                    p.maxLife = 1.0; 
-                    p.targetOpacity = 0.6; // Original value
+            spawnExplosion(pos, range, isBlazing = false) {
+                spawnImpact(pos, isBlazing ? 0xffaa00 : 0xff4400, 5.0); 
+                
+                if (isBlazing) {
+                    for(let i=0; i<30; i++) {
+                         _tempA.set(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize().multiplyScalar(Math.random() * range * 0.4);
+                         const emberPos = pos.clone().add(_tempA);
+                         const emberVel = _tempA.clone().normalize().multiplyScalar(4.0).add(new THREE.Vector3(0, 2.0, 0));
+                         spawnSlideEmbers(emberPos, emberVel, 0, true, true, 1.2, 1);
+                    }
+                } else {
+                    for(let i=0; i<16; i++) {
+                        const p = getParticle();
+                        p.active = true; 
+                        p.type = 'static'; 
+                        p.life = 1.0 + Math.random() * 0.8; 
+                        p.maxLife = p.life; 
+                        p.targetOpacity = 0.6;
+                        p.scaleStart = 1.0;
 
-                    p.mesh.visible = true;
-                    p.mesh.material.color.setHex(Math.random() > 0.5 ? 0xff2200 : 0x880000);
-                    p.mesh.material.blending = THREE.AdditiveBlending; 
-                    p.mesh.material.opacity = 0.6;
-                    
-                    const s = range * (1.0 + Math.random() * 1.0);
-                    p.mesh.scale.set(s, s, s);
-                    _tempA.set(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize().multiplyScalar(Math.random() * range * 0.6);
-                    p.mesh.position.copy(pos).add(_tempA);
-                    p.velocity.copy(_tempA).normalize().multiplyScalar(0.8).add(new THREE.Vector3(0, 3.0, 0));
+                        p.mesh.visible = true;
+                        p.mesh.material.color.setHex(Math.random() > 0.5 ? 0xff2200 : 0x880000);
+                        p.mesh.material.blending = THREE.AdditiveBlending; 
+                        p.mesh.material.opacity = 0.6;
+                        
+                        const s = range * (2.0 + Math.random() * 2.0);
+                        p.mesh.scale.set(s, s, s);
+                        _tempA.set(Math.random()-0.5, Math.random()-0.5, Math.random()-0.5).normalize().multiplyScalar(Math.random() * range * 0.6);
+                        p.mesh.position.copy(pos).add(_tempA);
+                        p.velocity.copy(_tempA).normalize().multiplyScalar(1.2).add(new THREE.Vector3(0, 4.0, 0));
+                    }
                 }
-                spawnParticles(pos, 0xff6600, 40, 4.0, 4.0); 
-                spawnParticles(pos, 0xaa0000, 30, 2.0, 6.0); 
+                
+                spawnParticles(pos, isBlazing ? 0xffaa00 : 0xff6600, 40, 4.0, 4.0); 
+                spawnParticles(pos, isBlazing ? 0xff8800 : 0xaa0000, 30, 2.0, 6.0); 
                 spawnRipple(pos, _UP, 0x000000); 
-                spawnRipple(pos, _UP, 0xff2200); 
+                spawnRipple(pos, _UP, isBlazing ? 0xffaa00 : 0xff2200); 
             }
 
             spawnImplosion(pos, range, color) {
@@ -6178,24 +6396,28 @@
         }
 
         class StasisField {
-            constructor(pos, range, color) {
+            constructor(pos, range, color, isBlazing = false) {
                 this.pos = pos.clone();
                 this.range = range;
-                this.color = color;
+                this.baseColor = 0x00BFFF; // Always cyan shell and cage
+                this.coreColor = isBlazing ? 0xffaa00 : color;
                 this.life = 3.0;
                 this.scale = 0.1;
                 this.maxScale = 1.0;
                 this.expanding = true;
                 this.vanishing = false;
                 this.internalTime = 0;
+                this.isBlazing = isBlazing;
 
                 this.group = new THREE.Group();
                 this.group.position.copy(pos);
                 scene.add(this.group);
 
                 const coreGeo = new THREE.SphereGeometry(range, 32, 32);
-                const coreMat = new THREE.MeshBasicMaterial({ 
-                    color: color,
+                const coreMat = new THREE.MeshStandardMaterial({ 
+                    color: 0x000000,
+                    emissive: this.coreColor,
+                    emissiveIntensity: 2.0,
                     transparent: true,
                     opacity: 1.0,
                     blending: THREE.CustomBlending,
@@ -6209,7 +6431,7 @@
                 this.ravenMat = new THREE.ShaderMaterial({
                     uniforms: {
                         time: { value: 0 },
-                        color: { value: new THREE.Color(color) },
+                        color: { value: new THREE.Color(this.baseColor) },
                         opacity: { value: 0.80 }
                     },
                     vertexShader: SHADERS.ravenMagic.vertex,
@@ -6223,7 +6445,7 @@
                 
                 this.wires = [];
                 for (let i = 1; i <= 5; i++) {
-                    const wireMat = new THREE.MeshBasicMaterial({ color: color, wireframe: true, transparent: true, opacity: 0.15 / i });
+                    const wireMat = new THREE.MeshBasicMaterial({ color: this.baseColor, wireframe: true, transparent: true, opacity: 0.15 / i });
                     const wireGeo = new THREE.IcosahedronGeometry(range * (1.0 + (i * 0.01)), 2);
                     const wire = new THREE.Mesh(wireGeo, wireMat);
                     wire.rotation.copy(this.ravenHull.rotation); // Match initial rotation
@@ -6275,6 +6497,21 @@
                     w.visible = !isInside; 
                     w.rotation.copy(this.ravenHull.rotation);
                 });
+
+                if (this.isBlazing && this.scale > 0.1) {
+                    if (Math.random() < 0.1) {
+                        const offset = new THREE.Vector3((Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2, (Math.random() - 0.5) * 2).normalize().multiplyScalar(this.range * this.scale * Math.random());
+                        spawnSlideEmbers(this.pos.clone().add(offset), new THREE.Vector3(0, 0.5, 0), 0, true, true, 0.5);
+                        for (let e of enemies) {
+                            if (e.state !== 'DEAD' && e.mesh.position.distanceToSquared(this.pos) < (this.range * this.scale) ** 2) {
+                                e.ignite(CONFIG.blaze.projectileBurnHeat * 0.2); // Apply fraction of heat periodically
+                            }
+                        }
+                        if (isInside) {
+                            player.ignite(CONFIG.blaze.projectileBurnHeat * 0.2); // Apply fraction of heat periodically
+                        }
+                    }
+                }
 
                 return true;
             }
@@ -6333,6 +6570,20 @@
 
                 AudioSys.playSlash();
                 const slashMesh = spawnSlash(camera);
+
+                let isBlazeAttack = false;
+                if (player.blazeActive && !player.energyExhausted && player.energy >= CONFIG.blaze.slashCost) {
+                    player.energy -= CONFIG.blaze.slashCost;
+                    isBlazeAttack = true;
+                    slashMesh.material.color.setHex(0xffaa00);
+                    // Aesthetics: spawn embers along the slash arc
+                    for(let i=0; i<4; i++) {
+                        const offset = new THREE.Vector3((Math.random()-0.5)*0.4, (Math.random()-0.5)*0.4, -1.0 - Math.random()*1.0);
+                        offset.applyQuaternion(camera.quaternion);
+                        const emberPos = camera.position.clone().add(offset);
+                        spawnSlideEmbers(emberPos, player.velocity.clone().multiplyScalar(0.02), 0, true, true, 0.5, 1);
+                    }
+                }
                 
                 const rng = Math.random();
                 const missChance = 1/50; 
@@ -6580,7 +6831,13 @@
                         addScore(hitScore); 
                         
                         const baseDamage = CONFIG.playerDamage * distancePenalty * dmgMult;
-                        let predictedDamage = baseDamage;
+                        let damageToApply = baseDamage;
+                        if (isBlazeAttack) {
+                            damageToApply += CONFIG.blaze.slashBonusDamage;
+                            h.enemy.ignite(CONFIG.blaze.slashBurnHeat);
+                        }
+
+                        let predictedDamage = damageToApply;
                         if (goldenBuffActive && h.enemy.type.name !== 'GOLDEN') {
                             predictedDamage = h.enemy.maxHealth * 2; 
                         }
@@ -6630,7 +6887,7 @@
                             spawnParticles(blastPos, 0xffaa00, 15, 2.0);
                         }
 
-                        h.enemy.takeHit(baseDamage, true);
+                        h.enemy.takeHit(damageToApply, true);
                         
                         const pColor = hitType === "CRIT" ? 0xff0000 : 0x00ffff;
                         
@@ -7187,10 +7444,12 @@
 
             timerDisplay.innerHTML = `<strong>${primaryLabel}:</strong> ${format(primaryValue)}`;
             
-            const tooltip = 
-                `${hoverLabel}: ${format(hoverValue)}\n` +
-                `Idle: ${format(totalBreakTime)}\n` +
-                `Breaks: ${breakCount}`;
+            let tooltip = `${hoverLabel}: ${format(hoverValue)}\n`;
+            if (autoplay.activatedThisSession) {
+                tooltip += `Autoplay: ${format(autoplay.activeSessionTime * 1000)}\n`;
+            }
+            tooltip += `Idle: ${format(totalBreakTime)}\n` +
+                       `Breaks: ${breakCount}`;
             
             timerDisplay.setAttribute('data-details', tooltip);
             timerDisplay.classList.add('session-info');
@@ -7598,6 +7857,9 @@
             for(let i=weatherParticles.length-1; i>=0; i--) {
                 const l = weatherParticles[i];
 
+                const pScale = getStasisMultiplier(l.mesh.position);
+                const localDt = dt * pScale;
+
                 // Optimization: Recycle distant particles
                 const distSq = l.mesh.position.distanceToSquared(camera.position);
                 if (distSq > 6400) { // 80 units radius
@@ -7608,7 +7870,7 @@
                 }
 
                 if (l.landed) {
-                    l.landTimer -= dt;
+                    l.landTimer -= localDt;
                     l.mesh.material.opacity = (l.landTimer / 2.0) * 0.8;
                     if (l.landTimer <= 0) {
                         scene.remove(l.mesh);
@@ -7619,26 +7881,26 @@
                 }
                 
                 if (l.type === 'leaf' || l.type === 'snow') {
-                    l.mesh.position.addScaledVector(currentWind, dt);
+                    l.mesh.position.addScaledVector(currentWind, localDt);
                     if(currentWind.lengthSq() > 1) {
                          if (l.type === 'leaf') {
-                             l.mesh.rotation.z += dt * 5;
-                             l.mesh.rotation.x += dt * 5;
+                             l.mesh.rotation.z += localDt * 5;
+                             l.mesh.rotation.x += localDt * 5;
                          } else {
-                             l.mesh.position.x += (Math.random()-0.5) * dt * 5;
+                             l.mesh.position.x += (Math.random()-0.5) * localDt * 5;
                          }
                     }
                 }
 
-                l.mesh.position.addScaledVector(l.vel, dt);
+                l.mesh.position.addScaledVector(l.vel, localDt);
                 
                 if (l.type === 'leaf') {
-                    l.mesh.rotation.x += dt * 2;
-                    l.mesh.rotation.y += dt;
-                    l.mesh.position.x += Math.sin(performance.now() * 0.002 + l.swayOffset) * dt * 2;
+                    l.mesh.rotation.x += localDt * 2;
+                    l.mesh.rotation.y += localDt;
+                    l.mesh.position.x += Math.sin(performance.now() * 0.002 + l.swayOffset) * localDt * 2;
                 } else {
-                    l.mesh.position.x += Math.sin(performance.now() * 0.001 + l.swayOffset) * dt * 0.5;
-                    l.mesh.rotation.z += dt; 
+                    l.mesh.position.x += Math.sin(performance.now() * 0.001 + l.swayOffset) * localDt * 0.5;
+                    l.mesh.rotation.z += localDt; 
                 }
 
                 const groundY = getGroundHeight(l.mesh.position.x, l.mesh.position.z, l.mesh.position.y);
@@ -7688,15 +7950,54 @@
             return s.mesh;
         }
 
-        function spawnSnowTrail(pos, velocity = player.velocity, yOffset = -1.25) {
-            const p = _particlePool[_particleIdx];
+        function getParticle() {
+            let p = _particlePool[_particleIdx];
             _particleIdx = (_particleIdx + 1) % 800;
+            return p;
+        }
+
+        function getTrailParticle(isPlayer = false) {
+            let p = _trailPool[_trailIdx];
+            // If the particle is active and high priority (Player), we MUST NOT recycle it 
+            // unless we've looped through the entire buffer and found absolutely nothing else.
+            let safety = 0;
+            const maxLoops = _trailPool.length;
+
+            while (p.active && safety < maxLoops) {
+                // If this is a player trail, NEVER recycle it early (unless we've looped the whole pool)
+                if (p.priority >= 2 && p.life > 0.05) {
+                    _trailIdx = (_trailIdx + 1) % maxLoops;
+                    p = _trailPool[_trailIdx];
+                    safety++;
+                    continue;
+                }
+                
+                // If it's a bot trail, it's expendable if the buffer is under pressure,
+                // but we try to find an inactive slot first for the first 50 checks.
+                if (p.priority === 1 && safety < 50) {
+                    _trailIdx = (_trailIdx + 1) % maxLoops;
+                    p = _trailPool[_trailIdx];
+                    safety++;
+                    continue;
+                }
+
+                break;
+            }
+
+            _trailIdx = (_trailIdx + 1) % maxLoops;
+            return p;
+        }
+
+        function spawnSlideTrail(pos, velocity = player.velocity, yOffset = -1.25, isBlaze = false, isPlayer = false) {
+            const p = getTrailParticle(isPlayer);
 
             p.active = true; 
-            p.type = 'snow-trail'; 
-            p.life = 1.5;
-            p.maxLife = 1.5;
+            p.priority = isPlayer ? 2 : 1; 
+            p.type = isBlaze ? 'blaze-trail' : 'slide-trail'; 
+            p.life = isBlaze ? CONFIG.blaze.trailLife : CONFIG.trail.slideLife;
+            p.maxLife = p.life;
             p.velocity.set(0,0,0);
+            p.scaleStart = isBlaze ? CONFIG.blaze.trailScale : CONFIG.trail.slideScale;
 
             p.mesh.visible = true;
             p.mesh.position.set(pos.x, pos.y + yOffset, pos.z);
@@ -7704,43 +8005,52 @@
             // Apply movement delay
             p.mesh.position.addScaledVector(velocity, -0.05);
             
-            p.mesh.material.color.setHex(0xffffff);
-            p.mesh.material.opacity = 0.8;
-            p.mesh.material.blending = THREE.NormalBlending;
-            p.mesh.scale.set(0.8, 0.8, 0.8);
+            p.mesh.material.color.setHex(isBlaze ? 0xff4400 : 0xffffff);
+            p.mesh.material.opacity = isBlaze ? CONFIG.blaze.trailOpacity : CONFIG.trail.slideOpacity;
+            p.mesh.material.blending = isBlaze ? THREE.AdditiveBlending : THREE.NormalBlending;
+            p.mesh.scale.setScalar(p.scaleStart);
         }
 
-        function spawnSnowKickup(pos, velocity = player.velocity, yOffset = -1.45) {
-            for(let i=0; i<3; i++) {
-                const p = _particlePool[_particleIdx];
-                _particleIdx = (_particleIdx + 1) % 800;
+        function spawnSlideEmbers(pos, velocity = player.velocity, yOffset = -1.45, isBlaze = false, isPlayer = false, scaleMod = 1.0, count = 3, customColor = null) {
+            for(let i=0; i<count; i++) {
+                const p = getParticle();
 
                 p.active = true;
-                p.type = 'static'; 
-                p.life = 0.5;
-                p.maxLife = 0.5;
+                p.priority = isPlayer ? 1 : (customColor !== null ? -1 : 0); 
+                p.type = isBlaze ? 'blaze-ember' : 'static'; 
+                p.life = isBlaze ? CONFIG.blaze.emberLife : CONFIG.trail.emberLife;
+                p.maxLife = p.life;
                 p.targetOpacity = 0.8;
 
                 p.mesh.visible = true;
-                p.mesh.material.color.setHex(0xffffff);
-                p.mesh.material.opacity = 0.8;
-                p.mesh.material.blending = THREE.NormalBlending;
+                const finalColor = customColor !== null ? customColor : (isBlaze ? 0xff4400 : 0xffffff);
+                p.mesh.material.color.setHex(finalColor);
+                p.mesh.material.opacity = isBlaze ? 0.0 : 0.8;
+                p.mesh.material.blending = isBlaze ? THREE.AdditiveBlending : THREE.NormalBlending;
                 
                 _tempA.set((Math.random()-0.5), yOffset, (Math.random()-0.5));
                 p.mesh.position.copy(pos).add(_tempA);
                 
                 p.mesh.position.addScaledVector(velocity, -0.05);
                 
-                p.velocity.set((Math.random()-0.5)*2, 1+Math.random()*3, (Math.random()-0.5)*2);
-                p.mesh.scale.set(0.3, 0.3, 0.3);
+                const isBlazeEmber = isBlaze && customColor === null;
+                const floatY = isBlazeEmber ? CONFIG.blaze.emberFloatSpeed * (0.8 + Math.random()*0.4) : (1+Math.random()*3);
+                p.velocity.set((Math.random()-0.5)*2, floatY, (Math.random()-0.5)*2);
+                p.scaleStart = scaleMod;
+                p.mesh.scale.setScalar(p.life * (isBlaze ? 2.5 : 2.0) * p.scaleStart);
             }
         }
 
         function spawnParticles(pos, col, count, speed=1.0, sizeMod=1.0) {
-            for(let i=0; i<count; i++) {
-                const p = _particlePool[_particleIdx];
-                _particleIdx = (_particleIdx + 1) % 800;
-                p.active = true; p.type = 'spark'; p.gravity = 15;
+            const distSq = pos.distanceToSquared(camera.position); 
+            if (distSq > 14400) return; // 120m hard cull for general particles
+            
+            let finalCount = count;
+            if (distSq > 3600) finalCount = Math.floor(count * 0.4); // Reduce counts at 60m+
+            
+            for(let i=0; i<finalCount; i++) {
+                const p = getParticle();
+                p.active = true; p.priority = 0; p.type = 'spark'; p.gravity = 15;
                 p.life = 0.4 + Math.random() * 0.3; p.maxLife = p.life;
                 p.mesh.visible = true; p.mesh.position.copy(pos);
                 p.mesh.material.color.setHex(col);
@@ -7755,9 +8065,8 @@
         function spawnImpact(pos, color=0xffffff, scale=1.0) {
             const configs = [{s: scale, l: 0.1, c: 0xffffff, e: scale * 0.5}, {s: scale * 2, l: 0.25, c: color, e: scale * 4}];
             configs.forEach(conf => {
-                const p = _particlePool[_particleIdx];
-                _particleIdx = (_particleIdx + 1) % 800;
-                p.active = true; p.type = 'flash'; p.life = conf.l; p.maxLife = conf.l;
+                const p = getParticle();
+                p.active = true; p.priority = 0; p.type = 'flash'; p.life = conf.l; p.maxLife = conf.l;
                 p.scaleStart = conf.s; p.scaleEnd = conf.e;
                 p.mesh.visible = true; p.mesh.position.copy(pos);
                 p.mesh.material.color.setHex(conf.c);
@@ -8478,6 +8787,9 @@
                 this.velocity = new THREE.Vector3();
                 this.jumps = 0;
                 this.state = initialState;
+                this.burnPower = 0;
+                this.burnTimer = 0;
+                this.burnActiveDuration = 0;
                 this.hasAggroed = initialState === 'AGGRO';
                 this.reactionTimer = aggroDelay > 0 ? aggroDelay * 1000 : 0;
 
@@ -8631,6 +8943,21 @@
 
             update(dt, playerPos) {
                 const distSq = this.mesh.position.distanceToSquared(camera.position);
+
+                if (this.burnTimer > 0) {
+                    this.burnTimer -= dt;
+                    this.burnActiveDuration += dt;
+                    
+                    // Native subtile damage increase over time: +15% damage per second of burning
+                    const ramp = 1.0 + (this.burnActiveDuration * 0.15);
+                    this.takeHit(this.burnPower * CONFIG.blaze.burnDps * ramp * dt); 
+                    
+                    if (Math.random() < 0.2) {
+                        spawnSlideEmbers(this.mesh.position, this.velocity, -0.5, true);
+                    }
+                } else {
+                    this.burnActiveDuration = 0;
+                }
 
                 // --- Visual LOD ---
                 let logicInterval = 1;
@@ -9085,8 +9412,10 @@
                 if (this.isSliding && !['CONFUSED', 'FALLEN', 'RECOVERING', 'DEAD'].includes(this.state)) {
                     const yOffTrail = -(this.type.scale - 0.35);
                     const yOffKick = -(this.type.scale - 0.15);
-                    if (Math.random() < 0.3 * intervalMultiplier) spawnSnowTrail(this.mesh.position, this.velocity, yOffTrail);
-                    if (Math.random() < 0.5 * intervalMultiplier) spawnSnowKickup(this.mesh.position, this.velocity, yOffKick);
+                    const distSq = this.mesh.position.distanceToSquared(playerPos);
+                    // Loosened bot trail LOD: trail at 70m, embers at 40m.
+                    if (distSq < 4900 && Math.random() < 0.15 * intervalMultiplier) spawnSlideTrail(this.mesh.position, this.velocity, yOffTrail, false, false);
+                    if (distSq < 1600 && Math.random() < 0.2 * intervalMultiplier) spawnSlideEmbers(this.mesh.position, this.velocity, yOffKick, false, false);
                 }
 
                 // Golden Aura
@@ -9628,6 +9957,12 @@
                 return Math.abs(this.mesh.position.y - (groundY + this.type.scale)) < 0.5;
             }
 
+            ignite(power) {
+                if (this.state === 'DEAD') return;
+                this.burnPower = Math.max(this.burnPower, power);
+                this.burnTimer = CONFIG.blaze.burnDuration; 
+            }
+
             takeHit(amt, isSlash = false) {
                 if (this.state === 'DEAD') return;
 
@@ -9742,6 +10077,9 @@
                 if (dist < range) {
                     const falloff = 1 - (dist / range);
                     if (damage > 0) e.takeHit(damage * falloff);
+                    if (sourceEntity && sourceEntity.isBlazing && e.ignite) {
+                        e.ignite(CONFIG.blaze.projectileBurnHeat);
+                    }
                     const dir = e.mesh.position.clone().sub(pos).normalize();
                     
                     if(type === 'VOID') {
@@ -9784,7 +10122,13 @@
                  const falloff = 1 - (pDist / range);
                  const dir = camera.position.clone().sub(pos).normalize();
                  
-                 if(damage > 0) damagePlayer(damage * 0.1 * falloff);
+                 if(damage > 0) {
+                     const isFire = sourceEntity && sourceEntity.isBlazing;
+                     damagePlayer(damage * falloff, isFire);
+                 }
+                 if (sourceEntity && sourceEntity.isBlazing && player.ignite) {
+                     player.ignite(CONFIG.blaze.projectileBurnHeat);
+                 }
                  
                  if(type === 'VOID') {
                      const pullStrength = (pDist / range);
@@ -9799,7 +10143,14 @@
             }
         }
         
-        function damagePlayer(amt) {
+        function damagePlayer(amt, isFire = false) {
+            amt *= CONFIG.playerDamageTakenMult;
+            if (isFire && player.blazeActive) {
+                if (player.health - amt <= 0) {
+                    amt = player.health - 1;
+                    if (amt < 0) amt = 0;
+                }
+            }
             player.health -= amt;
             player.lastDamageTime = performance.now();
             const overlay = document.getElementById('damage-overlay');
@@ -9878,6 +10229,9 @@
             breakCount = 0;
             lastSegmentDuration = 0;
             segmentStartTime = performance.now();
+            
+            autoplay.activatedThisSession = false;
+            autoplay.activeSessionTime = 0;
             
             updateLivesDisplay();
             
@@ -10003,7 +10357,10 @@
                     const p = _particlePool[i];
                     if (!p.active) continue;
 
-                    p.life -= dt;
+                    const pScale = getStasisMultiplier(p.mesh.position);
+                    const localDt = dt * pScale;
+
+                    p.life -= localDt;
                     if (p.life <= 0) {
                         p.active = false;
                         p.mesh.visible = false;
@@ -10016,18 +10373,106 @@
                         p.mesh.scale.setScalar(THREE.MathUtils.lerp(p.scaleStart, p.scaleEnd, progress));
                     } 
                     else if (p.type === 'spark') {
-                        p.velocity.y -= p.gravity * dt; 
-                        p.mesh.position.addScaledVector(p.velocity, dt);
+                        p.velocity.y -= p.gravity * localDt; 
+                        p.mesh.position.addScaledVector(p.velocity, localDt);
                         p.mesh.scale.setScalar(p.life * 2.0); 
                     }
-                    else if (p.type === 'static') {
-                         p.mesh.position.addScaledVector(p.velocity, dt);
-                         p.mesh.scale.setScalar(p.life * 2); 
-                         p.mesh.material.opacity = p.targetOpacity || 1.0; 
-                    } 
-                    else if (p.type === 'snow-trail') {
-                         p.mesh.material.opacity = p.life * 0.4; 
-                    } 
+                    else if (p.type === 'blaze-ember' || p.type === 'static') {
+                         if (p.type === 'static') {
+                             p.mesh.position.addScaledVector(p.velocity, localDt);
+                             p.mesh.scale.setScalar(p.life * 2.0 * (p.scaleStart || 1.0)); 
+                             p.mesh.material.opacity = p.targetOpacity || 1.0; 
+                         } else {
+                             let fade = Math.min(1.0, (p.maxLife - p.life) * 5.0);
+                             p.mesh.position.addScaledVector(p.velocity, localDt);
+                             p.mesh.scale.setScalar(p.life * 2.5 * p.scaleStart);
+                             p.mesh.material.opacity = (p.life / p.maxLife) * 0.8 * fade;
+
+                             // Blaze Ember Interaction: Constant contact damage + status
+                             if (p.priority >= 0) {
+                                 let isPlayerClose = camera.position.distanceToSquared(p.mesh.position) < 4.0;
+                                 let isActiveEmber = p.priority >= 1;
+
+                                 for(let j=0; j<enemies.length; j++) {
+                                     if(enemies[j].state !== 'DEAD' && enemies[j].mesh.position.distanceToSquared(p.mesh.position) < 4.0) {
+                                         enemies[j].takeHit(CONFIG.blaze.burnDps * 0.5 * localDt); 
+                                         if (isActiveEmber) {
+                                             enemies[j].ignite(CONFIG.blaze.burnHeat * 0.8);
+                                         }
+                                     }
+                                 }
+
+                                 if (isPlayerClose) {
+                                     let dmg = CONFIG.blaze.burnDps * 0.5 * localDt;
+                                     
+                                     // Player protection: Zero damage from embers if blaze is active
+                                     if (player.blazeActive) {
+                                         dmg = 0;
+                                     }
+                                     
+                                     if (dmg > 0) damagePlayer(dmg, true);
+                                     // Player ignition: Removed for embers (active fire elements)
+                                 }
+                             }
+                         }
+                    }
+                }
+
+                // 1.5 Dedicated Trail Update
+                for (let i = 0; i < 400; i++) {
+                    const p = _trailPool[i];
+                    if (!p.active) continue;
+
+                    const pScale = getStasisMultiplier(p.mesh.position);
+                    const localDt = dt * pScale;
+
+                    p.life -= localDt;
+                    if (p.life <= 0) {
+                        p.active = false;
+                        p.mesh.visible = false;
+                        continue;
+                    }
+
+                    if (p.type === 'slide-trail' || p.type === 'blaze-trail') {
+                         const ratio = p.life / p.maxLife;
+                         const baseOpacity = p.type === 'blaze-trail' ? CONFIG.blaze.trailOpacity : CONFIG.trail.slideOpacity;
+                         p.mesh.material.opacity = baseOpacity * (ratio * ratio);
+                         p.mesh.scale.setScalar(p.scaleStart * Math.sqrt(ratio));
+
+                         if (p.type === 'blaze-trail') {
+                             p.mesh.position.y += localDt * CONFIG.blaze.riseSpeed;
+
+                             const distSq = p.mesh.position.distanceToSquared(camera.position); 
+                             if (distSq < 14400 && Math.random() < localDt * CONFIG.blaze.emberSpawnRate) {
+                                  spawnSlideEmbers(p.mesh.position, _ZERO, 0, true, p.priority >= 2, 0.4, 1, null);
+                             }
+
+                             // Blaze Trail Interaction: Contact damage + status
+                             let isPlayerClose = distSq < CONFIG.blaze.ignitionRadiusSq;
+                             let isActiveTrail = p.priority >= 2;
+
+                             if (isActiveTrail) {
+                                 for(let j=0; j<enemies.length; j++) {
+                                     if(enemies[j].state !== 'DEAD' && enemies[j].mesh.position.distanceToSquared(p.mesh.position) < CONFIG.blaze.ignitionRadiusSq) {
+                                         enemies[j].takeHit(CONFIG.blaze.burnDps * localDt);
+                                         enemies[j].ignite(CONFIG.blaze.burnHeat); 
+                                     }
+                                 }
+
+                                 if (isPlayerClose) {
+                                     let dmg = CONFIG.blaze.burnDps * localDt;
+                                     
+                                     // Player protection: Zero damage from trails if blaze is active
+                                     if (player.blazeActive) {
+                                         dmg = 0;
+                                     }
+                                     
+                                     if (dmg > 0) damagePlayer(dmg, true);
+                                     // Player ignition: Removed for trails (active fire elements)
+                                 }
+                             }
+                         }
+                    }
                 }
 
                 // 2. Ripples (Impact Rings)
@@ -10035,7 +10480,10 @@
                     const r = _ripplePool[i];
                     if (!r.active) continue;
 
-                    r.life -= dt;
+                    const pScale = getStasisMultiplier(r.mesh.position);
+                    const localDt = dt * pScale;
+
+                    r.life -= localDt;
                     if (r.life <= 0) {
                         r.active = false;
                         r.mesh.visible = false;

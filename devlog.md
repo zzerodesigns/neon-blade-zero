@@ -72,6 +72,15 @@
 
 ## 📖 version history / patch notes
 
+### v48.8.0 - Thermal Dynamics & Kinetic Flow
+*   **The BLAZE Passive Subsystem:** Implemented BLAZE as a distinct "Passive" skill layer (toggled via Caps Lock) that converts ground sliding into persistent thermal hazard trails, dynamically bound completely within the stamina consumption economy with strict hysteresis thresholds.
+*   **Thermal Hierarchy & Protection Matrices:** Built a robust Active vs. Passive fire system preventing infinite combustion loops. Player-generated active sources ignite entities, yielding secondary ambient-damage passive embers. Supported aggressive tactical playstyles by hardcoding a 1HP survival safeguard against self-inflicted thermal death.
+*   **Weapon Synergy (Blazing Arsenal):** Modulated the core loadout under the BLAZE state—Sword Slashes spawn tightly packed tracking embers, and projectiles adopt thermal properties. Frag grenades completely detonate into high-density thermal bursts, and Stasis fields invert to an orange hue, scorching trapped entities with local tick-damage.
+*   **True Temporal Stasis Effects:** Deepened physics synchronization by tying global particle update queries directly against `localDt` multipliers. Environmental weather, localized sparks, and sliding embers now flawlessly execute slow-motion bullet-time representations directly inside cast Stasis fields.
+*   **Particle Buffer Hardening & Priority LOD:** Handled massive simulation influxes safely by splitting high-duration assets into a decoupled `_trailPool` (400 slots). Engineered a rigorous priority-skip indexing system protecting player inputs perfectly against rendering exhaustion, combined with distance-based emission culling on distant AI targets.
+*   **Tactical Action Fluidity & UI Integration:** Maximized kinetic combat flow by bridging menu actions strictly into gameplay inputs, allowing full gadget cycling via `[TAB] + [F/R/E]`. Cleaned up the HUD visual geometry tightening cluster padding and dedicatedly mapping BLAZE into a distinct visible slanted bar. Transferred Autoplay runtime trackers internally to UI tooltips.
+*   **Arena Dynamics & Physical Polish:** Abstracted typical Jump Pads outward from singular instances into a 5-charge rolling trigger stack. Reverted spatial variables opening up true radial kinetic overlaps effectively launching massive clusters of ordnance and bot assemblies horizontally.
+
 ### v48.7.2 - Smooth Sliding & Physics Optimization
 *   **Unified Horizontal Resolution:** Refactored oriented bounding box (OBB) physics into a single horizontal pass. This completely eliminated "sandpaper" directional friction on rotated obstacles, allowing smooth multidirectional sliding on all slanted surfaces.
 *   **Downward Slope Drift & Snapping:** Removed aggressive downhill vertical velocity zeroing. Implemented a sub-step ground-snapping probe so players securely drift and stick to steep drop-offs at high speeds without bouncy, bouncy gravity stutters.
