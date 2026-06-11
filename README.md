@@ -1,5 +1,7 @@
 <div align="center">
-<img width="1344" height="768" alt="Image" src="https://github.com/user-attachments/assets/c396f15e-ac16-405a-b6dd-e031c9a0430e" />
+  <a href="https://zzerodesigns.github.io/neon-blade-zero/">
+    <img width="1344" height="768" alt="Image" src="https://github.com/user-attachments/assets/c396f15e-ac16-405a-b6dd-e031c9a0430e" />
+  </a>
 </div>
 
 <div align="right"><sub><a href="https://ai.studio/apps/200f290d-ca1c-408a-a930-c7038b93561e">Developed with AI Studio</a></sub></div>
