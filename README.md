@@ -2,7 +2,7 @@
 <img width="1344" height="768" alt="Image" src="https://github.com/user-attachments/assets/c396f15e-ac16-405a-b6dd-e031c9a0430e" />
 </div>
 
-<div align="right">Developed with AI Studio: https://ai.studio/apps/200f290d-ca1c-408a-a930-c7038b93561e</div>
+<div align="right"><sub><a href="https://ai.studio/apps/200f290d-ca1c-408a-a930-c7038b93561e">Developed with AI Studio</a></sub></div>
 
 # NEON BLADE: Melee Arena
 
@@ -12,7 +12,7 @@
 
 ### 1. Latest Version (Web)
 The most recent stable build is automatically hosted via GitHub Pages:
-👉 https://zzerodesigns.github.io/neon-blade-zero/
+# 👉 [zzerodesigns.github.io/neon-blade-zero](https://zzerodesigns.github.io/neon-blade-zero/) ⚔️
 
 ### 2. Peak Performance & Archived Builds (Local)
 For the intended experience, it is highly recommended to **run the game locally**.
