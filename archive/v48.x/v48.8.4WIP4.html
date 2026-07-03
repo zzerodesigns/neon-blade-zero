@@ -21,7 +21,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Neon Blade: Melee Arena v48.8.5</title>
+    <title>Neon Blade: Melee Arena v48.8.4 WIP4</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -2106,29 +2106,22 @@
         </p>
         <div
           style="
-            margin-top: 20px;
-            font-size: 0.62rem;
-            color: #4a5a6a;
+            margin-top: 8px;
+            font-size: 0.65rem;
+            color: #555;
             font-family: monospace;
             letter-spacing: 1px;
             text-align: center;
-            line-height: 1.6;
           "
         >
-          NEON BLADE: MELEE ARENA v48.8.5<br />
-          — Architecture & Rival AI —<br />
-          <a 
-            href="https://github.com/zzerodesigns/neon-blade-zero" 
-            target="_blank" 
-            style="color: #4a5a6a; text-decoration: none; transition: color 0.25s ease;"
-            onmouseover="this.style.color='#33ccff'"
-            onmouseout="this.style.color='#4a5a6a'"
-          >Source Code</a>
+          NEON BLADE: MELEE ARENA v48.8.4<br />- WIP4 -<br /><i
+            >Refinements & Polish 4</i
+          >
         </div>
       </div>
     </div>
 
-<script src="https://unpkg.com/three@0.136.0/build/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
     <script>
       const stasisFields = [];
@@ -6813,7 +6806,6 @@
       const _groundVec2 = new THREE.Vector3();
       const _groundSet = new Set();
       const _groundCandidateMeshes = [];
-      const _groundHitsTarget = [];
 
       // --- ZERO-ALLOCATION MATH SCRATCHPAD ---
       const _UP = new THREE.Vector3(0, 1, 0);
@@ -7022,61 +7014,6 @@
       const weatherParticles = [];
       const projectiles = [];
       const _activeEchosPool = [];
-
-      class EnemySpatialGrid {
-        constructor() {
-          this.cells = new Map();
-          this.cellSize = 20;
-          this.queryId = 0;
-          this.queryArray = [];
-        }
-
-        clear() {
-          for (const cell of this.cells.values()) {
-            cell.length = 0;
-          }
-        }
-
-        insert(enemy) {
-          const x = Math.floor(enemy.mesh.position.x / this.cellSize);
-          const z = Math.floor(enemy.mesh.position.z / this.cellSize);
-          const key = ((x + 2000) << 16) | (z + 2000);
-          let cell = this.cells.get(key);
-          if (!cell) {
-            cell = [];
-            this.cells.set(key, cell);
-          }
-          cell.push(enemy);
-        }
-
-        query(x, z, radius) {
-          this.queryId++;
-          this.queryArray.length = 0;
-          
-          const minX = Math.floor((x - radius) / this.cellSize);
-          const maxX = Math.floor((x + radius) / this.cellSize);
-          const minZ = Math.floor((z - radius) / this.cellSize);
-          const maxZ = Math.floor((z + radius) / this.cellSize);
-
-          for (let cx = minX; cx <= maxX; cx++) {
-            for (let cz = minZ; cz <= maxZ; cz++) {
-              const key = ((cx + 2000) << 16) | (cz + 2000);
-              const cell = this.cells.get(key);
-              if (cell) {
-                for (let i = 0; i < cell.length; i++) {
-                  const enemy = cell[i];
-                  if (enemy.lastGridQueryId === this.queryId) continue;
-                  enemy.lastGridQueryId = this.queryId;
-                  this.queryArray.push(enemy);
-                }
-              }
-            }
-          }
-          return this.queryArray;
-        }
-      }
-
-      const enemyGrid = new EnemySpatialGrid();
 
       class SpatialHashGrid {
         constructor(bounds, dimensions) {
@@ -9997,15 +9934,14 @@
               const origin = new THREE.Vector3(x, y, z);
 
               raycaster.set(origin, dir);
-              const intersects = raycaster.intersectObjects(ms.walls, false);
+              const intersects = raycaster.intersectObjects(ms.walls);
 
               if (intersects.length > 0) {
                 const hit = intersects[0];
                 const normalMatrix = new THREE.Matrix3().getNormalMatrix(
                   hit.object.matrixWorld,
                 );
-                const faceNormal = hit.face ? hit.face.normal : new THREE.Vector3(0, 1, 0);
-                const worldNormal = faceNormal
+                const worldNormal = hit.face.normal
                   .clone()
                   .applyMatrix3(normalMatrix)
                   .normalize();
@@ -11678,7 +11614,7 @@
             const dirToSpawn = pos.clone().sub(eyePos).normalize();
             globalRaycaster.set(eyePos, dirToSpawn);
             globalRaycaster.far = distToSpawn;
-            const hits = globalRaycaster.intersectObjects(mapObjects, false);
+            const hits = globalRaycaster.intersectObjects(mapObjects);
 
             if (hits.length > 0) {
               this.meshPos = hits[0].point.sub(dirToSpawn.multiplyScalar(0.1));
@@ -11998,7 +11934,7 @@
             _projDir.normalize();
             globalRaycaster.set(this.mesh.position, _projDir);
             globalRaycaster.far = wallDist;
-            const hits = globalRaycaster.intersectObjects(mapObjects, false);
+            const hits = globalRaycaster.intersectObjects(mapObjects);
 
             if (hits.length > 0) {
               if (this.type === "IMPULSE") {
@@ -12023,8 +11959,7 @@
                 const normalMatrix = new THREE.Matrix3().getNormalMatrix(
                   hits[0].object.matrixWorld,
                 );
-                const faceNormal = hits[0].face ? hits[0].face.normal : new THREE.Vector3(0, 1, 0);
-                const n = faceNormal
+                const n = hits[0].face.normal
                   .clone()
                   .applyMatrix3(normalMatrix)
                   .normalize();
@@ -12036,11 +11971,15 @@
                       .reflect(n)
                       .multiplyScalar(fragPhys.bounciness);
                   } else {
-                    this.velocity.addScaledVector(n, -dot);
+                    this.velocity.subScaledVector(n, dot);
                     this.velocity.multiplyScalar(0.96);
                     if (n.y > 0.1 && n.y < 0.985) {
                       const G = CONFIG.gravity;
-                      const slopeAccel = new THREE.Vector3(0, -G, 0).addScaledVector(n, G * n.y);
+                      const slopeAccel = new THREE.Vector3(
+                        0,
+                        -G,
+                        0,
+                      ).subScaledVector(n, -G * n.y);
                       this.velocity.addScaledVector(slopeAccel, dt * 6.0);
                     } else if (n.y >= 0.985) {
                       this.velocity.x *= fragPhys.friction;
@@ -15216,13 +15155,11 @@
             globalRaycaster.set(_groundVec1, _groundVec2);
             globalRaycaster.far = scanDistance;
 
-            _groundHitsTarget.length = 0;
-            globalRaycaster.intersectObjects(
+            const hits = globalRaycaster.intersectObjects(
               _groundCandidateMeshes,
               false,
-              _groundHitsTarget
             );
-            if (_groundHitsTarget.length > 0) return _groundHitsTarget[0].point.y;
+            if (hits.length > 0) return hits[0].point.y;
           }
         }
         return -999;
@@ -15255,16 +15192,14 @@
           globalRaycaster.set(_groundVec1, _groundVec2);
           globalRaycaster.far = 2000;
 
-          _groundHitsTarget.length = 0;
-          globalRaycaster.intersectObjects(
+          const hits = globalRaycaster.intersectObjects(
             _groundCandidateMeshes,
             false,
-            _groundHitsTarget
           );
           const points = [];
 
-          for (let i = 0; i < _groundHitsTarget.length; i++) {
-            const hit = _groundHitsTarget[i];
+          for (let i = 0; i < hits.length; i++) {
+            const hit = hits[i];
             if (hit.face && hit.face.normal.y > 0.5) {
               points.push(hit.point.y);
             }
@@ -15302,7 +15237,7 @@
         origin.y += 1.0;
         globalRaycaster.set(origin, new THREE.Vector3(0, -1, 0));
         globalRaycaster.far = 6.0;
-        const hits = globalRaycaster.intersectObjects(groundObjects, false);
+        const hits = globalRaycaster.intersectObjects(groundObjects);
         if (hits.length > 0) {
           pos.y = hits[0].point.y + 1.6;
         }
@@ -15311,13 +15246,12 @@
       function getTeleportTarget(maxDist = CONFIG.teleportRange) {
         globalRaycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
         globalRaycaster.far = maxDist;
-        const intersects = globalRaycaster.intersectObjects(mapObjects, false);
+        const intersects = globalRaycaster.intersectObjects(mapObjects);
         if (intersects.length > 0) {
-          const faceNormal = intersects[0].face ? intersects[0].face.normal : new THREE.Vector3(0, 1, 0);
           return {
             point: intersects[0].point,
             hit: true,
-            normal: faceNormal,
+            normal: intersects[0].face.normal,
           };
         } else {
           const dir = new THREE.Vector3();
@@ -16083,7 +16017,6 @@
             this.mesh.position.x,
             this.mesh.position.z,
           );
-          this.lastWallCheckPos = new THREE.Vector3().copy(this.mesh.position);
           this.maxStamina = this.type.maxStamina || CONFIG.botStaminaMax;
           this.stamina = this.maxStamina;
           this.staminaRegen = this.type.staminaRegen || CONFIG.botStaminaRegen;
@@ -16333,16 +16266,15 @@
             const distMovedSq = dxEcho * dxEcho + dzEcho * dzEcho;
             const isInAir =
               Math.abs(this.mesh.position.y - this.lastGroundHeight) > 2.0;
-            const isAsleep = this.velocity.lengthSq() < 0.01 && this.currentMoveSpeed < 0.01 && !isInAir;
 
-            if (!isAsleep && (distMovedSq > 1.0 || isInAir || this.groundCheckTimer <= 0)) {
+            if (distMovedSq > 1.0 || isInAir || this.groundCheckTimer <= 0) {
               this.lastGroundHeight = getGroundHeight(
                 this.mesh.position.x,
                 this.mesh.position.z,
                 this.mesh.position.y,
               );
               this.groundCheckTimer = 0.5;
-            } else if (!isAsleep) {
+            } else {
               this.groundCheckTimer -= dt;
             }
 
@@ -16456,16 +16388,15 @@
           const distMovedSq = dxStandard * dxStandard + dzStandard * dzStandard;
           const isInAir =
             Math.abs(this.mesh.position.y - this.lastGroundHeight) > 2.0;
-          const isAsleep = this.velocity.lengthSq() < 0.01 && this.currentMoveSpeed < 0.01 && !isInAir;
 
-          if (!isAsleep && (distMovedSq > 1.0 || isInAir || this.groundCheckTimer <= 0)) {
+          if (distMovedSq > 1.0 || isInAir || this.groundCheckTimer <= 0) {
             this.lastGroundHeight = getGroundHeight(
               this.mesh.position.x,
               this.mesh.position.z,
               this.mesh.position.y,
             );
             this.groundCheckTimer = 0.5;
-          } else if (!isAsleep) {
+          } else {
             this.groundCheckTimer -= dt;
           }
 
@@ -17107,7 +17038,7 @@
         }
 
         updateUI() {
-          if (this.isDeadCorpse || !this.hasAggroed || this.playerDistSq > 22500) {
+          if (this.isDeadCorpse || !this.hasAggroed) {
             this.healthBarGroup.visible = false;
             return;
           }
@@ -17166,55 +17097,23 @@
             if (this.state !== "DEAD") this.confusedTimer -= dt;
 
             let isNaturallyStill = false;
-            let isTouchingGround = false;
-            const scale = this.type.scale;
-
-            // Pre-calculate lowest point for ground checks
-            let testLowestY = Infinity;
-            for (let i = 0; i < 8; i++) {
-              _vec3_1
-                .copy(_boxVertices[i])
-                .multiplyScalar(scale)
-                .applyQuaternion(this.mesh.quaternion);
-              if (_vec3_1.y < testLowestY) testLowestY = _vec3_1.y;
-            }
-            const worldLowest = this.mesh.position.y + testLowestY;
-            
-            if (Math.abs(worldLowest - this.lastGroundHeight) < 0.15) {
-              isTouchingGround = true;
-            }
-
-            let canSettle = true;
-            if (this.state === "CONFUSED") {
-              _vec3_1.set(0, 1, 0).applyQuaternion(this.mesh.quaternion);
-              const isAlignedVertically = Math.abs(_vec3_1.dot(_UP)) > 0.99; // Standing evenly on feet or head
-              const speedSq = this.velocity.lengthSq();
-              const isNearlyStill = speedSq < 0.5 && this.angularVelocity.lengthSq() < 0.5;
-              canSettle = isAlignedVertically && isNearlyStill;
-            }
-
-            if (
-              (this.state === "FALLEN" || this.state === "DEAD") ||
-              (this.state === "CONFUSED" && canSettle)
-            ) {
-              if (isTouchingGround) {
-                // Continuous ground drag to quickly bleed off sliding for resting bots (scaled gentler with dt)
-                const speedSq = this.velocity.lengthSq();
-                let dragExponent = -1.2;
-                if (speedSq < 1.5) {
-                  // Dynamic ramp-up of ground drag as speed crawls to a stop to prevent trailing crawl
-                  const t = 1.0 - (speedSq / 1.5);
-                  dragExponent = -1.2 - 5.0 * t;
+            if (this.state === "FALLEN" || this.state === "DEAD") {
+              // Check if it has organically bled off its energy down to a visually negligible level
+              if (
+                this.velocity.lengthSq() < 0.1 &&
+                this.angularVelocity.lengthSq() < 0.1
+              ) {
+                // Ensure it is truly resting on a surface
+                let testLowestY = Infinity;
+                for (let i = 0; i < 8; i++) {
+                  _vec3_1
+                    .copy(_boxVertices[i])
+                    .multiplyScalar(this.type.scale)
+                    .applyQuaternion(this.mesh.quaternion);
+                  if (_vec3_1.y < testLowestY) testLowestY = _vec3_1.y;
                 }
-                const groundDragFactor = Math.exp(dragExponent * dt);
-                this.velocity.multiplyScalar(groundDragFactor);
-                this.angularVelocity.multiplyScalar(groundDragFactor);
-
-                // Check if it has organically bled off its energy down to a visually negligible level
-                if (
-                  this.velocity.lengthSq() < 0.15 &&
-                  this.angularVelocity.lengthSq() < 0.15
-                ) {
+                const worldLowest = this.mesh.position.y + testLowestY;
+                if (Math.abs(worldLowest - this.lastGroundHeight) < 0.15) {
                   isNaturallyStill = true;
                 }
               }
@@ -17222,10 +17121,9 @@
 
             if (isNaturallyStill) {
               // The body has naturally settled entirely.
-              // Wipe the final macroscopic micro-energy, clamp flush to the ground, and bypass gravity.
+              // Wipe the final macroscopic micro-energy and bypass gravity to prevent eternal floor stuttering.
               this.velocity.set(0, 0, 0);
               this.angularVelocity.set(0, 0, 0);
-              this.mesh.position.y += this.lastGroundHeight - worldLowest;
             } else {
               // 1. Free-fall Gravity
               this.velocity.y -= CONFIG.gravity * dt;
@@ -17247,6 +17145,7 @@
             const groundY = this.lastGroundHeight;
             let lowestY = Infinity;
             let contactLocal = null;
+            const scale = this.type.scale;
 
             // Find deepest penetrating vertex
             for (let i = 0; i < 8; i++) {
@@ -17261,7 +17160,7 @@
               }
             }
 
-            if (!isNaturallyStill && lowestY < groundY) {
+            if (lowestY < groundY) {
               // Anti-clip constraint correction
               this.mesh.position.y += groundY - lowestY;
 
@@ -17308,20 +17207,14 @@
               }
             }
 
-            // Tune drag of ragdoll states (CONFUSED, FALLEN, DEAD) to closely match regular bots on XZ
-            const dragX = Math.exp(-2.0 * dt);
-            const dragY = Math.exp(-0.5 * dt);
-            const dragZ = Math.exp(-2.0 * dt);
-            this.velocity.x *= dragX;
-            this.velocity.y *= dragY;
-            this.velocity.z *= dragZ;
+            // Global air drag
+            this.velocity.multiplyScalar(Math.exp(-0.5 * dt));
 
             // Status transitions check based on structural rest
             const speedSq = this.velocity.lengthSq();
-            const speedXZ_sq = this.velocity.x * this.velocity.x + this.velocity.z * this.velocity.z;
             const angSq = av * av;
             const isResting =
-              speedXZ_sq < 0.8 && angSq < 0.8 && Math.abs(lowestY - groundY) < 0.2;
+              speedSq < 1.0 && angSq < 1.0 && Math.abs(lowestY - groundY) < 0.2;
 
             if (isResting) {
               this.stillTimer += dt;
@@ -17649,14 +17542,9 @@
 
           // 2. Mutual Bot Bumping (Proactive Resolve)
           // Skip mutual collision computations entirely if either bot is dead or too far, keeping O(N^2) load minimal.
-          if (isNear && !this.isDeadCorpse && enemyGrid) {
-            const neighbors = enemyGrid.query(
-              this.mesh.position.x,
-              this.mesh.position.z,
-              3.0
-            );
-            for (let i = 0; i < neighbors.length; i++) {
-              const other = neighbors[i];
+          if (isNear && !this.isDeadCorpse) {
+            for (let i = 0; i < enemies.length; i++) {
+              const other = enemies[i];
               if (
                 other === this ||
                 other.isDeadCorpse ||
@@ -17765,112 +17653,62 @@
           const botBox = _box3_1;
 
           if (spatialGrid) {
-            const isPhysicsAsleep =
-              this.velocity.lengthSq() < 0.01 &&
-              this.currentMoveSpeed < 0.01 &&
-              Math.abs(this.mesh.position.y - (this.lastGroundHeight + this.type.scale)) < 0.2;
             const isFar = !isNear;
             const wallCheckInterval = isFar ? (distSq > 10000 ? 15 : 5) : 1;
             const shouldCheckWalls =
-              (frameCounter + Math.floor(this.id * 7)) % wallCheckInterval === 0;
+              (frameCounter + Math.floor(this.id * 7)) % wallCheckInterval ===
+              0;
 
-            if (shouldCheckWalls && !isPhysicsAsleep) {
-              if (wallCheckInterval > 1) {
-                botBox.expandByPoint(this.lastWallCheckPos);
-              }
+            if (shouldCheckWalls) {
               const nearbyWalls = spatialGrid.query(botBox);
-              let sweptHit = false;
 
-              if (wallCheckInterval > 1) {
-                const dx = this.mesh.position.x - this.lastWallCheckPos.x;
-                const dz = this.mesh.position.z - this.lastWallCheckPos.z;
-                const sweepDist = Math.hypot(dx, dz);
-                
-                if (sweepDist > 0.5) {
-                  _vec3_1.set(dx, 0, dz).normalize();
-                  _vec3_2.set(this.lastWallCheckPos.x, this.mesh.position.y, this.lastWallCheckPos.z);
-                  globalRaycaster.set(_vec3_2, _vec3_1);
-                  globalRaycaster.far = sweepDist;
+              for (let i = 0; i < nearbyWalls.length; i++) {
+                const wb = nearbyWalls[i];
+                if (wb.mesh.userData.isFloor) continue;
+                if (this.mesh.position.y >= wb.box.max.y - 0.5) continue;
 
-                  _groundCandidateMeshes.length = 0;
-                  for (let i = 0; i < nearbyWalls.length; i++) {
-                    if (!nearbyWalls[i].mesh.userData.isFloor) {
-                      _groundCandidateMeshes.push(nearbyWalls[i].mesh);
-                    }
+                if (wb.mesh.userData.obb) {
+                  if (
+                    wb.mesh.userData.obb.intersectsBox3(
+                      botBox,
+                      _obbNormal,
+                      _obbDepth,
+                    )
+                  ) {
+                    this.mesh.position.addScaledVector(
+                      _obbNormal,
+                      _obbDepth.value,
+                    );
+                    const dot = this.velocity.dot(_obbNormal);
+                    if (dot < 0)
+                      this.velocity.addScaledVector(_obbNormal, -dot * 0.5); // Bot friction bounce
                   }
-                  
-                  if (_groundCandidateMeshes.length > 0) {
-                    _groundHitsTarget.length = 0;
-                    globalRaycaster.intersectObjects(
-                      _groundCandidateMeshes,
-                      false,
-                      _groundHitsTarget
-                    );
-                    if (_groundHitsTarget.length > 0) {
-                      const hit = _groundHitsTarget[0];
-                      this.mesh.position.copy(hit.point).addScaledVector(_vec3_1, -this.type.scale);
-                      this.velocity.x = 0;
-                      this.velocity.z = 0;
-                      this.currentMoveSpeed = 0;
-                      this.strafeDir *= -1;
-                      this.targetRotation += (Math.random() - 0.5) * Math.PI;
-                      sweptHit = true;
-                    }
-                  }
-                }
-              }
+                } else if (botBox.intersectsBox(wb.box)) {
+                  const xOverlap = Math.min(
+                    botBox.max.x - wb.box.min.x,
+                    wb.box.max.x - botBox.min.x,
+                  );
+                  const zOverlap = Math.min(
+                    botBox.max.z - wb.box.min.z,
+                    wb.box.max.z - botBox.min.z,
+                  );
 
-              if (!sweptHit) {
-                for (let i = 0; i < nearbyWalls.length; i++) {
-                  const wb = nearbyWalls[i];
-                  if (wb.mesh.userData.isFloor) continue;
-                  if (this.mesh.position.y >= wb.box.max.y - 0.5) continue;
+                  const wallX = wb.mesh.matrixWorld.elements[12];
+                  const wallZ = wb.mesh.matrixWorld.elements[14];
 
-                  if (wb.mesh.userData.obb) {
-                    if (
-                      wb.mesh.userData.obb.intersectsBox3(
-                        botBox,
-                        _obbNormal,
-                        _obbDepth,
-                      )
-                    ) {
-                      this.mesh.position.addScaledVector(
-                        _obbNormal,
-                        _obbDepth.value,
-                      );
-                      const dot = this.velocity.dot(_obbNormal);
-                      if (dot < 0)
-                        this.velocity.addScaledVector(_obbNormal, -dot * 0.5); // Bot friction bounce
-                    }
-                  } else if (botBox.intersectsBox(wb.box)) {
-                    const xOverlap = Math.min(
-                      botBox.max.x - wb.box.min.x,
-                      wb.box.max.x - botBox.min.x,
-                    );
-                    const zOverlap = Math.min(
-                      botBox.max.z - wb.box.min.z,
-                      wb.box.max.z - botBox.min.z,
-                    );
-
-                    const wallX = wb.mesh.matrixWorld.elements[12];
-                    const wallZ = wb.mesh.matrixWorld.elements[14];
-
-                    if (xOverlap < zOverlap) {
-                      const sign = this.mesh.position.x < wallX ? -1 : 1;
-                      this.mesh.position.x += xOverlap * sign;
-                      if (this.state === "CONFUSED" || this.state === "FALLEN")
-                        this.velocity.x *= -0.5;
-                    } else {
-                      const sign = this.mesh.position.z < wallZ ? -1 : 1;
-                      this.mesh.position.z += zOverlap * sign;
-                      if (this.state === "CONFUSED" || this.state === "FALLEN")
-                        this.velocity.z *= -0.5;
-                    }
+                  if (xOverlap < zOverlap) {
+                    const sign = this.mesh.position.x < wallX ? -1 : 1;
+                    this.mesh.position.x += xOverlap * sign;
+                    if (this.state === "CONFUSED" || this.state === "FALLEN")
+                      this.velocity.x *= -0.5;
+                  } else {
+                    const sign = this.mesh.position.z < wallZ ? -1 : 1;
+                    this.mesh.position.z += zOverlap * sign;
+                    if (this.state === "CONFUSED" || this.state === "FALLEN")
+                      this.velocity.z *= -0.5;
                   }
                 }
               }
-              
-              this.lastWallCheckPos.copy(this.mesh.position);
             }
           }
 
@@ -18658,7 +18496,7 @@
               realNarrativeSys.showHoverStyle
             ) {
               realNarrativeSys.showHoverStyle({
-                title: "SCORE STOLEN",
+                title: "SCORE SIPHONED",
                 desc: `THE ECHO CLAIMED YOUR SCORE<br>-<span style="font-family: 'Arial Black', sans-serif; font-style: italic; font-weight: 900; color:#ff4d4d;">${st}</span> SCORE LOST`,
                 duration: 4,
                 titleColor: "#ff0000",
@@ -19075,7 +18913,6 @@
           const playerPos = camera.position;
 
           _activeEchosPool.length = 0;
-          enemyGrid.clear();
           for (let j = 0; j < enemies.length; j++) {
             if (
               enemies[j] &&
@@ -19084,9 +18921,6 @@
               !enemies[j].isDeadCorpse
             ) {
               _activeEchosPool.push(enemies[j]);
-            }
-            if (enemies[j] && !enemies[j].isDeadCorpse) {
-              enemyGrid.insert(enemies[j]);
             }
           }
 

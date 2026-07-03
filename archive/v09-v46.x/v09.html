@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Blade: Melee Arena (V9)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Set Tailwind config for smooth transitions and the Inter font family
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        'neon-blue': '#4F46E5',
+                        'neon-pink': '#EC4899',
+                        'dark-bg': '#1F2937',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; }
+        canvas { display: block; }
+        #game-info {
+            position: absolute;
+            top: 0;
+            left: 0;
+            padding: 1rem;
+            color: white;
+            z-index: 10;
+            pointer-events: none; /* Allows mouse clicks to pass through to the canvas */
+            font-family: 'Inter', sans-serif;
+            text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+        }
+        .stats-label {
+            color: #ccc;
+            font-weight: 300;
+        }
+        .stats-value {
+            font-weight: 600;
+            color: #4F46E5; /* Neon Blue */
+        }
+        .message-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.9);
+            border: 2px solid #EC4899;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 20px #EC4899;
+            color: white;
+            text-align: center;
+            z-index: 1000;
+            display: none;
+            width: 80%;
+            max-width: 400px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- UI Overlay for Game Information -->
+    <div id="game-info" class="flex flex-col space-y-2">
+        <div><span class="stats-label">Position:</span> <span id="pos-display" class="stats-value">0.00, 0.00</span></div>
+        <div><span class="stats-label">Health:</span> <span id="health-display" class="stats-value text-red-400">100</span></div>
+        <div><span class="stats-label">Stamina:</span> <span id="stamina-display" class="stats-value text-green-400">100</span></div>
+        <div><span class="stats-label">Jumping:</span> <span id="jump-display" class="stats-value text-yellow-400">False</span></div>
+    </div>
+
+    <!-- Custom Modal/Message Box (Replaces alert()) -->
+    <div id="message-box" class="message-box">
+        <div id="message-content" class="text-lg mb-4"></div>
+        <button id="message-ok" class="px-4 py-2 bg-neon-pink text-white rounded-md shadow-lg hover:bg-pink-600 transition duration-150">
+            OK
+        </button>
+    </div>
+
+    <!-- Main Game Logic and Initialization -->
+    <script type="module">
+        // Global Three.js variables
+        let scene, camera, renderer;
+        let player, playerVelocity = new THREE.Vector3();
+        let isJumping = false;
+        let canDoubleJump = false; // New state for double jump
+        const jumpHeight = 25; // Base jump power
+        const gravity = 100;
+        const moveSpeed = 10;
+        const playerHeight = 8;
+        const groundY = 0;
+
+        // Player Stats (V9 additions)
+        let playerStats = {
+            health: 100,
+            maxHealth: 100,
+            stamina: 100,
+            maxStamina: 100,
+            staminaRegenRate: 10, // per second
+            staminaCostRun: 20, // per second
+            staminaCostJump: 10,
+        };
+
+        // Input state
+        const keys = {
+            w: false, s: false, a: false, d: false,
+            space: false, shift: false
+        };
+
+        // Mouse look controls
+        let isLocked = false;
+        let pointerLockElement = document.body;
+
+        // Utility function for custom messages
+        function showMessage(message) {
+            const box = document.getElementById('message-box');
+            document.getElementById('message-content').innerText = message;
+            box.style.display = 'block';
+        }
+
+        document.getElementById('message-ok').addEventListener('click', () => {
+            document.getElementById('message-box').style.display = 'none';
+        });
+
+        // Initialize the 3D scene
+        function init() {
+            // Setup Scene and Renderer
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000000); // Black background
+
+            // Setup Camera (First-Person Perspective)
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, playerHeight, 0);
+
+            // Setup Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.body.appendChild(renderer.domElement);
+
+            // Create Player Mesh (Invisible capsule for FPP camera mounting)
+            // The actual player body is the camera itself.
+            player = new THREE.Object3D();
+            player.position.set(0, playerHeight, 0); // Player position is tracked here
+            scene.add(player);
+
+            // Link camera to player object for movement
+            player.add(camera);
+
+            // Create the Ground (Grid/Floor)
+            createArenaFloor();
+
+            // Add Lights
+            const ambientLight = new THREE.AmbientLight(0x404040, 2); // soft white light
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(50, 100, 50);
+            scene.add(directionalLight);
+
+            // Set up event listeners
+            setupInputListeners();
+            setupPointerLock();
+            window.addEventListener('resize', onWindowResize, false);
+
+            // Start the game loop
+            animate();
+        }
+
+        // Creates a stylized, neon-lit grid floor
+        function createArenaFloor() {
+            // Grid helper for the floor visualization
+            const size = 200;
+            const divisions = 20;
+            const gridHelper = new THREE.GridHelper(size, divisions, 0x4F46E5, 0x4F46E5); // Neon Blue
+            scene.add(gridHelper);
+
+            // Arena Walls (Invisible barriers) - for simple boundary checking
+            const wallMaterial = new THREE.MeshBasicMaterial({ color: 0xff00ff, transparent: true, opacity: 0 }); // Invisible walls
+            const wallGeometry = new THREE.BoxGeometry(1, 40, size + 1);
+
+            // Wall 1: Z+ boundary
+            let wall1 = new THREE.Mesh(wallGeometry, wallMaterial);
+            wall1.position.set(0, 20, size / 2);
+            scene.add(wall1);
+
+            // Wall 2: Z- boundary
+            let wall2 = new THREE.Mesh(wallGeometry, wallMaterial);
+            wall2.position.set(0, 20, -size / 2);
+            scene.add(wall2);
+
+            // Wall 3: X+ boundary
+            const wallGeometry2 = new THREE.BoxGeometry(size + 1, 40, 1);
+            let wall3 = new THREE.Mesh(wallGeometry2, wallMaterial);
+            wall3.position.set(size / 2, 20, 0);
+            scene.add(wall3);
+
+            // Wall 4: X- boundary
+            let wall4 = new THREE.Mesh(wallGeometry2, wallMaterial);
+            wall4.position.set(-size / 2, 20, 0);
+            scene.add(wall4);
+        }
+
+        // Handle window resizing
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // Setup mouse lock for first-person control
+        function setupPointerLock() {
+            pointerLockElement.requestPointerLock = pointerLockElement.requestPointerLock || pointerLockElement.mozRequestPointerLock;
+            document.exitPointerLock = document.exitPointerLock || document.mozExitPointerLock;
+
+            pointerLockElement.addEventListener('click', () => {
+                if (!isLocked) {
+                    pointerLockElement.requestPointerLock();
+                }
+            }, false);
+
+            document.addEventListener('pointerlockchange', lockChangeAlert, false);
+            document.addEventListener('mozpointerlockchange', lockChangeAlert, false);
+        }
+
+        function lockChangeAlert() {
+            if (document.pointerLockElement === pointerLockElement || document.mozPointerLockElement === pointerLockElement) {
+                isLocked = true;
+                document.addEventListener("mousemove", onMouseMove, false);
+            } else {
+                isLocked = false;
+                document.removeEventListener("mousemove", onMouseMove, false);
+                // Optionally show a message when lock is lost
+                // showMessage("Pointer Lock Lost. Click anywhere to re-engage controls.");
+            }
+        }
+
+        function onMouseMove(event) {
+            const movementX = event.movementX || event.mozMovementX || 0;
+            const movementY = event.movementY || event.mozMovementY || 0;
+
+            // Horizontal rotation (Y-axis of the player object)
+            player.rotation.y -= movementX * 0.002;
+
+            // Vertical rotation (X-axis of the camera object)
+            // Limit vertical look to prevent flipping
+            camera.rotation.x -= movementY * 0.002;
+            camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x));
+        }
+
+        // Setup keyboard input listeners
+        function setupInputListeners() {
+            document.addEventListener('keydown', (event) => {
+                if (!isLocked) return;
+                switch (event.code) {
+                    case 'KeyW': keys.w = true; break;
+                    case 'KeyS': keys.s = true; break;
+                    case 'KeyA': keys.a = true; break;
+                    case 'KeyD': keys.d = true; break;
+                    case 'Space':
+                        // Only set true if it wasn't true before to prevent jump spamming
+                        if (!keys.space) {
+                            keys.space = true;
+                            handleJump(); // Handle jump immediately on key down
+                        }
+                        break;
+                    case 'ShiftLeft': keys.shift = true; break;
+                }
+            });
+
+            document.addEventListener('keyup', (event) => {
+                if (!isLocked) return;
+                switch (event.code) {
+                    case 'KeyW': keys.w = false; break;
+                    case 'KeyS': keys.s = false; break;
+                    case 'KeyA': keys.a = false; break;
+                    case 'KeyD': keys.d = false; break;
+                    case 'Space': keys.space = false; break;
+                    case 'ShiftLeft': keys.shift = false; break;
+                }
+            });
+        }
+
+        // Handles the jump and double jump logic
+        function handleJump() {
+            const jumpCost = playerStats.staminaCostJump;
+            if (playerStats.stamina >= jumpCost) {
+                if (!isJumping) {
+                    // First jump
+                    playerVelocity.y = jumpHeight;
+                    isJumping = true;
+                    canDoubleJump = true; // Enable double jump after the first jump
+                    playerStats.stamina -= jumpCost;
+                } else if (canDoubleJump) {
+                    // Double jump: reset vertical velocity and apply jump power again
+                    playerVelocity.y = jumpHeight * 0.8; // Slightly weaker double jump
+                    canDoubleJump = false; // Disable further jumps until landing
+                    playerStats.stamina -= jumpCost;
+                }
+            } else {
+                // Not enough stamina for jump
+                // console.log("Not enough stamina to jump!");
+            }
+        }
+
+        // Update player movement based on input and physics
+        function updateMovement(delta) {
+            // Reset lateral movement vector for calculation
+            let moveDirection = new THREE.Vector3();
+
+            // Determine if player is running
+            const isRunning = keys.shift && playerStats.stamina > 0 && (keys.w || keys.s || keys.a || keys.d);
+            let currentSpeed = isRunning ? moveSpeed * 2.5 : moveSpeed;
+
+            // Calculate movement direction relative to camera/player rotation
+            if (keys.w) moveDirection.z -= 1;
+            if (keys.s) moveDirection.z += 1;
+            if (keys.a) moveDirection.x -= 1;
+            if (keys.d) moveDirection.x += 1;
+
+            // Normalize vector to prevent faster diagonal movement
+            if (moveDirection.lengthSq() > 0) {
+                moveDirection.normalize();
+                // Apply player's current horizontal rotation to the movement vector
+                moveDirection.applyEuler(player.rotation);
+
+                // Apply movement to player velocity
+                playerVelocity.x = moveDirection.x * currentSpeed;
+                playerVelocity.z = moveDirection.z * currentSpeed;
+            } else {
+                // Smooth horizontal stop when keys are released
+                playerVelocity.x = 0;
+                playerVelocity.z = 0;
+            }
+
+            // Apply gravity
+            if (player.position.y > groundY + playerHeight) {
+                playerVelocity.y -= gravity * delta;
+            }
+
+            // Update position
+            player.position.x += playerVelocity.x * delta;
+            player.position.y += playerVelocity.y * delta;
+            player.position.z += playerVelocity.z * delta;
+
+            // Ground collision detection
+            if (player.position.y < groundY + playerHeight) {
+                playerVelocity.y = 0; // Stop vertical movement
+                player.position.y = groundY + playerHeight; // Set player precisely on the ground
+                isJumping = false; // Reset jump state
+                canDoubleJump = false; // Reset double jump state
+            }
+        }
+
+        // Update player stats (Stamina and Health)
+        function updateStats(delta) {
+            // Stamina Logic
+            const isMoving = keys.w || keys.s || keys.a || keys.d;
+            const isRunning = keys.shift && isMoving;
+
+            if (isRunning && playerStats.stamina > 0) {
+                // Drain stamina while running
+                playerStats.stamina -= playerStats.staminaCostRun * delta;
+                playerStats.stamina = Math.max(0, playerStats.stamina);
+            } else if (!isRunning) {
+                // Regenerate stamina when not running
+                playerStats.stamina += playerStats.staminaRegenRate * delta;
+                playerStats.stamina = Math.min(playerStats.maxStamina, playerStats.stamina);
+            }
+
+            // Update UI
+            document.getElementById('pos-display').innerText = `${player.position.x.toFixed(2)}, ${player.position.z.toFixed(2)}`;
+            document.getElementById('health-display').innerText = playerStats.health.toFixed(0);
+            document.getElementById('stamina-display').innerText = playerStats.stamina.toFixed(0);
+            document.getElementById('jump-display').innerText = isJumping ? (canDoubleJump ? "Double Ready" : "True") : "False";
+            document.getElementById('stamina-display').style.color = playerStats.stamina < 20 ? '#F87171' : '#4F46E5'; // Red if low, blue otherwise
+        }
+
+        // Main game loop
+        const clock = new THREE.Clock();
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const delta = clock.getDelta();
+
+            if (isLocked) {
+                updateMovement(delta);
+                updateStats(delta);
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // Start the game when the window is loaded
+        window.onload = function () {
+            init();
+        }
+
+    </script>
+</body>
+</html>
