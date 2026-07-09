@@ -1,0 +1,13 @@
+# Changelog: v48.8.5 to v48.8.6
+
+### Ceiling Traversal and Attachment Physics
+
+The player movement and physics pipeline has been upgraded to support active sliding and sprinting along inverted slopes and flat ceilings. The traversal loop now tracks persistent ceiling contacts, monitoring when entities slide or sprint into overhead structures. Instead of resetting vertical momentum or causing immediate falls, the traversal loop applies a dynamic normal force component that holds the player flush against the overhead surface. This modification preserves tangential velocity, enabling continuous movement and momentum mapping along sloped roofs and ceilings. To support this behavior, the player state has been updated to maintain tracking metrics for the normal of the physical plane of contact along with the precise timestamp of the interaction.
+
+### Oriented Bounding Box Teleport Resolution
+
+Teleport destination safety under sloped or rotated geometry has been refined through the integration of local-coordinate Oriented Bounding Box (OBB) math models. A newly implemented segment-box intersection routine, `intersectSegmentBox`, calculates precise line segment intersections in local coordinates to determine vertical ceiling clearance beneath rotated structural columns, angled pillars, and diagonal beams. In addition, the lateral boundary checking step inside the teleport resolver now evaluates OBB colliders directly. By utilizing three-dimensional Separating Axis Theorem (SAT) checks during target coordinate verification, the engine shifts destination coordinates safely outside of rotated solid boundaries to prevent clipping on arrival.
+
+### World-Space Normal Calculations and Wall Jump Fallback
+
+Environmental detection and movement feedback have been updated to ensure accurate trajectory execution against sloped structures. Within the targeting raycaster, raw intersected polygon face normals are converted into world-space coordinates by applying the hit object's normal matrix extracted from its world matrix. This coordinate transformation is paired with a fallback mechanism for wall-jumping off non-standard geometry. When standard camera-relative horizontal raycasts fail to find a surface due to rotated obstacles or extreme viewing angles, the wall jump routine queries the player's recent contact normal history. If a physical contact occurred within the preceding 250 milliseconds, the engine resolves the jump angle directly against that recorded normal.

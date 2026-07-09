@@ -66,6 +66,7 @@
 *   **Synthesized Melodies:** Integrate procedural Web Audio API melodies as easter eggs or ambient tracks.
 
 ## ✅ recently completed concepts
+- [x] **Ceiling Dynamics & Traversal Polish (v48.8.6):** Unified ceiling sliding and gluing to work seamlessly on AABB, OBB, and sloped/ramp ceilings. Improved the velocity vectors so sliding down under ramps is smooth and preserves momentum. Corrected teleportation raycast/marker interaction issues so resolving against any rotated box/ramp bottom surfaces works correctly.
 - [x] **Scoped EchoBots & Tech-Glass Shaders (v48.8.5-WIP1):** Upgraded Three.js to `r136`, implemented zero-allocation particle, trail, and weather pooling systems, built the scoped `EchoBot` AI with score siphoning, procedural 3D Maze level, custom GLSL tech-glass shaders, predictive Autoplay navigation, wall-sprinting, physical ragdoll death states, and SVG blur HUD filters.
 - [x] **Smooth Sliding & Physics Optimization (v48.7.2):** Consolidated OBB physics via Unified Horizontal Resolution, implemented ground-snapping for slope stability, and added universal dynamic camera tilt alongside critical UI and projectile fixes.
 - [x] **Tactile Physics & Stasis Integration:** finalized the v48.7.0 baseline including ragdoll tumbling and temporal dilation.
@@ -74,6 +75,11 @@
 - [ ] **Decoupled IPC Engine (Neural Shadow Core):** Attempted to split the 3D engine and physics into a Dedicated Web Worker with `SharedArrayBuffer` synchronization. Successfully implemented the logic but encountered insurmountable "silent crashes" in hosted environments lack cross-origin isolation headers. Shelved in v48.7.0 (Restored).
 
 ## 📖 version history / patch notes
+
+### v48.8.6 - Ceiling Dynamics & Traversal Polish
+*   **Unified Ceiling Physics & Gluing:** Standardized ceiling gluing and slide behaviors across all geometry types. Resolving collisions against flat ceilings, ramps, AABB bounds, and rotated OBB bottom surfaces now uses unified normal-based velocity redirects.
+*   **Smooth Ramp Sliding:** Adjusted the velocity resolution vectors when sliding along or under sloped/angled ceiling structures, preventing vertical snags and maintaining a continuous, fluid slide flow that matches normal wall traversal.
+*   **Interactive Teleport Target Alignment:** Corrected teleportation raycast/marker interaction issues when pointing at rotated OBB bottom surfaces or ramps, ensuring they are correctly treated as ceiling boundaries with consistent visual marker feedback.
 
 ### v48.8.5 - Architecture & Rival AI
 *   **Three.js Renderer Upgrade (r136):** Upgraded the foundational rendering pipeline from `r128` to `r136`, establishing a stable rendering environment for uniform bindings and dynamic GLSL shader clocks.
