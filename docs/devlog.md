@@ -41,7 +41,7 @@
 
 ### Visuals & Interface
 *   **Floating Damage Numbers:** Implement an optional MMO-style damage counter overlay above enemy HP bars.
-*   **Procedural Texturing:** Develop a system to generate consistent, math-based textures without external image assets.
+*   ~~**Procedural Texturing:** Develop a system to generate consistent, math-based textures without external image assets.~~ (Completed in v48.8.7)
 *   **Math-Driven 3D Pipeline:** Investigate rendering pipelines for importing simple 3D geometry as pure mathematical functions.
 *   **Combat Typography & FX:** Redesign the strike font and slash particle graphics for greater impact.
 
@@ -66,6 +66,7 @@
 *   **Synthesized Melodies:** Integrate procedural Web Audio API melodies as easter eggs or ambient tracks.
 
 ## ✅ recently completed concepts
+- [x] **Themes & Visual Polish (v48.8.7):** Overhauled the rendering pipeline with custom procedural shaders for the floor, walls, and skybox. Introduced distinct atmospheric environments with celestial bodies and real-time cosmic gradients for all four themes. Migrated obstacle materials to a localized dimension shader to render sharp, constant-width edge glows, and upgraded snow particles to screen-facing billboarded sprites with natural swaying physics.
 - [x] **Ceiling Dynamics & Traversal Polish (v48.8.6):** Unified ceiling sliding and gluing to work seamlessly on AABB, OBB, and sloped/ramp ceilings. Improved the velocity vectors so sliding down under ramps is smooth and preserves momentum. Corrected teleportation raycast/marker interaction issues so resolving against any rotated box/ramp bottom surfaces works correctly.
 - [x] **Scoped EchoBots & Tech-Glass Shaders (v48.8.5-WIP1):** Upgraded Three.js to `r136`, implemented zero-allocation particle, trail, and weather pooling systems, built the scoped `EchoBot` AI with score siphoning, procedural 3D Maze level, custom GLSL tech-glass shaders, predictive Autoplay navigation, wall-sprinting, physical ragdoll death states, and SVG blur HUD filters.
 - [x] **Smooth Sliding & Physics Optimization (v48.7.2):** Consolidated OBB physics via Unified Horizontal Resolution, implemented ground-snapping for slope stability, and added universal dynamic camera tilt alongside critical UI and projectile fixes.
@@ -75,6 +76,12 @@
 - [ ] **Decoupled IPC Engine (Neural Shadow Core):** Attempted to split the 3D engine and physics into a Dedicated Web Worker with `SharedArrayBuffer` synchronization. Successfully implemented the logic but encountered insurmountable "silent crashes" in hosted environments lack cross-origin isolation headers. Shelved in v48.7.0 (Restored).
 
 ## 📖 version history / patch notes
+
+### v48.8.7 - Themes & Visual Polish
+*   **Procedural Theme-Specific Skyboxes:** Integrated a dynamic, camera-tracking skybox sphere utilizing custom GLSL shaders to render real-time atmospheric gradients and celestial structures tailored to each theme (cosmic nebulas, synthwave wireframes, dawn cloud layers, and silhouette backdrops).
+*   **Coordinate-Mapped Triplanar Shaders:** Replaced standard textures with a unified coordinate-driven shader that maps floor and wall geometry in world-space coordinates, eliminating visual stretching, mirroring, and seams across non-standard structures.
+*   **Local-Dimension Obstacle Shaders:** Implemented a specialized decorator shader for dark-themed obstacles that calculates physical mesh dimensions dynamically to enforce uniform, scale-invariant edge glows and pulsing circuit paths regardless of object scale or rotation.
+*   **Billboarded Particle Refactoring:** Upgraded weather snow particles from 3D plane meshes to camera-facing billboarded sprites. Integrated trigonometric wave offsets to simulate realistic atmospheric flutter and drift, resolving clipping artifacts against flat geometry.
 
 ### v48.8.6 - Ceiling Dynamics & Traversal Polish
 *   **Unified Ceiling Physics & Gluing:** Standardized ceiling gluing and slide behaviors across all geometry types. Resolving collisions against flat ceilings, ramps, AABB bounds, and rotated OBB bottom surfaces now uses unified normal-based velocity redirects.
@@ -220,6 +227,25 @@
 *   Established `architecture.md` and single-file strict rules.
 
 ## 🗄️ session logs
+
+### Session: Themes & Visual Polish (v48.8.7)
+
+#### Development Log
+**GPU-Bound Procedural Environments**
+This session focused on upgrading the environmental visual pipeline, transitioning from flat backgrounds and static texturing to dynamic, procedural GLSL shaders executed entirely on the GPU. The main technical objective was to solve texture stretching, mirroring, and seam anomalies across non-standard and irregular structural geometry, while providing distinct atmospheric rendering for each of the four themes. Moving these computations to custom shaders allowed us to improve environmental immersion and aesthetic polish while preserving the constraints of the single-file engine architecture.
+
+**Camera-Tracking Skybox & Triplanar Surface Shaders**
+We integrated a camera-tracking skybox sphere that locks its center point to the active camera position, establishing consistent background depth. The skybox runs procedural shaders to draw custom horizons, atmospheric gradients, and celestial coordinates per theme (e.g., starry cosmic nebulas or retro suns). To eliminate visual stretching, a unified triplanar-mapped shader was implemented for the floors and walls. This shader calculates fragment coordinates directly in world-space coordinates, rendering seamless patterns such as expanding grid pulses, cellular ice patterns, carbon weaves, and magma cracks regardless of geometric layout.
+
+**Scale-Invariant Obstacle Glows & Sprite Billboarding**
+Obstacle materials in the dark theme were updated with a specialized local-dimension shader. By reading absolute physical mesh dimensions rather than conventional UV coordinates, this shader calculates constant-width glowing edges and circuit lines, keeping highlight borders perfectly uniform regardless of object rotation or scaling. Finally, weather particles (snow) were refactored from physical planes to high-performance billboarded sprites that align dynamically with the view plane, utilizing trigonometric offsets to simulate realistic aerodynamic drift and sway before settling.
+
+#### Prompt History
+*   **Visual Engine Modernization:** Upgraded the legacy texturing model to a procedurally shader-driven environmental system.
+*   **Procedural Skybox Implementation:** Added a camera-centered skybox sphere executing theme-specific shaders to render real-time celestial gradients.
+*   **Triplanar Surface Shader Mapping:** Implemented unified floor and wall shaders mapping fragment colors via world-space coordinates to eliminate stretching and seams.
+*   **Scale-Invariant Edge Shading:** Created dark-themed obstacle shaders that resolve physical dimensions dynamically to maintain uniform border highlight width.
+*   **Optimized Weather Billboarding:** Refactored snow particles to screen-space billboarded sprites running aerodynamic drift calculations via trigonometric offsets.
 
 ### Session: Decoupled Engine Architecture & IPC Optimization (v48.7.1)
 
