@@ -21,7 +21,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Neon Blade: Melee Arena v48.8.7</title>
+    <title>Neon Blade: Melee Arena v48.8.8</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -1190,14 +1190,55 @@
         text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
       }
 
-      /* Switch Grid (Bottom Row) */
+      /* Switch Grid (Functional Row) */
       .switch-container {
         display: grid;
-        grid-template-columns: 1fr 1fr 1fr 1fr;
+        grid-template-columns: repeat(4, 1fr);
         gap: 15px;
         padding-top: 10px;
         justify-items: center;
         /* Horizontally center grid items */
+      }
+
+      .jokes-toggle-wrapper {
+        display: flex;
+        justify-content: center;
+        padding-top: 10px;
+      }
+
+      .jokes-toggle-btn {
+        background: transparent;
+        border: 1px dashed rgba(51, 204, 255, 0.2);
+        color: #556677;
+        font-family: "Segoe UI", sans-serif;
+        font-size: 0.65rem;
+        font-weight: 700;
+        letter-spacing: 1.5px;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        padding: 4px 12px;
+        border-radius: 4px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .jokes-toggle-btn:hover {
+        color: #33ccff;
+        border-color: rgba(51, 204, 255, 0.5);
+        background: rgba(51, 204, 255, 0.05);
+      }
+
+      .switch-container-jokes {
+        display: none;
+        justify-content: center;
+        gap: 40px;
+        padding-top: 10px;
+      }
+
+      .switch-container-jokes.expanded {
+        display: flex;
       }
 
       #difficulty-toggle {
@@ -1900,6 +1941,30 @@
             </div>
 
             <div class="switch-wrapper">
+              <span class="setting-label">3rd Person</span>
+              <label class="cyber-switch">
+                <input type="checkbox" id="set-third-person" />
+                <span class="slider-track"></span>
+              </label>
+            </div>
+
+            <div class="switch-wrapper">
+              <span class="setting-label">Slash Angles</span>
+              <label class="cyber-switch">
+                <input type="checkbox" id="set-slash-angles" />
+                <span class="slider-track"></span>
+              </label>
+            </div>
+          </div>
+
+          <div class="jokes-toggle-wrapper">
+            <button type="button" class="jokes-toggle-btn" id="toggle-jokes-btn">
+              <span id="jokes-toggle-icon">+</span> LEGACY REGISTRY
+            </button>
+          </div>
+
+          <div class="switch-container-jokes">
+            <div class="switch-wrapper">
               <span class="setting-label" style="color: #556677">God Mode</span>
               <label class="cyber-switch" id="trap-god">
                 <input type="checkbox" />
@@ -2115,8 +2180,8 @@
             line-height: 1.6;
           "
         >
-          NEON BLADE: MELEE ARENA v48.8.7<br />
-          — Themes & Visual Polish —<br />
+          NEON BLADE: MELEE ARENA v48.8.8<br />
+          — Third-Person Perspective & Slash Shaders —<br />
           <a 
             href="https://github.com/zzerodesigns/neon-blade-zero" 
             target="_blank" 
@@ -2179,6 +2244,9 @@
         wallTiltAmount = 0.45;
         resonanceTuning = "TACTICAL";
         CONFIG.playerDamageTakenMult = 0.5;
+        isThirdPerson = false;
+        useDiverseSlashAngles = false;
+        if (playerVisualMesh) playerVisualMesh.visible = false;
 
         // 2. Sync HTML Elements
         document.getElementById("set-bright").value = 1.0;
@@ -2186,6 +2254,15 @@
         document.getElementById("set-fps").checked = true;
         document.getElementById("set-tilt").checked = true;
         document.getElementById("set-tilt-amt").value = 0.45;
+        const tpToggle = document.getElementById("set-third-person");
+        if (tpToggle) tpToggle.checked = false;
+        const saToggle = document.getElementById("set-slash-angles");
+        if (saToggle) saToggle.checked = false;
+
+        const jokesCont = document.querySelector(".switch-container-jokes");
+        if (jokesCont) jokesCont.classList.remove("expanded");
+        const tjBtnIcon = document.querySelector("#jokes-toggle-icon");
+        if (tjBtnIcon) tjBtnIcon.textContent = "+";
 
         if (typeof updateDifficultyUI === "function") {
           updateDifficultyUI("TACTICAL");
@@ -5005,6 +5082,7 @@
           window.addEventListener("contextmenu", (e) => e.preventDefault());
 
           document.addEventListener("mousedown", (e) => {
+            if (typeof checkDeathBreakout === "function" && checkDeathBreakout()) return;
             if (isLocked && autoplay.active) autoplay.cancel();
             if (e.button === 0) this.mouseDown = true;
             if (isLocked && e.button === 0) {
@@ -5021,6 +5099,7 @@
           document.addEventListener("mousemove", (e) => this.onMouseMove(e));
         },
         onKeyDown: function (e) {
+          if (typeof checkDeathBreakout === "function" && checkDeathBreakout()) return;
           this.capsLock = e.getModifierState("CapsLock");
           const key = e.key.toLowerCase();
           const controlKeys = [
@@ -5174,8 +5253,8 @@
           camera.rotation.y -= e.movementX * 0.002;
           camera.rotation.x -= e.movementY * 0.002;
           camera.rotation.x = Math.max(
-            -Math.PI / 2,
-            Math.min(Math.PI / 2, camera.rotation.x),
+            -1.52,
+            Math.min(1.52, camera.rotation.x),
           );
         },
       };
@@ -5201,7 +5280,9 @@
           },
         ],
         ARENA: [{ time: 3.0, text: "WELCOME TO THE <b>ARENA</b>" }],
+        ARENA_EX: [],
         TITAN: [],
+        TITAN_EX: [],
         MAZE: [],
         "3D_MAZE": [
           {
@@ -5252,8 +5333,8 @@
             triggered: false,
           }));
 
-          // Add universal hints for non-GYM maps
-          if (name !== "GYM" && name !== "3D_MAZE") {
+          // Add universal hints for non-GYM, non-3D_MAZE, and non-EX maps
+          if (name !== "GYM" && name !== "3D_MAZE" && !name.includes("EX")) {
             baseQueue.push({
               time: 8.0,
               text: "Press 'M' to open Minimap",
@@ -6738,6 +6819,8 @@
       let comboTimer = 0;
       let lastSlashID = 0;
       let slashActive = false;
+      let gymCylinderSlash = null;
+      let gymFloatingSlash = null;
 
       let sessionStartTime = 0;
       let segmentStartTime = 0;
@@ -6765,7 +6848,20 @@
       let frameCounter = 0;
       const globalRaycaster = new THREE.Raycaster();
 
+      // --- THIRD-PERSON GLOBALS & OPTIMIZATIONS ---
+      let isThirdPerson = false;
+      let playerVisualMesh = null;
+      let playerGlowMat = null;
+      let cameraColliders = [];
+      const cameraRaycaster = new THREE.Raycaster();
+      const cameraRayDirection = new THREE.Vector3();
+      const cameraPhysicalPos = new THREE.Vector3();
+      const cameraPhysicalQuat = new THREE.Quaternion();
+
       // --- HIGH PERFORMANCE OPTIMIZATIONS ---
+      let useDiverseSlashAngles = false;
+      const _scratchLookMatrix = new THREE.Matrix4();
+      const _scratchAimQuat = new THREE.Quaternion();
       const _scratchVec1 = new THREE.Vector3();
       const _scratchVec2 = new THREE.Vector3();
       const _scratchVec3 = new THREE.Vector3();
@@ -6819,6 +6915,7 @@
 
       // --- ZERO-ALLOCATION MATH SCRATCHPAD ---
       const _UP = new THREE.Vector3(0, 1, 0);
+      const _FORWARD = new THREE.Vector3(0, 0, 1);
       const _ZERO = new THREE.Vector3(0, 0, 0);
       const _quat = new THREE.Quaternion();
       const _quat2 = new THREE.Quaternion();
@@ -7301,8 +7398,26 @@
             far: 1000,
             useShadows: true,
           });
+          this.maps["ARENA_EX"] = new MapState("ARENA_EX", {
+            type: "ARENA_EX",
+            size: 400,
+            bots: 60,
+            scale: 1,
+            fog: 0.004,
+            far: 1000,
+            useShadows: true,
+          });
           this.maps["TITAN"] = new MapState("TITAN", {
             type: "OPEN",
+            size: 2000,
+            bots: 300,
+            scale: 3,
+            fog: 0.001,
+            far: 4000,
+            useShadows: false,
+          });
+          this.maps["TITAN_EX"] = new MapState("TITAN_EX", {
+            type: "TITAN_EX",
             size: 2000,
             bots: 300,
             scale: 3,
@@ -7513,6 +7628,8 @@
           applyTheme();
           Minimap.preRender();
 
+          rebuildCameraColliders();
+
           document.getElementById("map-btn").innerText = "MAP: " + name;
         },
       };
@@ -7688,6 +7805,9 @@
             this.build3DMaze(mapState);
           } else if (cfg.type === "GYM") {
             this.buildGym(mapState);
+          } else if (cfg.type === "ARENA_EX" || cfg.type === "TITAN_EX") {
+            this.buildOpenArena(mapState);
+            this.buildExperimentalTraversal(mapState);
           } else {
             this.buildOpenArena(mapState);
           }
@@ -7803,7 +7923,7 @@
             -1,
           );
 
-          if (ms.name === "TITAN") {
+          if (ms.name === "TITAN" || ms.name === "TITAN_EX") {
             const baseHeight = 100;
             const gapHeight = 100;
             const layers = 5;
@@ -7871,7 +7991,7 @@
               );
             }
           } else {
-            const wallMatToUse = (ms.name !== "TITAN" && ms.name !== "LABYRINTH") ? materials.arenaWall : materials.wall;
+            const wallMatToUse = (!ms.name.includes("TITAN") && ms.name !== "LABYRINTH") ? materials.arenaWall : materials.wall;
             this.createBox(
               0,
               50,
@@ -8415,6 +8535,238 @@
 
           ms.glassDemoBoxes = [glassBox1, glassBox2, glassBox3];
           ms.mapObjects.push(glassBox1, glassBox2, glassBox3);
+        },
+
+        buildExperimentalTraversal: function (ms) {
+          const cfg = ms.config;
+          const size = cfg.size;
+          const scaleMod = cfg.scale;
+          const g = 30; // Physics engine gravity constant
+          const vSprint = 20 * scaleMod; // Calibrated player sprint velocity
+
+          // --- 1. SLOPED & BANKED INNER RINGS (Center Arena Vaulting) ---
+          // Positioned closer to center (r ~ 0.18 * size) with dynamic slope & centrifugal bank angles
+          const rInner = size * 0.18;
+          const countInner = Math.floor(12 * (scaleMod > 1 ? 1.2 : 1));
+          const wInner = 24 * scaleMod;
+          const hInner = 2.5 * scaleMod;
+          const dInner = 24 * scaleMod;
+
+          for (let i = 0; i < countInner; i++) {
+            const theta = (i / countInner) * Math.PI * 2;
+            const x = rInner * Math.cos(theta);
+            const z = rInner * Math.sin(theta);
+            const y = (14 + 10 * Math.sin(2 * theta)) * scaleMod;
+
+            const yaw = -theta + Math.PI / 2;
+            // Bank angle tilted into centrifugal turn for high-speed momentum conversion
+            const bank = Math.atan((vSprint * vSprint) / (g * rInner)) * (i % 2 === 0 ? 1 : -0.7);
+            const pitch = 0.22 * Math.cos(3 * theta);
+
+            const rotEuler = new THREE.Euler(pitch, yaw, bank, "YXZ");
+
+            this.createBox(
+              x,
+              y,
+              z,
+              wInner,
+              hInner,
+              dInner,
+              materials.obstacle,
+              false,
+              false,
+              ms,
+              rotEuler,
+              false,
+              null,
+              true // isRamp = true prevents unwanted face/gift decorations and uses clean platform material!
+            );
+          }
+
+          // --- 2. PHYSICS-CALIBRATED ASCENDING SPIRAL PARKOUR STAIRCASE ---
+          // Ascends continuously from y = 8 to y = 145 (reaching highest floating anchors)
+          // Calibrated for player's jump velocity, double-jumps, and generous platform landing area
+          const rSpiral = size * 0.30;
+          const totalAscentSteps = Math.floor(28 * (scaleMod > 1 ? 1.25 : 1));
+          const totalRevolutions = 2.25; // ~2.25 full circular spirals
+          const startY = 8 * scaleMod;
+          const endY = 142 * scaleMod;
+          const stepW = 26 * scaleMod; // Generous landing platform width
+          const stepH = 2.5 * scaleMod;
+          const stepD = 26 * scaleMod;
+
+          for (let i = 0; i < totalAscentSteps; i++) {
+            const t = i / (totalAscentSteps - 1);
+            const theta = t * Math.PI * 2 * totalRevolutions;
+            const x = rSpiral * Math.cos(theta);
+            const z = rSpiral * Math.sin(theta);
+            const y = startY + t * (endY - startY);
+
+            // Compute arc trajectory for pitch & bank calculations
+            const dTheta = (Math.PI * 2 * totalRevolutions) / totalAscentSteps;
+            const arcDist = rSpiral * dTheta;
+            const deltaY = (endY - startY) / totalAscentSteps;
+
+            const yaw = -theta + Math.PI / 2;
+            const pitch = -Math.atan2(deltaY, arcDist); // Pitch upward along climb path
+            const bank = Math.atan2(vSprint * vSprint, g * rSpiral); // Centripetal banking
+
+            // Replace every other step (i % 2 !== 0) with a true horizontal pad (pitch = 0, bank = 0)
+            const rotEuler =
+              i % 2 !== 0
+                ? new THREE.Euler(0, yaw, 0, "YXZ")
+                : new THREE.Euler(pitch, yaw, bank, "YXZ");
+
+            this.createBox(
+              x,
+              y,
+              z,
+              stepW,
+              stepH,
+              stepD,
+              materials.obstacle,
+              false,
+              false,
+              ms,
+              rotEuler,
+              false,
+              null,
+              true // isRamp = true
+            );
+          }
+
+          // --- 3. 100% FLUSH SEAMLESS DUAL PARALLEL SPIRAL WALL-RUN TRACK ---
+          // Outer spiral (r ~ 0.44 * size) & Inner parallel spiral.
+          // Inner gap distance is doubled for ARENA_EX (36 * scaleMod) while kept standard for TITAN_EX (18 * scaleMod).
+          const isTitanMap =
+            (ms.config && ms.config.type === "TITAN_EX") ||
+            (ms.name && ms.name.includes("TITAN"));
+          const gapDistance = (isTitanMap ? 18 : 36) * scaleMod;
+
+          const rWallOuter = size * 0.44;
+          const rWallInner = Math.max(rWallOuter * 0.35, rWallOuter - gapDistance);
+          const totalSpiralSlots = Math.floor(64 * (scaleMod > 1 ? 1.25 : 1));
+          const totalSpiralRevolutions = 2.5; // 2.5 full circular spirals
+          const spiralStartY = 18 * scaleMod;
+          const spiralEndY = 120 * scaleMod;
+          const panelHeight = 26 * scaleMod;
+          const panelThick = 2.5 * scaleMod;
+
+          const stepAngle = (Math.PI * 2 * totalSpiralRevolutions) / totalSpiralSlots;
+          const deltaYSpiral = (spiralEndY - spiralStartY) / totalSpiralSlots;
+
+          // Randomized spread mask for seamless runs vs open gaps (~50% fill ratio)
+          const isSeamlessSlot = new Array(totalSpiralSlots).fill(false);
+          let slotIdx = 0;
+          let placeWall = true;
+          while (slotIdx < totalSpiralSlots) {
+            const runLen = Math.floor(Math.random() * 4) + 2; // Randomized run lengths of 2 to 5 slots
+            for (let s = 0; s < runLen && slotIdx < totalSpiralSlots; s++) {
+              isSeamlessSlot[slotIdx] = placeWall;
+              slotIdx++;
+            }
+            placeWall = !placeWall;
+          }
+
+          for (let i = 0; i < totalSpiralSlots; i++) {
+            if (!isSeamlessSlot[i]) continue;
+
+            const tStart = (i - 0.5) * stepAngle;
+            const tEnd = (i + 0.5) * stepAngle;
+            const thetaMid = i * stepAngle;
+
+            const yStart = spiralStartY + (i - 0.5) * deltaYSpiral;
+            const yEnd = spiralStartY + (i + 0.5) * deltaYSpiral;
+            const yMid = spiralStartY + i * deltaYSpiral;
+
+            // --- Outer Spiral Wall Panel ---
+            const pStartOuter = new THREE.Vector3(
+              rWallOuter * Math.cos(tStart),
+              yStart,
+              rWallOuter * Math.sin(tStart)
+            );
+            const pEndOuter = new THREE.Vector3(
+              rWallOuter * Math.cos(tEnd),
+              yEnd,
+              rWallOuter * Math.sin(tEnd)
+            );
+            const pMidOuter = new THREE.Vector3(
+              rWallOuter * Math.cos(thetaMid) * Math.cos(stepAngle / 2),
+              yMid,
+              rWallOuter * Math.sin(thetaMid) * Math.cos(stepAngle / 2)
+            );
+
+            const vChordOuter = new THREE.Vector3().subVectors(pEndOuter, pStartOuter);
+            const panelLenOuter = vChordOuter.length() * 1.005; // 0.5% micro-overlap for seamless fit
+
+            const tangentOuter = vChordOuter.clone().normalize();
+            const normalOuter = new THREE.Vector3(Math.cos(thetaMid), 0, Math.sin(thetaMid)).normalize();
+            const binormalOuter = new THREE.Vector3().crossVectors(normalOuter, tangentOuter).normalize();
+
+            const basisMatOuter = new THREE.Matrix4().makeBasis(tangentOuter, binormalOuter, normalOuter);
+            const rotOuter = new THREE.Euler().setFromRotationMatrix(basisMatOuter, "YXZ");
+
+            this.createBox(
+              pMidOuter.x,
+              pMidOuter.y,
+              pMidOuter.z,
+              panelLenOuter,
+              panelHeight,
+              panelThick,
+              materials.obstacle,
+              false,
+              true, // isWall = true
+              ms,
+              rotOuter,
+              false,
+              null,
+              true // isRamp = true
+            );
+
+            // --- Inner Parallel Spiral Wall Panel ---
+            const pStartInner = new THREE.Vector3(
+              rWallInner * Math.cos(tStart),
+              yStart,
+              rWallInner * Math.sin(tStart)
+            );
+            const pEndInner = new THREE.Vector3(
+              rWallInner * Math.cos(tEnd),
+              yEnd,
+              rWallInner * Math.sin(tEnd)
+            );
+            const pMidInner = new THREE.Vector3(
+              rWallInner * Math.cos(thetaMid) * Math.cos(stepAngle / 2),
+              yMid,
+              rWallInner * Math.sin(thetaMid) * Math.cos(stepAngle / 2)
+            );
+
+            const vChordInner = new THREE.Vector3().subVectors(pEndInner, pStartInner);
+            const panelLenInner = vChordInner.length() * 1.005;
+
+            const tangentInner = vChordInner.clone().normalize();
+            const normalInner = new THREE.Vector3(Math.cos(thetaMid), 0, Math.sin(thetaMid)).normalize();
+            const binormalInner = new THREE.Vector3().crossVectors(normalInner, tangentInner).normalize();
+
+            const basisMatInner = new THREE.Matrix4().makeBasis(tangentInner, binormalInner, normalInner);
+            const rotInner = new THREE.Euler().setFromRotationMatrix(basisMatInner, "YXZ");
+
+            this.createBox(
+              pMidInner.x,
+              pMidInner.y,
+              pMidInner.z,
+              panelLenInner,
+              panelHeight,
+              panelThick,
+              materials.obstacle,
+              false,
+              true, // isWall = true
+              ms,
+              rotInner,
+              false,
+              null,
+              true // isRamp = true
+            );
+          }
         },
 
         build3DMaze: function (ms) {
@@ -9516,8 +9868,8 @@
           const mapAABB = mesh.geometry.boundingBox.clone();
           mapAABB.applyMatrix4(mesh.matrixWorld);
 
-          // If it's a box (not a floor or wall), add decorations
-          if (!isFloor && !isWall) {
+          // If it's a box (not a floor, or a wall with isRamp/obstacle mat), add decorations/theme
+          if (!isFloor && (!isWall || isRamp)) {
             mesh.material = mesh.material.clone();
             mesh.userData.originalMat = mesh.material;
             mesh.userData.darkMat = materials.darkDecorationShader.clone();
@@ -9642,6 +9994,10 @@
                   ud.wireframeMesh.material.color.setHex(0x00ffff);
               }
             }.bind(mesh);
+
+            if (mesh.userData.updateTheme) {
+              mesh.userData.updateTheme(typeof currentTheme !== "undefined" ? currentTheme : 0);
+            }
           }
 
           // Narrowphase: OBB (Only if rotated)
@@ -9952,7 +10308,34 @@
                 }
               }
               if (valid) {
-                new Decoration(x, y, z, scale, ms);
+                const isExperimentalMap =
+                  ms &&
+                  (ms.config.type === "ARENA_EX" ||
+                    ms.config.type === "TITAN_EX" ||
+                    ms.config.type === "GYM");
+                const isFloating = minY !== null && maxY !== null;
+                if (isExperimentalMap && isFloating && Math.random() < 0.333) {
+                  const boxSize = scale * 2;
+                  const rotYaw = Math.random() * Math.PI * 2;
+                  this.createBox(
+                    x,
+                    y,
+                    z,
+                    boxSize,
+                    boxSize,
+                    boxSize,
+                    materials.obstacle,
+                    false,
+                    false,
+                    ms,
+                    new THREE.Euler(0, rotYaw, 0),
+                    false,
+                    null,
+                    true,
+                  );
+                } else {
+                  new Decoration(x, y, z, scale, ms);
+                }
                 obstacleBounds.push({ x: x, z: z, r: radius });
               }
             }
@@ -10190,6 +10573,7 @@
         }
 
         onJumpInput(isRepeat) {
+          if (this.isDead) return;
           if (this.onGround) {
             performJump();
             this.jumpsRemaining--;
@@ -10215,6 +10599,7 @@
         }
 
         onAttackInput(isClick = false) {
+          if (this.isDead) return;
           if (teleportMode === "AIM" && this.teleportActive) {
             tryAimTeleport();
             this.currentWeapon.use(isClick);
@@ -10224,6 +10609,7 @@
         }
 
         onSecondaryInput() {
+          if (this.isDead) return;
           // Allow input if we are Aiming OR if we have a Lock to clear
           if (
             teleportMode === "AIM" &&
@@ -10247,6 +10633,7 @@
         }
 
         onTeleportInput() {
+          if (this.isDead) return;
           if (teleportMode === "INSTANT") {
             tryInstantTeleport();
           } else if (teleportMode === "AIM") {
@@ -10290,6 +10677,7 @@
         }
 
         beginAim(type) {
+          if (this.isDead) return;
           this.aimingGadget = type;
           this.updateGadgetHUD();
         }
@@ -10354,7 +10742,7 @@
         initRagdoll() {
           this.ragdollPos = camera.position
             .clone()
-            .add(new THREE.Vector3(0, -0.8, 0));
+            .add(new THREE.Vector3(0, -0.7, 0));
           this.ragdollQuat = camera.quaternion.clone();
           this.ragdollVelocity = this.velocity.clone();
           this.ragdollVelocity.y += 8.0;
@@ -10365,6 +10753,12 @@
             (Math.random() - 0.5) * 8,
             (Math.random() - 0.5) * 8,
           );
+          this.lastGroundHeight = getGroundHeight(
+            this.ragdollPos.x,
+            this.ragdollPos.z,
+            this.ragdollPos.y,
+          );
+          if (this.lastGroundHeight <= -999) this.lastGroundHeight = 0;
         }
 
         update(dt) {
@@ -10373,94 +10767,152 @@
               this.initRagdoll();
             }
 
-            // 1. Gravity
-            this.ragdollVelocity.y -= CONFIG.gravity * dt;
+            let isNaturallyStill = false;
 
-            // 2. Linear displacement
-            this.ragdollPos.addScaledVector(this.ragdollVelocity, dt);
-
-            // 3. Angular rotation
-            const av = this.angularVelocity.length();
-            if (av > 0.0001) {
-              _quat.setFromAxisAngle(
-                _vec3_1.copy(this.angularVelocity).normalize(),
-                av * dt,
-              );
-              this.ragdollQuat.premultiply(_quat);
-            }
-
-            // 4. Ground Collision
-            let groundY = getGroundHeight(
-              this.ragdollPos.x,
-              this.ragdollPos.z,
-              this.ragdollPos.y,
-            );
-            if (groundY <= -999) groundY = 0;
-
-            let lowestY = Infinity;
-            let contactLocal = null;
-            const scale = 1.0;
-
+            // Calculate lowest point for ground checks (0.6x0.6x1.8m box, center of mass at 0.9m)
+            let testLowestY = Infinity;
             for (let i = 0; i < 8; i++) {
-              _vec3_1.copy(_boxVertices[i]);
-              _vec3_1.x *= 0.6;
-              _vec3_1.y *= 0.9;
-              _vec3_1.z *= 0.6;
-
+              _vec3_1.set(_boxVertices[i].x * 0.6, _boxVertices[i].y * 0.9, _boxVertices[i].z * 0.6);
               _vec3_2
                 .copy(_vec3_1)
+                .applyQuaternion(this.ragdollQuat);
+              if (_vec3_2.y < testLowestY) testLowestY = _vec3_2.y;
+            }
+            const worldLowest = this.ragdollPos.y + testLowestY;
+
+            // Cache ground height while moving; freeze cached ground height once nearly still
+            if (
+              this.lastGroundHeight === undefined ||
+              this.lastGroundHeight === null ||
+              this.ragdollVelocity.lengthSq() > 0.01
+            ) {
+              let gh = getGroundHeight(
+                this.ragdollPos.x,
+                this.ragdollPos.z,
+                this.ragdollPos.y,
+              );
+              if (gh > -999) this.lastGroundHeight = gh;
+              else if (this.lastGroundHeight === undefined) this.lastGroundHeight = 0;
+            }
+            const groundY = this.lastGroundHeight;
+
+            let isTouchingGround = Math.abs(worldLowest - groundY) < 0.25;
+
+            if (isTouchingGround) {
+              // Continuous ground drag to bleed off sliding and rolling
+              const groundDragFactor = Math.exp(-1.5 * dt);
+              this.ragdollVelocity.multiplyScalar(groundDragFactor);
+              this.angularVelocity.multiplyScalar(groundDragFactor);
+
+              if (
+                this.ragdollVelocity.lengthSq() < 0.1 &&
+                this.angularVelocity.lengthSq() < 0.1
+              ) {
+                isNaturallyStill = true;
+              }
+            }
+
+            if (isNaturallyStill) {
+              // The body has naturally settled entirely.
+              // Wipe final micro-energy, clamp flush to ground, and bypass gravity & velocity integration.
+              this.ragdollVelocity.set(0, 0, 0);
+              this.angularVelocity.set(0, 0, 0);
+              this.ragdollPos.y += groundY - worldLowest;
+            } else {
+              // Free-fall Gravity
+              this.ragdollVelocity.y -= CONFIG.gravity * dt;
+
+              this.ragdollPos.addScaledVector(this.ragdollVelocity, dt);
+
+              // Spatial Rotation
+              const av = this.angularVelocity.length();
+              if (av > 0.0001) {
+                _quat.setFromAxisAngle(
+                  _vec3_1.copy(this.angularVelocity).normalize(),
+                  av * dt,
+                );
+                this.ragdollQuat.premultiply(_quat);
+              }
+
+              // True Collision against Floor
+              let lowestY = Infinity;
+              let contactLocal = null;
+
+              for (let i = 0; i < 8; i++) {
+                _vec3_1.set(_boxVertices[i].x * 0.6, _boxVertices[i].y * 0.9, _boxVertices[i].z * 0.6);
+                _vec3_2
+                  .copy(_vec3_1)
+                  .applyQuaternion(this.ragdollQuat)
+                  .add(this.ragdollPos);
+                if (_vec3_2.y < lowestY) {
+                  lowestY = _vec3_2.y;
+                  contactLocal = _vec3_1.clone();
+                }
+              }
+
+              if (lowestY < groundY) {
+                this.ragdollPos.y += groundY - lowestY;
+
+                _vec3_1.copy(contactLocal).applyQuaternion(this.ragdollQuat);
+                _vec3_2
+                  .copy(this.angularVelocity)
+                  .cross(_vec3_1)
+                  .add(this.ragdollVelocity);
+
+                if (_vec3_2.y < 0) {
+                  const isSoftImpact = _vec3_2.y > -2.0;
+                  const restitution = isSoftImpact ? 0.0 : 0.45;
+                  const inertiaInv = 1.0 / 0.4;
+
+                  _vec3_3.copy(_vec3_1).cross(_UP);
+                  const denom = 1.0 + _vec3_3.lengthSq() * inertiaInv;
+                  let j = (-(1.0 + restitution) * _vec3_2.y) / denom;
+
+                  this.ragdollVelocity.y += j;
+
+                  _vec3_3
+                    .copy(_vec3_1)
+                    .cross(_UP)
+                    .multiplyScalar(j * inertiaInv);
+                  this.angularVelocity.add(_vec3_3);
+
+                  const friction = isSoftImpact ? 0.4 : 0.8;
+                  this.ragdollVelocity.x *= friction;
+                  this.ragdollVelocity.z *= friction;
+                  this.angularVelocity.multiplyScalar(0.85);
+                }
+              }
+
+              const dragX = Math.exp(-2.0 * dt);
+              const dragY = Math.exp(-0.5 * dt);
+              const dragZ = Math.exp(-2.0 * dt);
+              this.ragdollVelocity.x *= dragX;
+              this.ragdollVelocity.y *= dragY;
+              this.ragdollVelocity.z *= dragZ;
+            }
+
+            if (!isThirdPerson) {
+              const localEyeOffset = new THREE.Vector3(0, 0.7, 0);
+              camera.position
+                .copy(localEyeOffset)
                 .applyQuaternion(this.ragdollQuat)
                 .add(this.ragdollPos);
-              if (_vec3_2.y < lowestY) {
-                lowestY = _vec3_2.y;
-                contactLocal = _boxVertices[i].clone();
-                contactLocal.x *= 0.6;
-                contactLocal.y *= 0.9;
-                contactLocal.z *= 0.6;
-              }
+              camera.quaternion.copy(this.ragdollQuat);
             }
 
-            if (lowestY < groundY) {
-              this.ragdollPos.y += groundY - lowestY;
-
-              _vec3_1.copy(contactLocal).applyQuaternion(this.ragdollQuat);
-              _vec3_2
-                .copy(this.angularVelocity)
-                .cross(_vec3_1)
-                .add(this.ragdollVelocity);
-
-              if (_vec3_2.y < 0) {
-                const restitution = 0.45;
-                const inertiaInv = 1.0 / (0.4 * scale * scale);
-
-                _vec3_3.copy(_vec3_1).cross(_UP);
-                const denom = 1.0 + _vec3_3.lengthSq() * inertiaInv;
-                let j = (-(1.0 + restitution) * _vec3_2.y) / denom;
-
-                this.ragdollVelocity.y += j;
-
-                _vec3_3
-                  .copy(_vec3_1)
-                  .cross(_UP)
-                  .multiplyScalar(j * inertiaInv);
-                this.angularVelocity.add(_vec3_3);
-
-                this.ragdollVelocity.x *= 0.4;
-                this.ragdollVelocity.z *= 0.4;
-                this.angularVelocity.multiplyScalar(0.85);
+            // Interactive respawn breakout prompt check after 5 seconds
+            if (!this.deathPromptShown && !this.respawnHandled) {
+              const elapsed = (performance.now() - (this.deathStartTime || 0)) / 1000;
+              if (elapsed >= 5.0) {
+                this.deathPromptShown = true;
+                if (typeof NarrativeSys !== "undefined" && NarrativeSys.show) {
+                  NarrativeSys.show(
+                    "<span style='color:#ffff00; font-weight:bold; letter-spacing:2px;'>PRESS ANY KEY TO CONTINUE</span>",
+                    10.0,
+                  );
+                }
               }
             }
-
-            // Global air drag
-            this.ragdollVelocity.multiplyScalar(Math.exp(-0.5 * dt));
-
-            // 5. Update Camera Position & Rotation to match virtual eyes
-            const localEyeOffset = new THREE.Vector3(0, 0.7, 0);
-            camera.position
-              .copy(localEyeOffset)
-              .applyQuaternion(this.ragdollQuat)
-              .add(this.ragdollPos);
-            camera.quaternion.copy(this.ragdollQuat);
             return;
           }
 
@@ -12784,7 +13236,7 @@
           ) {
             this.owner.energy -= CONFIG.blaze.slashCost;
             isBlazeAttack = true;
-            slashMesh.material.color.setHex(0xffaa00);
+            if(slashMesh.material.uniforms) slashMesh.material.uniforms.u_color.value.setHex(0xffaa00); else slashMesh.material.color.setHex(0xffaa00);
             // Aesthetics: spawn embers along the slash arc
             for (let i = 0; i < 4; i++) {
               const offset = new THREE.Vector3(
@@ -13315,10 +13767,12 @@
             AudioSys.playHit(hitPos);
 
             if (slashMesh) {
-              slashMesh.material.color.setHex(
-                hitType === "CRIT" ? 0xff0000 : 0xffffff,
-              );
-              slashMesh.material.opacity = 1;
+              if (slashMesh.material.uniforms) {
+                slashMesh.material.uniforms.u_color.value.setHex(hitType === "CRIT" ? 0xff0000 : 0xffffff);
+              } else {
+                slashMesh.material.color.setHex(hitType === "CRIT" ? 0xff0000 : 0xffffff);
+              }
+              if(slashMesh.material.uniforms) slashMesh.material.uniforms.u_opacity.value = 1; else slashMesh.material.opacity = 1;
               slashMesh.scale.setScalar(1.2);
               slashMesh.userData.fadeSpeed = 0.06;
               slashMesh.userData.isHit = true;
@@ -13615,6 +14069,36 @@
           if (window.updateUnifiedBackdrop) window.updateUnifiedBackdrop();
         });
 
+        // Third Person Toggle
+        document.getElementById("set-third-person").addEventListener("change", (e) => {
+          isThirdPerson = e.target.checked;
+          if (playerVisualMesh) {
+            playerVisualMesh.visible = isThirdPerson;
+          }
+          AudioSys.playUI(true);
+        });
+
+        // Slash Angles Toggle
+        const saElem = document.getElementById("set-slash-angles");
+        if (saElem) {
+          saElem.addEventListener("change", (e) => {
+            useDiverseSlashAngles = e.target.checked;
+            AudioSys.playUI(true);
+          });
+        }
+
+        // Toggle Legacy/Joke switches container
+        const tjBtn = document.getElementById("toggle-jokes-btn");
+        const jokesCont = document.querySelector(".switch-container-jokes");
+        if (tjBtn && jokesCont) {
+          tjBtn.addEventListener("click", () => {
+            const isExpanded = jokesCont.classList.toggle("expanded");
+            const iconSpan = tjBtn.querySelector("#jokes-toggle-icon");
+            if (iconSpan) iconSpan.textContent = isExpanded ? "−" : "+";
+            AudioSys.playUI(true);
+          });
+        }
+
         // Wall Tilt Toggle & Slider
         const tiltRow = document.getElementById("tilt-slider-row");
         document.getElementById("set-tilt").addEventListener("change", (e) => {
@@ -13706,7 +14190,9 @@
           const order = [
             "GYM",
             "ARENA",
+            "ARENA_EX",
             "TITAN",
+            "TITAN_EX",
             "MAZE",
             "LABYRINTH",
             "3D_MAZE",
@@ -14529,12 +15015,39 @@
           clearcoat: 0.5,
           clearcoatRoughness: 0.1,
         });
-        materials.slash = new THREE.MeshBasicMaterial({
-          color: 0x0088ff,
+        materials.slash = new THREE.ShaderMaterial({
+          uniforms: {
+            u_color: { value: new THREE.Color(0x0088ff) },
+            u_opacity: { value: 0.0 }
+          },
+          vertexShader: `
+            varying vec2 vUv;
+            void main() {
+              vUv = uv;
+              gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+          `,
+          fragmentShader: `
+            uniform vec3 u_color;
+            uniform float u_opacity;
+            varying vec2 vUv;
+            void main() {
+              // Extended Fading Trail: Keep trail bright over 80% of the arc, fading out smoothly only at the extreme ends (0% to 10%, and 90% to 100%)
+              float arcFade = smoothstep(0.0, 0.10, vUv.x) * smoothstep(1.0, 0.90, vUv.x);
+              
+              // Smooth glow peaking in the middle of the crescent ribbon's width, tapering off at the edges
+              float widthFade = smoothstep(0.0, 0.5, vUv.y) * smoothstep(1.0, 0.5, vUv.y);
+              
+              float alpha = u_opacity * arcFade * widthFade;
+              if (alpha < 0.005) discard;
+              
+              gl_FragColor = vec4(u_color, alpha * 2.0);
+            }
+          `,
           transparent: true,
-          opacity: 0,
           side: THREE.DoubleSide,
-          depthTest: false,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
         });
         materials.marker = new THREE.MeshStandardMaterial({
           color: 0x0088ff,
@@ -14978,6 +15491,8 @@
 
         createSlashEffect();
         createTeleportMarker();
+        createPlayerVisualMesh();
+        rebuildCameraColliders();
         initObjectPools(); // Pre-allocate memory pools
         InputManager.init();
         NarrativeSys.init();
@@ -15373,7 +15888,7 @@
           : 0.004;
         let isStandardArena =
           MapManager.current &&
-          ["ARENA", "TITAN", "GYM"].includes(MapManager.current.name);
+          ["ARENA", "ARENA_EX", "TITAN", "TITAN_EX", "GYM"].includes(MapManager.current.name);
 
         if (typeof renderer !== "undefined" && renderer) {
           if (currentTheme === 2) {
@@ -15495,7 +16010,23 @@
           }
         }
 
-        if (materials.slash) materials.slash.color.setHex(currentSlashColor);
+        if (materials.slash) {
+          if (materials.slash.uniforms) {
+            materials.slash.uniforms.u_color.value.setHex(currentSlashColor);
+          } else {
+            materials.slash.color.setHex(currentSlashColor);
+          }
+        }
+        if (playerVisualMesh && playerVisualMesh.userData.glowMaterial) {
+          const glowMat = playerVisualMesh.userData.glowMaterial;
+          if (glowMat.uniforms) {
+            if (glowMat.uniforms.u_glowColor) glowMat.uniforms.u_glowColor.value.setHex(currentSlashColor);
+            if (glowMat.uniforms.u_theme) glowMat.uniforms.u_theme.value = currentTheme;
+          } else {
+            if (glowMat.color) glowMat.color.setHex(currentSlashColor);
+            if (glowMat.emissive) glowMat.emissive.setHex(currentSlashColor);
+          }
+        }
         if (materials.glassBorderMat) {
           materials.glassBorderMat.uniforms.u_glowColor.value.setHex(
             currentSlashColor,
@@ -15865,34 +16396,81 @@
         }
       }
 
-      function createSlashEffect() {
-        const shape = new THREE.Shape();
-        shape.moveTo(0, 1.2);
-        shape.quadraticCurveTo(-0.5, 0, 0, -1.2);
-        shape.quadraticCurveTo(-0.2, 0, 0, 1.2);
-        slashGeometry = new THREE.ShapeGeometry(shape);
-        slashGeometry.center();
+      function createCrescentMoonGeometry(radius, maxHalfWidth, segments, startAngle = -Math.PI * 0.4, endAngle = Math.PI * 0.4) {
+        const geometry = new THREE.BufferGeometry();
+        const vertices = [];
+        const uvs = [];
+        const indices = [];
 
-        // Straight powerful slash geometry from v43
-        const shapeStraight = new THREE.Shape();
-        const h = 1.1;
-        const wOuter = 0.3;
-        const wInner = 0.05;
-        shapeStraight.moveTo(0, h);
-        shapeStraight.quadraticCurveTo(-wOuter, 0, 0, -h);
-        shapeStraight.quadraticCurveTo(-wInner, 0, 0, h);
-        slashGeometryStraight = new THREE.ShapeGeometry(shapeStraight);
-        slashGeometryStraight.center();
+        const angleSpan = endAngle - startAngle;
+
+        for (let i = 0; i <= segments; i++) {
+          const t = i / segments;
+          const angle = startAngle + t * angleSpan;
+
+          // Width tapers to 0 at the ends (sin profile)
+          const w = maxHalfWidth * Math.sin(Math.PI * t);
+
+          const cos = Math.cos(angle);
+          const sin = Math.sin(angle);
+
+          // Symmetric Crescent in local XY plane:
+          // x is antisymmetric: sweeping left-to-right
+          // y is symmetric: pointing forward
+          const rOuter = radius + w;
+          const xOuter = rOuter * sin;
+          const yOuter = rOuter * cos - radius;
+          const zOuter = 0;
+
+          const rInner = radius - w;
+          const xInner = rInner * sin;
+          const yInner = rInner * cos - radius;
+          const zInner = 0;
+
+          vertices.push(xInner, yInner, zInner);
+          vertices.push(xOuter, yOuter, zOuter);
+
+          // UV mapping: x is along the arc [0, 1], y is across [0, 1]
+          uvs.push(t, 0.0);
+          uvs.push(t, 1.0);
+        }
+
+        // Generate faces (two triangles per segment)
+        for (let i = 0; i < segments; i++) {
+          const v0 = i * 2;
+          const v1 = i * 2 + 1;
+          const v2 = (i + 1) * 2;
+          const v3 = (i + 1) * 2 + 1;
+
+          indices.push(v0, v1, v2);
+          indices.push(v1, v3, v2);
+        }
+
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+        geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+        geometry.setIndex(indices);
+        geometry.computeVertexNormals();
+
+        return geometry;
       }
 
-      function spawnSlash(parent, isClick = false) {
+      function createSlashEffect() {
+        // A sweeping arc for default slashes (larger curve)
+        slashGeometry = createCrescentMoonGeometry(2.0, 0.35, 64, -Math.PI * 0.6, Math.PI * 0.6);
+
+        // A tighter, straighter arc for click attacks
+        slashGeometryStraight = createCrescentMoonGeometry(2.4, 0.25, 64, -Math.PI * 0.4, Math.PI * 0.4);
+      }
+
+      function spawnSlash(parent, isClick = false, targetPos = null) {
         const s = _slashPool[_slashIdx];
         _slashIdx = (_slashIdx + 1) % 20;
         s.active = true;
+        s.mesh.userData.isHit = false;
         s.isHit = false;
         s.fadeSpeed = 0.15;
-        s.mesh.material.color.setHex(currentSlashColor);
-        s.mesh.material.opacity = 1;
+        if(s.mesh.material.uniforms) s.mesh.material.uniforms.u_color.value.setHex(currentSlashColor); else s.mesh.material.color.setHex(currentSlashColor);
+        if(s.mesh.material.uniforms) s.mesh.material.uniforms.u_opacity.value = 1; else s.mesh.material.opacity = 1;
         s.mesh.visible = true;
         s.mesh.scale.set(1, 1, 1);
 
@@ -15903,20 +16481,110 @@
           s.mesh.geometry = slashGeometry;
         }
 
-        if (parent === camera) {
-          if (isClick) {
-            s.mesh.position.set(0, 0, -2.0);
-          } else {
-            s.mesh.position.set(0.05, 0.05, -2.0);
-          }
-          s.mesh.rotation.set(0, 0, -Math.PI / 8);
-          camera.add(s.mesh);
-          slashActive = true;
-          document.getElementById("crosshair").style.opacity = 0;
+        s.isPlayer = (parent === camera && !parent.isEchoCamera);
+
+        // Determine slash slant angle theta based on setting
+        let theta = 0;
+        if (useDiverseSlashAngles) {
+          // Universal Diverse Slash Angles mode
+          const anglePresets = [
+            -5 * Math.PI / 12, // -75° (standard forward slash)
+            5 * Math.PI / 12,  // +75° (backhand slash)
+            -Math.PI / 4,      // -45° (steep diagonal)
+            Math.PI / 4,       // +45° (backhand steep diagonal)
+            -Math.PI / 6,      // -30° (shallow diagonal)
+            Math.PI / 6,       // +30° (backhand shallow diagonal)
+            0,                 // 0° (pure horizontal slice)
+          ];
+          const baseSlant = anglePresets[Math.floor(Math.random() * anglePresets.length)];
+          const angleVar = (Math.random() - 0.5) * 0.25;
+          theta = baseSlant + angleVar;
         } else {
-          s.mesh.position.set(0, 1.5, 1.0);
-          s.mesh.lookAt(camera.position);
-          parent.add(s.mesh);
+          // Standard mode: default forward slash slant with slight variations
+          const baseSlant = -5 * Math.PI / 12; // -75° standard top-right to bottom-left
+          const angleVar = (Math.random() - 0.5) * 0.15;
+          theta = baseSlant + angleVar;
+        }
+
+        if (parent === camera) {
+          // Reparent to scene FIRST to clear any bot/phantom parenting offsets
+          scene.add(s.mesh);
+
+          const isEcho = !!parent.isEchoCamera;
+
+          // Get player physical position and orientation
+          const pPos = (isThirdPerson && !isEcho) ? cameraPhysicalPos : camera.position;
+          const pQuat = (isThirdPerson && !isEcho) ? cameraPhysicalQuat : camera.quaternion;
+
+          // Compute forward look vector of the player
+          const lookDir = new THREE.Vector3(0, 0, -1).applyQuaternion(pQuat).normalize();
+
+          // Position the slash exactly on the forward line of sight so its center cuts through the crosshair
+          const spawnDist = 1.6;
+          const slashPos = pPos.clone().addScaledVector(lookDir, spawnDist);
+          s.mesh.position.copy(slashPos);
+
+          // Start with the player's true physical heading/quaternion
+          s.mesh.quaternion.copy(pQuat);
+
+          // Align crescent arc bulge with look vector
+          s.mesh.rotateX(-Math.PI / 2);
+          s.mesh.rotateY(theta);
+
+          if (!isEcho) {
+            slashActive = true;
+            document.getElementById("crosshair").style.opacity = 0;
+          }
+        } else {
+          // Bot / phantom slash: spawn relative to bot's perspective & 3D aim vector
+          scene.add(s.mesh);
+
+          const enemyScale = (parent.userData && parent.userData.enemy && parent.userData.enemy.type)
+            ? parent.userData.enemy.type.scale
+            : 1.0;
+
+          // Aim Origin: Chest / eye level of the bot
+          const aimOrigin = parent.position.clone();
+          aimOrigin.y += 0.8 * enemyScale;
+
+          // Determine 3D target position
+          let finalTargetPos = targetPos ? targetPos.clone() : null;
+          if (!finalTargetPos) {
+            const enemy = parent.userData && parent.userData.enemy;
+            if (enemy && enemy.lockedTarget && !enemy.lockedTarget.isDeadCorpse) {
+              finalTargetPos = enemy.lockedTarget.mesh.position.clone();
+              finalTargetPos.y += 0.8 * (enemy.lockedTarget.type ? enemy.lockedTarget.type.scale : 1.0);
+            } else if (typeof cameraPhysicalPos !== "undefined" && isThirdPerson) {
+              finalTargetPos = cameraPhysicalPos.clone();
+              finalTargetPos.y += 1.0;
+            } else {
+              finalTargetPos = camera.position.clone();
+            }
+          }
+
+          // Compute 3D direction vector from bot aim origin to target
+          const aimDir = new THREE.Vector3().subVectors(finalTargetPos, aimOrigin);
+          if (aimDir.lengthSq() < 0.0001) {
+            aimDir.set(0, 0, 1).applyQuaternion(parent.quaternion);
+          } else {
+            aimDir.normalize();
+          }
+
+          // Position slash in front of bot along the 3D aim vector from aim origin
+          const spawnDist = 1.5 * enemyScale;
+          s.mesh.position.copy(aimOrigin).addScaledVector(aimDir, spawnDist);
+
+          // Construct stable view frame looking towards target with _UP vector
+          const upVector = Math.abs(aimDir.y) > 0.99 ? _FORWARD : _UP;
+          _scratchLookMatrix.lookAt(aimOrigin, finalTargetPos, upVector);
+          _scratchAimQuat.setFromRotationMatrix(_scratchLookMatrix);
+
+          s.mesh.quaternion.copy(_scratchAimQuat);
+          s.mesh.rotateX(-Math.PI / 2);
+          s.mesh.rotateY(theta);
+
+          // Scale slash mesh proportionally to bot size
+          s.mesh.scale.set(enemyScale, enemyScale, enemyScale);
         }
         return s.mesh;
       }
@@ -16246,6 +16914,179 @@
           player.teleportMarker = createTeleportMarkerGroup(0x00ffff);
           teleportMarker = player.teleportMarker;
         }
+      }
+
+      function rebuildCameraColliders() {
+        cameraColliders = [];
+        decorations.forEach(d => {
+          if (d.mesh) cameraColliders.push(d.mesh);
+        });
+        if (MapManager.current && MapManager.current.terrainMesh) {
+          cameraColliders.push(MapManager.current.terrainMesh);
+        }
+      }
+
+      function createPlayerVisualMesh() {
+        if (playerVisualMesh) {
+          scene.remove(playerVisualMesh);
+        }
+
+        playerVisualMesh = new THREE.Group();
+
+        // 1. Create the Custom Animated Holographic Shader Material for Cyber-Glow parts tailored to EACH theme
+        playerGlowMat = new THREE.ShaderMaterial({
+          uniforms: {
+            u_glowColor: { value: new THREE.Color(currentSlashColor) },
+            u_theme: { value: currentTheme },
+            u_time: { value: 0.0 },
+          },
+          vertexShader: `
+            varying vec2 vUv;
+            varying vec3 vNormal;
+            varying vec3 vViewPosition;
+            varying vec3 vLocalPos;
+            varying vec3 vLocalNormal;
+            void main() {
+              vUv = uv;
+              vLocalPos = position;
+              vLocalNormal = normal;
+              vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+              vNormal = normalize(normalMatrix * normal);
+              vViewPosition = -mvPosition.xyz;
+              gl_Position = projectionMatrix * mvPosition;
+            }
+          `,
+          fragmentShader: `
+            uniform vec3 u_glowColor;
+            uniform int u_theme;
+            uniform float u_time;
+            varying vec2 vUv;
+            varying vec3 vNormal;
+            varying vec3 vViewPosition;
+            varying vec3 vLocalPos;
+            varying vec3 vLocalNormal;
+
+            void main() {
+              vec3 normal = normalize(vNormal);
+              vec3 viewDir = normalize(vViewPosition);
+              float rim = 1.0 - max(dot(normal, viewDir), 0.0);
+              rim = pow(rim, 2.5);
+
+              // Calculate object-local face dimensions and coordinates for box object glow patterns (0.6 x 1.8 x 0.6)
+              vec3 localNorm = normalize(vLocalNormal);
+              vec3 absNormal = abs(localNorm);
+              vec2 faceDims;
+              vec2 localCoords;
+
+              if (absNormal.y > 0.5) {
+                faceDims = vec2(0.6, 0.6);
+                localCoords = vLocalPos.xz;
+              } else if (absNormal.x > 0.5) {
+                faceDims = vec2(0.6, 1.8);
+                localCoords = vLocalPos.zy;
+              } else {
+                faceDims = vec2(0.6, 1.8);
+                localCoords = vLocalPos.xy;
+              }
+
+              vec2 relCoords = localCoords + faceDims * 0.5;
+
+              // Physical outer edge glow along face borders (ONLY outer outline, no inner grid lines)
+              float physDistX = min(relCoords.x, faceDims.x - relCoords.x);
+              float physDistY = min(relCoords.y, faceDims.y - relCoords.y);
+              float physMinDist = min(physDistX, physDistY);
+              float edgeThickness = 0.045;
+              float edgeGlow = 1.0 - smoothstep(0.0, edgeThickness, physMinDist);
+
+              // Local animated pulse wave (100% position & camera invariant)
+              float pulse = sin(vLocalPos.x * 5.0 + u_time * 2.5) * cos(vLocalPos.y * 3.0 - u_time * 1.8) * 0.5 + 0.5;
+              float edgeVal = edgeGlow * (0.4 + pulse * 1.1);
+
+              vec3 finalColor = vec3(0.0);
+              float alpha = 0.85;
+
+              if (u_theme == 0) {
+                // LIGHT / SNOW: Frosted Ice & Blue Diamond Crystal Pulse + Animated Outer Body Outline
+                float scanline = sin((vLocalPos.y * 15.0) - (u_time * 3.0)) * 0.5 + 0.5;
+                scanline = pow(scanline, 3.0);
+                float icePulse = sin(u_time * 2.0) * 0.15 + 0.85;
+                vec3 iceBase = vec3(0.7, 0.9, 1.0);
+                vec3 iceGlow = mix(iceBase, u_glowColor, 0.6);
+                finalColor = iceGlow * (icePulse * (0.6 + 0.4 * scanline) + rim * 0.5) + u_glowColor * edgeVal * 0.8;
+                alpha = 0.82 + 0.18 * scanline;
+              } else if (u_theme == 1) {
+                // DARK / TACTICAL: Stealth Box Glow with Outer Edge Outline & Faster, Prominent Scanlines
+                float scanline = sin((vLocalPos.y * 6.0) - (u_time * 2.0)) * 0.5 + 0.5;
+                scanline = pow(scanline, 2.2);
+                vec3 stealthDark = vec3(0.08, 0.1, 0.14);
+                vec3 tacticalGlow = mix(stealthDark, u_glowColor, 0.85);
+                finalColor = mix(stealthDark, tacticalGlow, 0.25 + 0.3 * scanline) + u_glowColor * (edgeVal * 1.0 + rim * 0.35 + scanline * 0.32);
+                alpha = 0.85 + 0.15 * scanline;
+              } else if (u_theme == 2) {
+                // NEON / CYBERPUNK: High-Intensity Dual-Tone Digital Scanlines + Animated Outer Body Outline
+                float scanline = sin((vLocalPos.y * 22.0) - (u_time * 7.0)) * 0.5 + 0.5;
+                scanline = pow(scanline, 2.0);
+                float neonPulse = sin(u_time * 4.0) * 0.15 + 0.85;
+                vec3 neonSecondary = vec3(1.0, 0.0, 0.8);
+                vec3 cyberGlow = mix(u_glowColor, neonSecondary, sin(vLocalPos.y * 4.0 + u_time * 2.0) * 0.3 + 0.3);
+                finalColor = cyberGlow * (neonPulse * (0.7 + 0.5 * scanline) + rim * 0.6) + u_glowColor * edgeVal * 1.0;
+                alpha = 0.85 + 0.15 * scanline;
+              } else {
+                // HALLOWEEN: Molten Pumpkin Ember Wave & Slow Flickering + Prominent Wide/Broad Scanlines
+                float scanline = sin((vLocalPos.y * 2.5) - (u_time * 0.9)) * 0.5 + 0.5;
+                scanline = pow(scanline, 1.3);
+                float flicker = sin(u_time * 1.5) * 0.08 + sin(u_time * 2.5) * 0.05 + 0.87;
+                vec3 fireBase = vec3(1.0, 0.35, 0.0);
+                vec3 flameGlow = mix(fireBase, u_glowColor, 0.6);
+                finalColor = flameGlow * (flicker * (0.3 + 0.75 * scanline) + rim * 0.4) + u_glowColor * (edgeVal * 0.6 + scanline * 0.45);
+                alpha = 0.85 + 0.15 * scanline;
+              }
+
+              gl_FragColor = vec4(finalColor, alpha);
+            }
+          `,
+          transparent: true,
+          side: THREE.DoubleSide,
+        });
+
+        // Set glow material to userData for easy reference
+        playerVisualMesh.userData.glowMaterial = playerGlowMat;
+
+        // Base Body material is replaced with our special animated holographic glow shader
+        const bodyGeo = new THREE.BoxGeometry(0.6, 1.8, 0.6);
+        const playerBoxMesh = new THREE.Mesh(bodyGeo, playerGlowMat);
+        playerBoxMesh.position.set(0, 0.9, 0);
+        playerBoxMesh.castShadow = true;
+        playerBoxMesh.receiveShadow = true;
+        playerVisualMesh.add(playerBoxMesh);
+
+        // Box Outline for matching high-tech aesthetic
+        const outline = new THREE.LineSegments(
+          sharedEchoEdgeGeo,
+          new THREE.LineBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.3,
+          })
+        );
+        outline.position.set(0, 0.9, 0);
+        outline.scale.setScalar(1.02);
+        playerVisualMesh.add(outline);
+
+        // Echo Bot's signature box eyes (dimension 0.12, 0.12, 0.05)
+        const eyeGeo = new THREE.BoxGeometry(0.12, 0.12, 0.05);
+        const eyeMat = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+
+        const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
+        eyeL.position.set(-0.15, 1.6, -0.301); // matching local Y 0.7 relative to center (0.9 + 0.7 = 1.6)
+        playerVisualMesh.add(eyeL);
+
+        const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
+        eyeR.position.set(0.15, 1.6, -0.301); // matching local Y 0.7 relative to center (0.9 + 0.7 = 1.6)
+        playerVisualMesh.add(eyeR);
+
+        playerVisualMesh.visible = isThirdPerson;
+        scene.add(playerVisualMesh);
       }
 
       function getGroundHeight(x, z, startY = null) {
@@ -17609,11 +18450,14 @@
               this.lastSlashTime = performance.now();
 
               AudioSys.playSlash(this.mesh.position);
-              const slash = spawnSlash(this.mesh, false);
-              slash.material.color.setHex(0xff0000);
+              const echoTargetPos = bestTargetPos
+                ? bestTargetPos.clone().add(new THREE.Vector3(0, 0.8, 0))
+                : (typeof cameraPhysicalPos !== "undefined" && isThirdPerson ? cameraPhysicalPos.clone().add(new THREE.Vector3(0, 1.0, 0)) : camera.position.clone());
+              const slash = spawnSlash(this.mesh, false, echoTargetPos);
+              if(slash.material.uniforms) slash.material.uniforms.u_color.value.setHex(0xff0000); else slash.material.color.setHex(0xff0000);
 
               if (!bestTargetEntity) {
-                damagePlayer(40 * this.type.skill, false, this);
+                damagePlayer(40 * this.type.skill, false, this, true);
               } else {
                 bestTargetEntity.takeHit(40 * this.type.skill);
                 bestTargetEntity.triggerConfused(1.5);
@@ -17987,47 +18831,76 @@
               if (dist < 5 * this.type.scale) {
                 const now = performance.now();
                 if (now - this.lastAttack > CONFIG.botAttackCooldown) {
-                  this.lastAttack = now;
-                  spawnSlash(this.mesh);
-                  AudioSys.playSlash(this.mesh.position);
-                  // Zero-Allocation Lunge
-                  _aiDir.subVectors(playerPos, this.mesh.position).normalize();
-                  _aiDir.y = 0;
-                  _aiDir.normalize();
-
-                  const lungeForce = 25 + this.type.scale * 5;
-                  this.velocity.addScaledVector(_aiDir, lungeForce);
-
-                  const hitChance = 1.05 - this.type.scale * 0.1;
-                  if (Math.random() < hitChance) {
-                    if (now - this.lastHitTime > 2000) this.streak = 0;
-                    let dmg = Math.min(
-                      CONFIG.botDamage * this.type.scale + this.streak * 2,
-                      40,
+                  let attackTarget = player;
+                  if (playerPos !== camera.position) {
+                    const matchingEcho = enemies.find(
+                      (e) =>
+                        e &&
+                        e.type &&
+                        e.type.isEcho &&
+                        !e.isDeadCorpse &&
+                        e.mesh.position === playerPos,
                     );
-                    this.streak++;
-                    this.lastHitTime = now;
+                    if (matchingEcho) attackTarget = matchingEcho;
+                  }
 
-                    let attackTarget = player;
-                    if (playerPos !== camera.position) {
-                      const matchingEcho = enemies.find(
-                        (e) =>
-                          e &&
-                          e.type &&
-                          e.type.isEcho &&
-                          !e.isDeadCorpse &&
-                          e.mesh.position === playerPos,
+                  const targetWorldPos = (attackTarget === player && typeof cameraPhysicalPos !== "undefined" && isThirdPerson)
+                    ? cameraPhysicalPos.clone().add(new THREE.Vector3(0, 1.0, 0))
+                    : (attackTarget === player ? camera.position.clone() : attackTarget.mesh.position.clone().add(new THREE.Vector3(0, 0.8 * (attackTarget.type ? attackTarget.type.scale : 1.0), 0)));
+
+                  // Facing & Aim Alignment Check to prevent attacking targets behind back
+                  const botFwd = new THREE.Vector3(0, 0, 1).applyQuaternion(this.mesh.quaternion).normalize();
+                  const botFwd2D = new THREE.Vector2(botFwd.x, botFwd.z);
+                  if (botFwd2D.lengthSq() > 0.0001) botFwd2D.normalize();
+
+                  const toTarget = new THREE.Vector3().subVectors(targetWorldPos, this.mesh.position);
+                  const dy = Math.abs(toTarget.y);
+                  const toTarget2D = new THREE.Vector2(toTarget.x, toTarget.z);
+                  const hDist = toTarget2D.length();
+                  if (hDist > 0.0001) toTarget2D.divideScalar(hDist);
+
+                  const facingAlignment = botFwd2D.dot(toTarget2D);
+
+                  // Only slash if bot is turned toward target (facingAlignment >= 0.2, ~78 deg frontal arc)
+                  if (facingAlignment >= 0.2) {
+                    this.lastAttack = now;
+
+                    spawnSlash(this.mesh, false, targetWorldPos);
+                    AudioSys.playSlash(this.mesh.position);
+
+                    // Zero-Allocation Lunge
+                    _aiDir.subVectors(playerPos, this.mesh.position).normalize();
+                    _aiDir.y = 0;
+                    _aiDir.normalize();
+
+                    const lungeForce = 25 + this.type.scale * 5;
+                    this.velocity.addScaledVector(_aiDir, lungeForce);
+
+                    // Hit conditions: within horizontal reach, vertical reach, and ~130° frontal arc facing target
+                    const maxReach = 4.2 * this.type.scale;
+                    const maxVertical = 2.2 * this.type.scale;
+                    const hitChance = 1.05 - this.type.scale * 0.1;
+
+                    const isPhysicallyAligned = (hDist <= maxReach) && (dy <= maxVertical) && (facingAlignment >= 0.35);
+
+                    if (isPhysicallyAligned && Math.random() < hitChance) {
+                      if (now - this.lastHitTime > 2000) this.streak = 0;
+                      let dmg = Math.min(
+                        CONFIG.botDamage * this.type.scale + this.streak * 2,
+                        40,
                       );
-                      if (matchingEcho) attackTarget = matchingEcho;
-                    }
-                    if (attackTarget === player) {
-                      damagePlayer(dmg, false, this);
+                      this.streak++;
+                      this.lastHitTime = now;
+
+                      if (attackTarget === player) {
+                        damagePlayer(dmg, false, this, true);
+                      } else {
+                        attackTarget.takeHit(dmg, true, this);
+                      }
                     } else {
-                      attackTarget.takeHit(dmg, true, this);
+                      AudioSys.playMiss(this.mesh.position);
+                      this.streak = 0;
                     }
-                  } else {
-                    AudioSys.playMiss(this.mesh.position);
-                    this.streak = 0;
                   }
                 }
               }
@@ -18321,9 +19194,9 @@
           // Dead State (Ragdoll Fade Out)
           if (this.state === "DEAD") {
             this.corpseTimer -= dt;
-            this.body.material.opacity = Math.max(0, this.corpseTimer / 3.0);
+            this.body.material.opacity = Math.max(0, this.corpseTimer / 5.0);
             this.body.material.transparent = true;
-            this.eyeMat.opacity = Math.max(0, this.corpseTimer / 3.0);
+            this.eyeMat.opacity = Math.max(0, this.corpseTimer / 5.0);
             this.eyeMat.transparent = true;
             if (this.corpseTimer <= 0) {
               this.remove();
@@ -19296,7 +20169,10 @@
             }
             if (!shouldSplit) {
               this.state = "DEAD";
-              this.corpseTimer = 3.0;
+              this.corpseTimer = 5.0;
+              if (this.burnTimer > 0) {
+                this.burnTimer = this.corpseTimer;
+              }
               this.healthBarGroup.visible = false;
               this.outline.visible = false;
               if (killByPlayer) showKillMessage("THREAT NEUTRALIZED");
@@ -19352,6 +20228,7 @@
           this.virtualCamera.rotation.order = "YXZ";
           this.virtualCamera.position.copy(this.mesh.position);
           this.virtualCamera.position.y += 0.6;
+          this.virtualCamera.isEchoCamera = true;
           scene.add(this.virtualCamera);
 
           this.input = {
@@ -19408,6 +20285,7 @@
 
           const panel = document.getElementById("echo-score-panel");
           if (panel) panel.style.display = Minimap.visible ? "block" : "none";
+          if (window.updateUnifiedBackdrop) window.updateUnifiedBackdrop();
         }
 
         die() {
@@ -19505,7 +20383,7 @@
               triggerConfused: (duration = 2.0) => {},
               takeHit: (amt, isSlash = false, attacker = null) => {
                 if (typeof damagePlayer !== "undefined")
-                  damagePlayer(amt, false, attacker);
+                  damagePlayer(amt, false, attacker, isSlash);
               },
             };
           }
@@ -19759,8 +20637,7 @@
           const dir = camera.position.clone().sub(pos).normalize();
 
           if (damage > 0) {
-            const isFire = sourceEntity && sourceEntity.isBlazing;
-            damagePlayer(damage * falloff, isFire, attacker);
+            damagePlayer(damage * falloff, false, attacker);
           }
           if (sourceEntity && sourceEntity.isBlazing && player.ignite) {
             player.ignite(CONFIG.blaze.projectileBurnHeat);
@@ -19779,7 +20656,7 @@
         }
       }
 
-      function damagePlayer(amt, isFire = false, attacker = null) {
+      function damagePlayer(amt, isFire = false, attacker = null, isSlash = false) {
         if (realPlayer.isDead) return;
         if (attacker && attacker.echoBotInstance) {
           attacker = attacker.echoBotInstance;
@@ -19794,7 +20671,7 @@
         } else if (attacker && attacker.goldenBuffActive) {
           attackerHasBuff = attacker.goldenBuffActive;
         }
-        if (attackerHasBuff) amt = CONFIG.playerMaxHP * 2;
+        if (attackerHasBuff && isSlash) amt = CONFIG.playerMaxHP * 2;
 
         amt *= CONFIG.playerDamageTakenMult;
         if (isFire && realPlayer.blazeActive) {
@@ -19851,6 +20728,9 @@
 
           realPlayer.health = 0;
           realPlayer.isDead = true;
+          realPlayer.deathStartTime = performance.now();
+          realPlayer.respawnHandled = false;
+          realPlayer.deathPromptShown = false;
 
           if (typeof applyExplosionForce !== "undefined") {
             applyExplosionForce(
@@ -19868,36 +20748,63 @@
           if (!realPlayer.onGround) realPlayer.velocity.y = 5;
           else realPlayer.velocity.y = 8;
 
-          // wait 3 seconds before restoring life or game over
-          setTimeout(() => {
-            if (realPlayer.extraLives > 0) {
-              realPlayer.extraLives--;
-              realPlayer.isDead = false;
-              realPlayer.ragdollPos = null;
-              realPlayer.health = CONFIG.playerMaxHP;
-              camera.quaternion.setFromEuler(
-                new THREE.Euler(0, camera.rotation.y, 0, "YXZ"),
-              );
-              camera.rotation.z = 0;
-              camera.rotation.x = 0;
-              showKillMessage("BONUS LIFE USED!", "achievement", "#00ff00");
-              AudioSys.playTeleport(camera.position);
-              updateLivesDisplay();
-            } else {
-              document.exitPointerLock();
-              realPlayer.ragdollPos = null;
-              camera.quaternion.set(0, 0, 0, 1);
-              camera.rotation.z = 0;
-              camera.rotation.x = 0;
-              showKillMessage("TERMINATED", "achievement");
-              const diff = Date.now() - sessionStartTime;
-              const mins = Math.floor(diff / 60000);
-              const secs = Math.floor((diff % 60000) / 1000);
-              document.getElementById("session-timer").innerText =
-                `Session Time: ${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-            }
-          }, 3000);
+          // wait 10 seconds before restoring life or game over (player can break out after 5s)
+          if (realPlayer.deathTimeoutId) clearTimeout(realPlayer.deathTimeoutId);
+          realPlayer.deathTimeoutId = setTimeout(() => {
+            triggerPlayerRespawnOrGameOver();
+          }, 10000);
         }
+      }
+
+      function triggerPlayerRespawnOrGameOver() {
+        if (!realPlayer || !realPlayer.isDead || realPlayer.respawnHandled) return;
+        realPlayer.respawnHandled = true;
+        if (realPlayer.deathTimeoutId) {
+          clearTimeout(realPlayer.deathTimeoutId);
+          realPlayer.deathTimeoutId = null;
+        }
+        if (typeof NarrativeSys !== "undefined" && NarrativeSys.hide) {
+          NarrativeSys.hide();
+        }
+
+        if (realPlayer.extraLives > 0) {
+          realPlayer.extraLives--;
+          realPlayer.isDead = false;
+          realPlayer.ragdollPos = null;
+          realPlayer.health = CONFIG.playerMaxHP;
+          camera.quaternion.setFromEuler(
+            new THREE.Euler(0, camera.rotation.y, 0, "YXZ"),
+          );
+          camera.rotation.z = 0;
+          camera.rotation.x = 0;
+          showKillMessage("BONUS LIFE USED!", "achievement", "#00ff00");
+          AudioSys.playTeleport(camera.position);
+          updateLivesDisplay();
+        } else {
+          document.exitPointerLock();
+          realPlayer.ragdollPos = null;
+          camera.quaternion.set(0, 0, 0, 1);
+          camera.rotation.z = 0;
+          camera.rotation.x = 0;
+          showKillMessage("TERMINATED", "achievement");
+          const diff = Date.now() - sessionStartTime;
+          const mins = Math.floor(diff / 60000);
+          const secs = Math.floor((diff % 60000) / 1000);
+          document.getElementById("session-timer").innerText =
+            `Session Time: ${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+        }
+      }
+
+      function checkDeathBreakout() {
+        if (realPlayer && realPlayer.isDead && !realPlayer.respawnHandled) {
+          const elapsed = (performance.now() - (realPlayer.deathStartTime || 0)) / 1000;
+          if (elapsed >= 5.0) {
+            triggerPlayerRespawnOrGameOver();
+            return true;
+          }
+          return true; // Swallow input while dead prior to breakout time
+        }
+        return false;
       }
 
       function updateLivesDisplay() {
@@ -19941,12 +20848,21 @@
         if (panel) {
           panel.style.display = Minimap.visible ? "block" : "none";
         }
+        if (window.updateUnifiedBackdrop) window.updateUnifiedBackdrop();
       }
 
       function resetGame() {
         if (player) {
           player.goldenBuffActive = false;
           player.missedSlashesCount = 0;
+        }
+        if (realPlayer) {
+          if (realPlayer.deathTimeoutId) {
+            clearTimeout(realPlayer.deathTimeoutId);
+            realPlayer.deathTimeoutId = null;
+          }
+          realPlayer.respawnHandled = false;
+          realPlayer.deathPromptShown = false;
         }
         goldenBotRespawnTimer = 0.1;
         echoBotRespawnTimer = 0.1;
@@ -19957,6 +20873,9 @@
         EchoStats.reset();
         const echoDisplay = document.getElementById("echo-score-display");
         if (echoDisplay) echoDisplay.innerText = "ECHO: 0";
+        const echoPanel = document.getElementById("echo-score-panel");
+        if (echoPanel) echoPanel.style.display = "none";
+        if (window.updateUnifiedBackdrop) window.updateUnifiedBackdrop();
         player.extraLives = 0;
         player.isDead = false;
         player.ragdollPos = null;
@@ -20170,6 +21089,13 @@
         ) {
           materials.glassTintedMat.uniforms.u_time.value = now * 0.001;
         }
+        if (playerGlowMat) {
+          playerGlowMat.uniforms.u_time.value = now * 0.001;
+          playerGlowMat.uniforms.u_glowColor.value.setHex(currentSlashColor);
+          if (playerGlowMat.uniforms.u_theme) {
+            playerGlowMat.uniforms.u_theme.value = currentTheme;
+          }
+        }
 
         if (showFPS) {
           fpsFrames++;
@@ -20241,6 +21167,84 @@
               currentMap.moonBox.position,
             );
             currentMap.moonBox.material.opacity = dist < 80 ? 0.3 : 0;
+          }
+
+          // Repeated slash animation on top of the Gym cylinder
+          if (currentMap && currentMap.config && currentMap.config.type === "GYM") {
+            let centralCylinder = null;
+            scene.traverse((child) => {
+              if (child.isMesh && child.userData && child.userData.isCentralCylinder) {
+                centralCylinder = child;
+              }
+            });
+
+            if (centralCylinder) {
+              if (!gymCylinderSlash) {
+                const baseSlashMat = materials.slash.clone();
+                gymCylinderSlash = new THREE.Mesh(slashGeometry, baseSlashMat);
+                gymCylinderSlash.visible = true;
+                scene.add(gymCylinderSlash);
+              }
+              
+              const cylHeight = (centralCylinder.geometry && centralCylinder.geometry.parameters) ? centralCylinder.geometry.parameters.height : 26.1;
+              const topY = centralCylinder.position.y + cylHeight / 2;
+              
+              // Place it floating cleanly ABOVE the cylinder (not resting flush)
+              gymCylinderSlash.position.set(0, topY + 5.0, 0);
+              
+              // Animated rotation around Y axis
+              const angle = (now * 0.001) % (Math.PI * 2);
+              gymCylinderSlash.rotation.set(Math.PI / 2, 0, angle);
+              
+              // Repeated pulse animation for scale & opacity
+              const pulseTime = (now * 0.002) % (Math.PI * 2);
+              const scaleVal = 6.0 + Math.sin(pulseTime) * 1.5; // Make it look grand on top of the cylinder!
+              gymCylinderSlash.scale.set(scaleVal, scaleVal, scaleVal);
+              
+              const opacityVal = 0.5 + Math.sin(pulseTime) * 0.3;
+              if (gymCylinderSlash.material.uniforms) {
+                gymCylinderSlash.material.uniforms.u_opacity.value = opacityVal;
+                gymCylinderSlash.material.uniforms.u_color.value.setHex(currentSlashColor);
+              } else {
+                gymCylinderSlash.material.opacity = opacityVal;
+                gymCylinderSlash.material.color.setHex(currentSlashColor);
+              }
+
+              // --- ADDITIONAL REPRESENTATIVE PLAYER SLASH FOR INSPECTION ---
+              // Add an actual, slow-spinning player-style slash animation floating on the gym platform at eye level
+              if (!gymFloatingSlash) {
+                const baseSlashMat = materials.slash.clone();
+                gymFloatingSlash = new THREE.Mesh(slashGeometry, baseSlashMat);
+                gymFloatingSlash.visible = true;
+                scene.add(gymFloatingSlash);
+              }
+              
+              const hoverY = 32.5 + Math.sin(now * 0.0025) * 0.35;
+              gymFloatingSlash.position.set(0, hoverY, -15.0); // Eye level, 15m in front of the (0, 30, 0) spawn point
+              
+              // Order YXZ: spin slowly around world Y, pitch 45-deg around local X, and a nice roll tilt
+              gymFloatingSlash.rotation.order = 'YXZ';
+              const slowSpin = (now * 0.0006) % (Math.PI * 2);
+              gymFloatingSlash.rotation.set(-Math.PI / 4, slowSpin, Math.PI / 6);
+              
+              gymFloatingSlash.scale.set(3.5, 3.5, 3.5);
+              if (gymFloatingSlash.material.uniforms) {
+                gymFloatingSlash.material.uniforms.u_opacity.value = 0.85;
+                gymFloatingSlash.material.uniforms.u_color.value.setHex(currentSlashColor);
+              } else {
+                gymFloatingSlash.material.opacity = 0.85;
+                gymFloatingSlash.material.color.setHex(currentSlashColor);
+              }
+            }
+          } else {
+            if (gymCylinderSlash) {
+              scene.remove(gymCylinderSlash);
+              gymCylinderSlash = null;
+            }
+            if (gymFloatingSlash) {
+              scene.remove(gymFloatingSlash);
+              gymFloatingSlash = null;
+            }
           }
 
           updateWeather(dt);
@@ -20498,16 +21502,16 @@
 
             // FIX: Scale fade by dt to make it frame-rate independent and slower
             // 2.5 is the tuned multiplier to match the original 'feel'
-            s.mesh.material.opacity -= s.fadeSpeed * dt * 30;
+            if(s.mesh.material.uniforms) s.mesh.material.uniforms.u_opacity.value -= s.fadeSpeed * dt * 30; else s.mesh.material.opacity -= s.fadeSpeed * dt * 30;
 
-            if (s.isHit) s.mesh.scale.multiplyScalar(1.05);
+            if (s.mesh.userData.isHit) s.mesh.scale.multiplyScalar(1.05);
 
-            if (s.mesh.material.opacity <= 0) {
+            if ((s.mesh.material.uniforms ? s.mesh.material.uniforms.u_opacity.value : s.mesh.material.opacity) <= 0) {
               s.active = false;
               s.mesh.visible = false;
               if (s.mesh.parent) s.mesh.parent.remove(s.mesh);
             } else {
-              if (s.mesh.parent === camera) isSlashActive = true;
+              if (s.isPlayer) isSlashActive = true;
             }
           }
           slashActive = isSlashActive;
@@ -20540,8 +21544,87 @@
             btn.style.letterSpacing = "2px";
           }
         }
+        let activeThirdPerson = isThirdPerson;
+
+        if (activeThirdPerson) {
+          // 1. Save original physical state
+          cameraPhysicalPos.copy(camera.position);
+          cameraPhysicalQuat.copy(camera.quaternion);
+
+          // Standardized over-the-shoulder action camera calculation
+          const backVector = new THREE.Vector3(0, 0, 1).applyQuaternion(cameraPhysicalQuat).normalize();
+          const rightVector = new THREE.Vector3(1, 0, 0).applyQuaternion(cameraPhysicalQuat).normalize();
+
+          const targetOffsetDistance = 2.8;
+          const cameraHeightOffset = 1.0;
+          const cameraRightOffset = 0.15;
+
+          // Base point is the player's physical center (corpse center on death)
+          const playerCenter = (player.isDead && player.ragdollPos)
+            ? player.ragdollPos.clone()
+            : cameraPhysicalPos.clone().add(new THREE.Vector3(0, -0.4, 0));
+
+          // Cast collision check ray (from player center backward)
+          cameraRayDirection.copy(backVector);
+          cameraRaycaster.set(playerCenter, cameraRayDirection);
+
+          // Intersect against cached colliders
+          const intersections = cameraRaycaster.intersectObjects(cameraColliders, true);
+
+          let actualDistance = targetOffsetDistance;
+          if (intersections.length > 0 && intersections[0].distance < targetOffsetDistance) {
+            actualDistance = Math.max(1.0, intersections[0].distance - 0.25);
+          }
+
+          // Position and orient camera
+          const finalPosition = playerCenter.clone()
+            .addScaledVector(backVector, actualDistance)
+            .addScaledVector(rightVector, cameraRightOffset)
+            .add(new THREE.Vector3(0, cameraHeightOffset, 0));
+
+          camera.position.copy(finalPosition);
+          camera.quaternion.copy(cameraPhysicalQuat);
+
+          // Update player visual mesh
+          if (playerVisualMesh) {
+            playerVisualMesh.visible = true;
+            if (player.isDead && player.ragdollPos) {
+              const feetOffset = new THREE.Vector3(0, -0.9, 0).applyQuaternion(player.ragdollQuat);
+              playerVisualMesh.position.copy(player.ragdollPos).add(feetOffset);
+              playerVisualMesh.quaternion.copy(player.ragdollQuat);
+            } else {
+              const originalEuler = new THREE.Euler().setFromQuaternion(cameraPhysicalQuat, 'YXZ');
+              const currentTilt = originalEuler.z;
+
+              playerVisualMesh.position.copy(cameraPhysicalPos).add(new THREE.Vector3(0, -(1.6 + player.cameraHeightOffset), 0));
+              playerVisualMesh.rotation.order = 'YXZ';
+
+              let pitch = 0;
+              if (player.isSliding) {
+                pitch = 0.7;
+              } else if (player.isCrouching) {
+                pitch = 0.3;
+              }
+
+              const yaw = originalEuler.y;
+              const roll = currentTilt;
+              playerVisualMesh.rotation.set(pitch, yaw, roll);
+            }
+          }
+        } else {
+          if (playerVisualMesh) {
+            playerVisualMesh.visible = false;
+          }
+        }
+
         Minimap.update();
         renderer.render(scene, camera);
+
+        // Restore original physical state so that physics engine is 100% unaffected
+        if (activeThirdPerson) {
+          camera.position.copy(cameraPhysicalPos);
+          camera.quaternion.copy(cameraPhysicalQuat);
+        }
       }
 
       init();
