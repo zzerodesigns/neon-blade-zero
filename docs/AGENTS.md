@@ -24,4 +24,7 @@ Avoid O(N*M) computational loops without staging.
 - Avoid attaching logic redundantly across classes. If global environmental states (gravity zones, spatial hashes, audio synchronization, or game difficulty curves) exist, they should exist as explicit singleton subsystems.
 - Example: `getGroundHeight()`, `AudioSys()`, `MapManager` and `NarrativeSys`. The object themselves only act as delegates calling the core singleton rules.
 
+## 5. Single-File Integrity
+- Single-File Integrity: All HTML, CSS, shaders, and game logic live exclusively in index.html. The package.json and vite.config.ts files exist solely to provide a local development server and standard build process. Agents are strictly forbidden from adding any unnecessary configuration files, clutter, script files, or metadata files (including metadata.json). Keep the workspace clean and uncluttered.
+
 By rigorously applying these laws, an environment handles over 10x the entity load before CPU stall.

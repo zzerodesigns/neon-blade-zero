@@ -11,6 +11,8 @@
 *   **Floating Teleport Marker:** Still persists on certain OBB rotated objects.
 
 ## 📝 playtest observations & implementation notes
+*   **Twin Citadels Map Implementation:** Structured and placed all 107 arena blocks into a symmetrical dual-citadel arena featuring elevated fortress courtyards (Y=22), towering high bastions (Y=48), central chasm tactical cover, a suspended Great Sky Bridge (Y=36-40), and stepped perimeter parkour routes along the east and west boundaries. Full collision detection, portal, jump pad, and AI bot spawning support active.
+
 *   **EchoBot Context Redirection:** The virtual scoping context manager is highly effective, allowing EchoBots to seamlessly execute player-level logic like wall-sprinting, blink teleports, and gadget aiming using the same code engines as standard controllers.
 *   **Rigid-Body Ragdoll Weight:** The transition to full 8-vertex rigid-body ragdoll simulations on death gives combat outcomes a substantial mechanical weight. Lock-on tumbling cameras and low-velocity stillness checks ensure visual fidelity while conserving processing overhead once bodies settle.
 *   **Tactile Physics Integration:** The shift to continuous collision detection (CCD) naturally fixed high-speed geometry clipping and created a strong "battering ram" feel. Combined with rigid-body ragdoll tumbling, the simulation possesses significantly more physical weight.
@@ -66,6 +68,13 @@
 *   **Synthesized Melodies:** Integrate procedural Web Audio API melodies as easter eggs or ambient tracks.
 
 ## ✅ recently completed concepts
+- [x] **Universal Sliding Mechanics & Posture Animation (v49.5.0):** Overhauled sliding physics with universal momentum conservation across floors, slopes, walls, ceilings, and aerial glides. Developed procedural character posture smoothing, tactical sprint diving, strafe banking, jump-crouch anticipation, aerial slide buffering, and decoupled physical matter ballistics.
+- [x] **Unified Boot Configuration & Settings Persistence (v49.4.8 - v49.4.9):** Consolidated engine initialization under `BOOT_SETTINGS` with synchronous DOM hydration, interactive release notice tooltips, `localStorage` persistence (`nb_settings_v1`) for themes, maps, movement modes, and loadouts, alongside rotationally symmetric portals and jump pads.
+- [x] **Leaf Aerodynamics Continuum Engine (v49.4.3):** Synthesized calm atmospheric drifting with dynamic glider sweeps into a continuous energy spectrum ($E \in [0, 1]$), governing multi-frequency trigonometric leaf and snow particle flutter.
+- [x] **High-Velocity Motion Stabilization & Ragdoll Unification (v49.1.1 - v49.2.0):** Eliminated high-speed camera translation judder via a 4-sample rolling frame-delta buffer (`dtHistory`), stabilized vertical ground-snapping, and standardized 8-vertex player and bot ragdoll tumbling.
+- [x] **Continuous Collision Detection & Spatial Diagnostics (v49.0.5 - v49.0.8):** Implemented swept collision verification (CCD) against high-velocity tunneling, real-time 3D coordinate HUD (`#pos-display`), and procedural polyhedral obstacle blocks.
+- [x] **Twin Citadels Map, UI Glassmorphism & Start Architecture (v48.9.9 - v49.0.4):** Symmetrical 107-block dual-citadel fortress arena, liquid-glass drop-down map indicator menu (`.map-dropdown`), and slanted/circular start button architecture.
+- [x] **Machina Map, Kinematic Platforms & Dash Ability (v48.9.0 - v48.9.4):** Added Dash ability with hold-to-charge impulses, kinematic moving platform engine (`MovingPlatform`) for elevators and rotating hubs, and customizable binary glyph slash overlays.
 - [x] **Third-Person Perspective, Crescent Slash Shaders & Traversal Maps (v48.8.8):** Implemented an over-the-shoulder third-person camera with collision-aware raycasting and a theme-adaptive holographic player avatar. Replaced 2D slashes with procedurally generated 3D crescent ribbon geometries with arc-fading GLSL shaders and 7 randomized attack slant angles. Introduced high-speed traversal maps (`ARENA_EX`, `TITAN_EX`) with banked vaulting rings and spiral wall-runs. Unified player death and ragdoll physics with complete input suppression until respawn breakout, fixed Golden Buff explosion instant-kills, enabled grenade vulnerability under passive Blaze, and added synchronized 5s corpse/burn fading.
 - [x] **Themes & Visual Polish (v48.8.7):** Overhauled the rendering pipeline with custom procedural shaders for the floor, walls, and skybox. Introduced distinct atmospheric environments with celestial bodies and real-time cosmic gradients for all four themes. Migrated obstacle materials to a localized dimension shader to render sharp, constant-width edge glows, and upgraded snow particles to screen-facing billboarded sprites with natural swaying physics.
 - [x] **Ceiling Dynamics & Traversal Polish (v48.8.6):** Unified ceiling sliding and gluing to work seamlessly on AABB, OBB, and sloped/ramp ceilings. Improved the velocity vectors so sliding down under ramps is smooth and preserves momentum. Corrected teleportation raycast/marker interaction issues so resolving against any rotated box/ramp bottom surfaces works correctly.
@@ -77,6 +86,49 @@
 - [ ] **Decoupled IPC Engine (Neural Shadow Core):** Attempted to split the 3D engine and physics into a Dedicated Web Worker with `SharedArrayBuffer` synchronization. Successfully implemented the logic but encountered insurmountable "silent crashes" in hosted environments lack cross-origin isolation headers. Shelved in v48.7.0 (Restored).
 
 ## 📖 version history / patch notes
+
+### v49.5.0 - Universal Sliding Mechanics
+*   **Universal Momentum Conservation:** Re-engineered traversal physics to eliminate artificial velocity damping when transitioning between surfaces. Sliding preserves tangent velocity and kinetic energy seamlessly across floors, angled slopes, vertical walls, inverted ceilings, and aerial glides.
+*   **Dynamic Slope Traversal (Downhill & Uphill):** Downhill descents apply tangential gravitational acceleration allowing exponential speed building. Uphill slides convert forward kinetic energy into climbing momentum with proportional friction decay rather than abrupt stops. Enhanced sub-step ground-snapping prevents micro-bouncing on steep declines.
+*   **Lateral Wall & Ceiling Dynamics:** Sliding into vertical surfaces engages dynamic wall contact with a 30% gravity reduction for horizontal wall-runs and climbs. Inverted surface normals redirect momentum along ceilings and angled overhangs with corresponding character lean.
+*   **Procedural Character Kinematics & Posture:** Added adaptive avatar posture smoothing (`animLerpRate`), sprint diving, strafe banking, jump-crouch anticipation, and mid-air slide buffering for natural parabolic flight arcs.
+*   **Matter Ballistics Integration:** Developed physical projectile trajectories independent of camera raycasts, maintaining true ballistic origins during rapid traversal.
+
+### v49.4.8 - Settings Persistence & Boot Configuration
+*   **Unified Boot Configuration (`BOOT_SETTINGS`):** Centralized engine initialization parameters, default loadouts, map presets, and UI notices into a single immutable configuration block with synchronous DOM hydration.
+*   **Persistent Preferences:** Integrated browser `localStorage` storage (`nb_settings_v1`) to automatically save and restore visual themes, active arena, movement mode, and gadget keybindings across sessions.
+*   **Traveral Symmetry Polish (v49.4.9):** Placed precision-calibrated jump pads and directional portal pairs across maps with 180-degree rotational coordinate symmetry and seamless velocity preservation.
+
+### v49.4.3 - Aerodynamic Continuum Engine
+*   **Dynamic Particle Continuum:** Unified tranquil atmospheric drifting and high-energy glider swoops for snow and zen courtyard leaves into a continuous mathematical energy spectrum ($E \in [0.0, 1.0]$).
+*   **Aerodynamic Math:** Governs multi-frequency trigonometric swaying, spatial 3D wind sampling ($x, y, z$ phase offsets), and aerodynamic lift cushioning ($10\text{--}20\%$ descent deceleration during lateral glides).
+
+### v49.2.0 - Ragdoll Physics Unification
+*   **Standardized Ragdoll Tumbling:** Fully aligned player and enemy bot ragdoll physics with 8-vertex impulse transfer, true 3D angular torque, ground friction, and an `isNaturallyStill` kinetic dampening gate to ensure clean, jitter-free resting on terrain.
+
+### v49.1.1 - High-Velocity Smoothness & Motion Stabilization
+*   **Frame-Delta Stabilization:** Eliminated high-speed camera translation judder using a 4-sample rolling frame-delta buffer (`dtHistory`).
+*   **Sub-Step Wall Smoothing:** Removed micro-stutter vibrations during high-velocity wall-pulls and standardized vertical ground-snapping on steep descents.
+*   **Dynamic FOV Warping:** Introduced speed-adaptive field of view dilation (80° to 95°) during high-momentum slides and dashes.
+
+### v49.0.8 - Continuous Collision Detection (CCD)
+*   **Swept-Sphere Verification:** Implemented continuous collision sweeps along velocity vectors, eliminating tunneling and geometry clipping through thin walls, ramps, and obstacle boxes at extreme traversal speeds.
+
+### v49.0.5 - Real-Time POS Dev Tool & Polyhedral Blocks
+*   **Position Readout HUD:** Added live 3D player coordinate display (`#pos-display` / `"Show POS"` toggle) in the top-right header for real-time spatial diagnostics during level design.
+*   **Procedural Polyhedral Geometry:** Added Rhombic Dodecahedra, Octahedra, and Tetrahedra building blocks to procedural map generation.
+
+### v49.0.0 - Twin Citadels Arena & Map Dropdown
+*   **Twin Citadels Map:** Constructed a symmetrical 107-block fortress arena featuring dual elevated courtyards (Y=22), towering high bastions (Y=48), central chasm cover, and the suspended Great Sky Bridge (Y=40).
+*   **Glassmorphic Map Dropdown:** Introduced the liquid-glass drop-down map indicator menu (`.map-dropdown`) with backdrop blur and hover flyouts, developed through the `v48.9.9 WIP` series.
+*   **Start Screen Overhaul (v49.0.4):** Redesigned the main menu layout with futuristic slanted selectors (`.btn-start-skewed`) and circular action buttons.
+
+### v48.9.4 - Machina Map & Kinematic Platform Physics
+*   **Kinematic Platform Engine (`MovingPlatform`):** Built real-time moving, sweeping, and rotating platforms with synchronized SAT collision resolution and dynamic matrix/OBB updates.
+*   **Machina Arena:** Industrial testing layout featuring oscillating linear elevators, central rotating hubs, and pendulum sweeps.
+
+### v48.9.0 - Dash Mobility Ability
+*   **Dash Integration:** Added Dash as an alternate primary mobility ability in the Q slot with instant kinetic blasts, hold-to-charge impulses, and in-game quick-swapping (`Tab + Q`).
 
 ### v48.8.8 - Third-Person Perspective, Crescent Slash Shaders & Traversal Maps
 *   **Third-Person Action Camera:** Added an over-the-shoulder third-person camera mode with collision-aware raycasting from player center of mass to prevent geometry clipping, fully togglable via system settings.

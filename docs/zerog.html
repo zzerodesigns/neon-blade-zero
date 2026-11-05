@@ -1,0 +1,966 @@
+ <!-- EDIT_TIMESTAMP_HANOI: 2026-09-07 15:05:00 ICT --> 
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZeroG &mdash; Zero-Allocation Engine (v0.0.3)</title>
+  <meta name="description" content="ZeroG: An architectural meta-engine and evolving backbone for designing self-contained, zero-allocation web applications and software." />
+  <meta property="og:title" content="ZeroG &mdash; Zero-Allocation Engine (v0.0.3)" />
+  <meta property="og:description" content="ZeroG: An architectural meta-engine and evolving backbone for designing self-contained, zero-allocation web applications and software." />
+  <meta property="og:type" content="website" />
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    :root {
+      --bg: #09090b;
+      --card-bg: #121215;
+      --card-border: #222226;
+      --card-hover-border: #323238;
+      --text: #f4f4f5;
+      --text-muted: #a1a1aa;
+      --text-dim: #71717a;
+      --accent: #10b981;
+      --accent-dim: rgba(16, 185, 129, 0.12);
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      padding-bottom: 80px;
+    }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(9, 9, 11, 0.72);
+      backdrop-filter: blur(16px) saturate(180%);
+      -webkit-backdrop-filter: blur(16px) saturate(180%);
+      border-bottom: 1px solid var(--card-border);
+    }
+    .header-inner {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 0 24px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+      flex-shrink: 0;
+      opacity: 0;
+      filter: blur(12px);
+      transform: translateY(-4px);
+      pointer-events: none;
+      will-change: opacity, filter, transform;
+    }
+    .header-brand-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      flex-shrink: 0;
+    }
+    .brand-title {
+      font-size: 14.5px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #fff;
+      line-height: 1;
+    }
+    .version-tag {
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      color: var(--accent);
+      background: var(--accent-dim);
+      border: 1px solid rgba(16, 185, 129, 0.28);
+      border-radius: 3px;
+      padding: 1.5px 5px;
+      line-height: 1.1;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      background: var(--accent);
+      border-radius: 50%;
+      box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+      flex-shrink: 0;
+    }
+    .meta-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #141417;
+      border: 1px solid var(--card-border);
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      white-space: nowrap;
+      height: 26px;
+      box-sizing: border-box;
+      flex-shrink: 0;
+    }
+    .pill-label {
+      color: var(--text-dim);
+      font-weight: 500;
+      letter-spacing: 0.04em;
+    }
+    .pill-val {
+      color: #e4e4e7;
+    }
+    @media (max-width: 680px) {
+      .meta-pill {
+        display: none;
+      }
+    }
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .segmented-control {
+      display: inline-flex;
+      align-items: center;
+      background: #18181b;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 2px;
+      height: 32px;
+      box-sizing: border-box;
+      flex-shrink: 0;
+    }
+    .seg-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-family: var(--font-sans);
+      padding: 0 12px;
+      height: 26px;
+      line-height: 26px;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: color 0.15s, background 0.15s;
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .seg-btn.active {
+      background: #27272a;
+      color: #fff;
+      font-weight: 500;
+    }
+    .action-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: #1c1c20;
+      color: var(--text);
+      border: 1px solid var(--card-border);
+      height: 32px;
+      width: 176px;
+      min-width: 176px;
+      max-width: 176px;
+      padding: 0 12px;
+      font-size: 12px;
+      font-family: var(--font-mono);
+      border-radius: 6px;
+      cursor: pointer;
+      white-space: nowrap;
+      flex-shrink: 0;
+      box-sizing: border-box;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .action-btn:hover {
+      background: #27272a;
+      border-color: var(--card-hover-border);
+    }
+    .action-btn span {
+      white-space: nowrap;
+    }
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 40px 24px 0 24px;
+    }
+    .hero {
+      margin-bottom: 40px;
+    }
+    .hero-brand-block {
+      margin-bottom: 14px;
+    }
+    .hero-brand-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      line-height: 1.1;
+      margin-bottom: 22px;
+      will-change: opacity;
+    }
+    .hero-status-dot {
+      width: 11px;
+      height: 11px;
+      background: var(--accent);
+      border-radius: 50%;
+      box-shadow: 0 0 16px rgba(16, 185, 129, 0.65);
+      flex-shrink: 0;
+    }
+    .hero-brand-title {
+      font-size: 34px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: #fff;
+      line-height: 1;
+    }
+    .hero-version-tag {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--accent);
+      background: var(--accent-dim);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      line-height: 1;
+    }
+    .hero-sep {
+      color: #52525b;
+      font-size: 16px;
+      user-select: none;
+    }
+    .hero-spec-tag {
+      font-family: var(--font-mono);
+      font-size: 15px;
+      letter-spacing: 0.04em;
+      color: #a1a1aa;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .hero-principles-title {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #f4f4f5;
+      line-height: 1.25;
+      margin: 0;
+    }
+    @media (max-width: 640px) {
+      .hero-brand-title {
+        font-size: 28px;
+      }
+      .hero-spec-tag {
+        font-size: 13px;
+      }
+      .hero-principles-title {
+        font-size: 22px;
+      }
+    }
+    .hero p {
+      font-size: 16.5px;
+      color: var(--text-muted);
+      max-width: 760px;
+      margin-top: 14px;
+      margin-bottom: 20px;
+      line-height: 1.6;
+    }
+    .golden-rule-box {
+      background: rgba(16, 185, 129, 0.06);
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 24px;
+      font-size: 15px;
+      color: #e4e4e7;
+    }
+    .golden-rule-title {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      text-transform: uppercase;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .tag {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 4px 10px;
+      background: #18181b;
+      border: 1px solid var(--card-border);
+      border-radius: 4px;
+      color: var(--text-dim);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+      margin-bottom: 48px;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 20px;
+      transition: border-color 0.2s;
+    }
+    .card:hover {
+      border-color: var(--card-hover-border);
+    }
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .card-title-badge {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent);
+      background: var(--accent-dim);
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
+    .card-desc {
+      font-size: 13.5px;
+      color: var(--text-muted);
+      line-height: 1.55;
+    }
+    .content-block {
+      border-top: 1px solid var(--card-border);
+      padding-top: 36px;
+      margin-bottom: 40px;
+    }
+    .content-block h2 {
+      font-size: 20px;
+      font-weight: 600;
+      color: #fff;
+      margin-bottom: 12px;
+      letter-spacing: -0.01em;
+    }
+    .content-block p {
+      font-size: 15px;
+      color: var(--text-muted);
+      line-height: 1.65;
+      margin-bottom: 16px;
+    }
+    .code-box {
+      background: #0d0d10;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      padding: 18px;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      color: #e4e4e7;
+      overflow-x: auto;
+      line-height: 1.6;
+      margin: 16px 0;
+      white-space: pre;
+      tab-size: 2;
+    }
+    .code-comment {
+      color: var(--text-dim);
+    }
+    .code-keyword {
+      color: #93c5fd;
+    }
+    .code-accent {
+      color: #34d399;
+    }
+    #raw-container {
+      display: none;
+      background: #0d0d10;
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 24px;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      color: #d4d4d8;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.6;
+    }
+    footer {
+      border-top: 1px solid var(--card-border);
+      margin-top: 60px;
+      padding: 32px 0 44px;
+      text-align: center;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .footer-clock {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: #141417;
+      border: 1px solid var(--card-border);
+      border-radius: 5px;
+      padding: 5px 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      height: 28px;
+      box-sizing: border-box;
+    }
+    .footer-clock-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+      flex-shrink: 0;
+    }
+    .clock-label {
+      color: var(--text-dim);
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      font-size: 10px;
+    }
+    .clock-val {
+      color: #e4e4e7;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <div class="header-left" id="header-left">
+        <div class="header-brand-badge">
+          <span class="status-dot"></span>
+          <span class="brand-title">ZeroG</span>
+          <span class="version-tag">v0.0.3</span>
+        </div>
+        <div class="meta-pill" id="edit-timestamp" title="Last Edit Timestamp (Hanoi Time, ICT / UTC+7)">
+          <span class="pill-label">UPDATED</span>
+          <span class="pill-val" id="edit-timestamp-val">2026-09-07 16:50 ICT</span>
+        </div>
+      </div>
+      <div class="nav-actions">
+        <div class="segmented-control">
+          <button id="tab-overview" class="seg-btn active" onclick="switchView('overview')">Overview</button>
+          <button id="tab-raw" class="seg-btn" onclick="switchView('raw')">Raw Specification</button>
+        </div>
+        <button id="copy-btn" class="action-btn" onclick="copyDocument()">
+          <span id="copy-icon">&#x2398;</span>
+          <span id="copy-text">Copy Specification</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div id="overview-view">
+      <section class="hero" id="hero-section">
+        <div class="hero-brand-block">
+          <div class="hero-brand-row" id="hero-brand-row">
+            <span class="hero-status-dot"></span>
+            <span class="hero-brand-title">ZeroG</span>
+            <span class="hero-version-tag">v0.0.3</span>
+            <span class="hero-sep">&bull;</span>
+            <span class="hero-spec-tag">Zero-Allocation Web Engine Specification</span>
+          </div>
+          <h1 class="hero-principles-title">Architectural Standards &amp; Principles</h1>
+        </div>
+        <p>
+          The definitive engineering standard for high-performance, single-file, zero-allocation web applications and game simulations. Guaranteed 60&ndash;240 FPS frame pacing, zero GC pauses, and zero asset overhead.
+        </p>
+
+        <div class="golden-rule-box">
+          <div class="golden-rule-title">The Golden Rule</div>
+          If a variable, vector, buffer, container, sound, or mesh is needed during runtime, it must exist before the first frame runs. The animation loop only mutates; it never creates.
+        </div>
+
+        <div class="tag-row">
+          <span class="tag">0% Heap Allocation Hot-Paths</span>
+          <span class="tag">100% Single-File index.html</span>
+          <span class="tag">Zero External Audio/Textures</span>
+          <span class="tag">Dual-Paradigm Kinematics</span>
+          <span class="tag">3D Prime Spatial Hash</span>
+          <span class="tag">Zero-Thrash DOM Pipeline</span>
+        </div>
+      </section>
+
+      <section class="grid">
+        <div class="card">
+          <div class="card-title">
+            <span>Zero GC Hot Paths</span>
+            <span class="card-title-badge">HOT</span>
+          </div>
+          <div class="card-desc">
+            No object/array construction in ticks. Module-level scratchpad registers (_V1, _M1) handle transient math. Swap-and-pop arrays eliminate splice overhead.
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <span>Dual Kinematic Paradigms</span>
+            <span class="card-title-badge">PHYS</span>
+          </div>
+          <div class="card-desc">
+            Fixed timestep with state interpolation for rigid bodies, or adaptive displacement-clamped substepping for fast-paced responsive parkour and movement.
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <span>3D Prime Spatial Grid</span>
+            <span class="card-title-badge">O(1)</span>
+          </div>
+          <div class="card-desc">
+            Bitwise prime hashing maps 3D volumetric coordinates to flat 32-bit array buckets with zero string allocations and zero Map iterator churn.
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <span>Zero-Asset Procedural Audio</span>
+            <span class="card-title-badge">AUDIO</span>
+          </div>
+          <div class="card-desc">
+            Web Audio oscillators and pre-allocated cyclic noise buffers synthesize all sound effects. First-gesture unlock ensures immediate audio playback.
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <span>Zero-Layout-Thrashing DOM</span>
+            <span class="card-title-badge">DOM</span>
+          </div>
+          <div class="card-desc">
+            Quantized, dirty-checked HUD updates prevent layout thrashing. GPU-composited transforms (translate3d, opacity) avoid reflow penalties.
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <span>Unidirectional Topology</span>
+            <span class="card-title-badge">SYS</span>
+          </div>
+          <div class="card-desc">
+            State flows in a strict pipeline: Inputs &rarr; Kinematics &rarr; Spatial Grid &rarr; Entities &rarr; Audio &rarr; Camera Decoupling &rarr; GPU Render.
+          </div>
+        </div>
+      </section>
+
+      <section class="content-block">
+        <h2>1. Zero Garbage Collection Mandate</h2>
+        <p>
+          In high-frequency loops (60&ndash;240 FPS), memory allocations trigger garbage collection spikes. Objects created inside update functions are immediately discarded, forcing the engine into unpredictable freeze frames.
+        </p>
+        <pre class="code-box"><code><span class="code-comment">// Pre-allocated math registers at module scope (allocated once at boot):</span>
+<span class="code-keyword">const</span> _V1 = <span class="code-keyword">new</span> THREE.Vector3();
+<span class="code-keyword">const</span> _V2 = <span class="code-keyword">new</span> THREE.Vector3();
+
+<span class="code-comment">// Inside hot loop (animate / physicsStep):</span>
+_V1.copy(player.position).addScaledVector(_V2, dt);
+
+<span class="code-comment">// Result: Zero heap allocations, zero GC pauses.</span></code></pre>
+      </section>
+
+      <section class="content-block">
+        <h2>2. Single-File Integrity</h2>
+        <p>
+          The entire application is completely portable. It does not rely on an external bundler runtime, nested source files, or separate assets. Opening index.html directly serves the complete, functional application with zero setup and zero missing dependencies.
+        </p>
+      </section>
+
+      <section class="content-block">
+        <h2>3. Procedural Sound &amp; GPU Visuals</h2>
+        <p>
+          Web Audio API nodes (oscillators, biquad filters, gain envelopes, cyclic noise buffers) synthesize laser blasts, impacts, and ambient drones mathematically. World-space triplanar shaders render scale-invariant borders and procedural surfaces directly on the GPU.
+        </p>
+      </section>
+    </div>
+
+    <div id="raw-view" style="display: none;">
+      <pre id="raw-container"></pre>
+    </div>
+  </main>
+
+  <footer>
+    <div class="footer-clock" id="footer-clock" title="Real-time accurate system date &amp; time">
+      <span class="footer-clock-dot"></span>
+      <span class="clock-label">SYSTEM TIME</span>
+      <span class="clock-val" id="footer-time-val">--</span>
+    </div>
+  </footer>
+
+  <script>
+    const RAW_MARKDOWN = `# ZeroG: Architectural Principles for Zero-Allocation Web Engines
+### The Definitive Engineering Specification &bull; v0.0.3
+
+This specification establishes the architectural standards and design philosophy for building high-performance, single-file, zero-allocation web applications, games, and real-time interactive engines. Every rule here is oriented toward a single objective: rock-solid frame pacing (60–240 FPS), deterministic memory behavior, zero asset friction, and radical simplicity in workspace management.
+
+---
+
+## The Golden Rule of Zero-Allocation Engines
+
+> **If a variable, vector, buffer, container, sound, or mesh is needed during runtime, it must exist before the first frame runs. The animation loop only mutates; it never creates.**
+
+---
+
+## 1. The Zero-Heap Hot Path (GC Elimination)
+
+In interactive rendering and real-time simulation, memory allocation during the frame loop is the primary cause of stutter, frame drops, and input lag. JavaScript's garbage collector runs unpredictably; when it pauses execution to sweep discarded objects, frames drop. A real-time engine must treat heap allocation in hot paths as a fatal design error.
+
+### 1.1 The Module-Level Scratchpad Register
+* **Zero Construction in Ticks:** Never use \`new\` inside any function called per frame (loops, ticks, raycasts, event callbacks, or physics solvers).
+* **Pre-Allocated Math Buffers:** Allocate all temporary vectors, matrices, quaternions, and bounding boxes at module/file scope as dedicated registers:
+  const _V1 = new THREE.Vector3();
+  const _V2 = new THREE.Vector3();
+  const _V3 = new THREE.Vector3();
+  const _Q1 = new THREE.Quaternion();
+  const _M1 = new THREE.Matrix4();
+  const _BOX1 = new THREE.Box3();
+* **In-Place Mutation:** Mutate values using direct component assignment (\`.x = ...\`), \`.copy()\`, \`.set()\`, \`.addScaledVector()\`, or \`.subVectors()\`. Never return cloned objects from math helpers; write results directly into passed target registers.
+
+### 1.2 Zero Literal & Closure Allocation
+* **Zero Inline Literals:** Never declare \`{}\` or \`[]\` inside high-frequency functions. Reusable parameter bags, working arrays, or query results must be allocated once at initialization.
+* **No Functional Closures in Ticks:** Array methods (\`.forEach()\`, \`.map()\`, \`.filter()\`, \`.reduce()\`, \`.some()\`) instantiate intermediate arrays and allocate new function closure contexts every frame. Use standard indexed loops:
+  for (let i = 0, len = entities.length; i < len; i++) {
+    entities[i].update(dt);
+  }
+* **Avoid Iterator Churn:** Never call \`.keys()\`, \`.values()\`, or \`.entries()\` on ES6 \`Map\` or \`Set\` instances in hot paths, as they allocate iterator objects on the heap. Use flat arrays or integer keys.
+* **Primitive Timers:** Avoid \`new Date()\` inside frame callbacks. Use \`performance.now()\` or \`Date.now()\` (which return unboxed numeric timestamps with zero heap allocation).
+
+### 1.3 Object Pooling and Flyweight Recycling
+* Fast-spawning, transient entities (projectiles, particles, slash ribbons, hit sparks, debris) must draw from fixed-size pre-allocated pools.
+* Never dynamically add or remove objects from the visual scene hierarchy during active gameplay. Activate and deactivate pooled members via visibility flags (\`mesh.visible = false\`, \`active = false\`).
+* Reset working index arrays using \`.length = 0\` rather than instantiating new arrays.
+
+### 1.4 Hot-Loop Memory Compaction: Swap-and-Pop (O(1))
+* **Never use \`.splice()\` on Active Arrays:** \`array.splice(i, 1)\` causes an O(N) memory shift of all subsequent elements and churns engine throughput.
+* **The Swap-and-Pop Pattern:** When element ordering does not matter (particles, projectiles, audio voices, active enemy handles), overwrite the dead element with the last element and shrink the array length by one:
+  function swapAndPop(arr, index) {
+    const last = arr.length - 1;
+    if (index < last) {
+      arr[index] = arr[last];
+    }
+    arr.pop();
+  }
+
+---
+
+## 2. Frame Pacing & Kinematic Physics Architecture
+
+Frame rates on modern client hardware vary drastically (60Hz, 120Hz, 144Hz, 240Hz, or variable VRR displays). Movement physics, jumping arcs, sliding friction, and collision resolution must remain mathematically consistent regardless of refresh rate.
+
+### 2.1 The Two Physics Paradigms (Choose by Movement Model)
+
+#### Paradigm A: Fixed Timestep with State Interpolation (Rigid-Body & Network Determinism)
+Use this when you need rigid-body physics, deterministic simulation replay, or multiplayer state parity:
+* Accumulate delta time and consume it in fixed slices (e.g., exactly dt = 1/120s).
+* Clamp delta to prevent the "spiral of death" during frame hitches: rawDelta = Math.min(rawDelta, 0.1).
+* **State Interpolation Requirement:** Every render frame occurs between physics steps. To eliminate visual judder at mismatched refresh rates, interpolate rendering between previous and current physics transforms:
+  renderPos = lerp(prevPos, currPos, alpha), where alpha = accumulator / dtFixed
+
+#### Paradigm B: Adaptive Distance-Clamped Substepping (Fast-Paced Arcade Movement)
+Use this for parkour, responsive character controllers, sliding, and fast movement where inputs must affect kinematics immediately without interpolation lag:
+* Integrate with the render frame's delta, but prevent tunneling through thin geometry by substepping by displacement:
+  const speed = this.velocity.length();
+  const maxStepDist = 0.2; // Maximum distance allowed per collision step
+  const steps = Math.max(1, Math.min(16, Math.ceil((speed * dt) / maxStepDist)));
+  const subDt = dt / steps;
+
+  for (let i = 0; i < steps; i++) {
+    this.physicsSubstep(subDt);
+  }
+
+### 2.2 Analytical Narrowphase & SAT
+* **Reject Heavy Physics Engines:** General-purpose engines (Cannon, Ammo, Rapier) introduce heap churn, opaque memory allocators, and non-deterministic jitter.
+* **Separating Axis Theorem (SAT):** Implement custom, zero-allocation SAT solvers for Orientated Bounding Boxes (OBBs), slopes, and ramps using pre-allocated projection buffers.
+* **Continuous Collision Detection (CCD):** Use swept segment-to-box checks for fast projectiles and high-speed characters to eliminate passing through thin walls.
+* **Surface-Normal Tangent Snapping:** Project velocity onto ground and slope tangent planes (vTangent = v - (v . n)n) to prevent artificial bouncing down ramps.
+* **Unified Impulse Models:** Model ragdolls, knockbacks, and kinetic projectiles with lightweight rigid-body approximations (e.g., 8-vertex impulse boxes) that smoothly transition into resting states via explicit velocity thresholds.
+
+### 2.3 Post-Render Camera Decoupling
+* **Decouple Physical Coordinates from Visual Offsets:** Never perturb the character's physical collision anchor with view-bobbing, camera lean, wall-run roll, or recoil shake.
+* **The Render Restore Pattern:**
+  1. Complete physics integration and store character's true simulation position.
+  2. Before rendering, apply visual camera offsets (third-person orbit, collision raycasts, screenshake).
+  3. Render the frame.
+  4. **Restore:** Immediately revert the camera/character coordinates back to the physical simulation position post-render so kinematic checks are never contaminated by visual camera adjustments.
+
+---
+
+## 3. Big-O Discipline & High-Performance Spatial Partitioning
+
+Iterating over all entities for collisions, line-of-sight, or spatial queries scales quadratically (O(N^2)). Computational complexity must be strictly bounded.
+
+### 3.1 Flat Zero-Iterator 3D Spatial Hash Grid
+* **Integer Prime Bit-Packing:** Quantize 3D positions into integer cell coordinates (Math.floor(x * invCellSize) | 0).
+* **Zero-String Integer Hashing:** Never use strings for hash keys. Use bitwise prime multipliers to map 3D cells into flat, power-of-two 32-bit array buckets:
+  hash(x, y, z) {
+    const ix = Math.floor(x * this.invCellSize) | 0;
+    const iy = Math.floor(y * this.invCellSize) | 0;
+    const iz = Math.floor(z * this.invCellSize) | 0;
+    return ((ix * 73856093) ^ (iy * 19349663) ^ (iz * 83492791)) & this.tableMask;
+  }
+* **Flat Array Bucketing (No Map Iterators):** Track populated cells via flat arrays (cellList). Clear them between frames by resetting .length = 0 on existing array references rather than instantiating new arrays or iterating map.values().
+
+### 3.2 Defensive Math Shortcuts
+* **Squared Distances:** Never use Euclidean distance (Math.sqrt(), vector.length(), or vector.distanceTo()) for proximity queries, ranges, trigger zones, or spatial sorting. Always compare against squared thresholds (distanceToSquared(), dx*dx + dy*dy + dz*dz < r*r).
+* **Early-Out Bounding Spheres:** Before executing fine SAT polyhedral intersection tests, perform an instant squared-radius check. If bounding spheres do not overlap, abort immediately.
+* **Frame-Interleaved Throttling:** Stagger expensive calculations (vision raycasts, complex path adjustments, ambient audio panning) across consecutive frames using modular arithmetic:
+  if ((globalFrameCount + entityIndex) % 5 === 0) {
+    this.updateExpensiveQuery();
+  }
+
+---
+
+## 4. Procedural Sensory Synthesis (Zero-Asset Architecture)
+
+External asset pipelines (.gltf, .png, .mp3) introduce asynchronous latency, loading states, CDN failure points, and cache corruption. A zero-allocation engine synthesizes all sensory feedback programmatically at runtime.
+
+### 4.1 Procedural Audio (Web Audio API)
+* **Zero External Media Files:** Synthesize all soundscapes, hits, ambient rumbles, engine hums, and UI clicks mathematically using Web Audio oscillators, biquad filters, dynamic stereo panners, and noise graphs.
+* **Pre-Allocated Shared Noise Buffers:** Never invoke audioCtx.createBuffer() inside sound trigger functions. Allocate a single multi-second cyclic white/pink noise buffer at initialization and reuse it across all impacts, friction, and wind effects.
+* **AudioParam Hardware Clock Automation:** Drive impact envelopes, slides, and sweeps using native setValueAtTime() and exponentialRampToValueAtTime() scheduled on the hardware clock (audioCtx.currentTime).
+* **Universal First-Gesture Unlock:** Modern browsers block audio until user interaction. Bind a one-time { passive: true, once: true } listener to pointerdown and keydown to seamlessly resume or create the AudioContext without startup warnings or dropped sound effects.
+
+### 4.2 Procedural Visuals & GPU Materials
+* **World-Space Triplanar Mapping:** Floor and wall shaders must compute texture coordinates directly from world-space coordinates (vWorldPosition.xz, vWorldPosition.xy, vWorldPosition.zy). This guarantees seamless tiling across scaled or procedurally generated geometry without UV distortion.
+* **Scale-Invariant Edge Glow:** Materials compute edge borders, circuit traces, and outlines mathematically inside the fragment shader using vertex bounds or screen-space derivatives (fwidth()).
+* **Procedural Parametric Meshes:** Visual arcs, slash ribbons, and particle trails are generated via mathematical curve definitions (crescent parametric extrusions, ring geometries) driven by GPU time uniforms.
+
+---
+
+## 5. Decoupled Presentation & Zero-Layout-Thrashing DOM
+
+The browser Document Object Model (DOM) is an asynchronous, layout-heavy tree. Modifying DOM attributes or reading layout metrics inside the render loop causes costly forced synchronous layouts ("layout thrashing").
+
+### 5.1 Quantized / Dirty-Checked HUD Pipeline
+* **No Unconditional String Injection:** Never execute .innerHTML = ... or .textContent = ... every frame.
+* **Quantized Change Thresholds:** Compare values to cached primitives. Only update DOM nodes when displayed values actually change beyond visual precision thresholds:
+  const qx = (playerPos.x * 10) | 0;
+  if (qx !== lastCachedQx) {
+    lastCachedQx = qx;
+    posElem.textContent = (qx * 0.1).toFixed(1);
+  }
+* **Hardware-Accelerated Layout Properties:** Animate UI elements strictly through GPU-composited properties (transform: translate3d(...), opacity). Never animate top, left, width, height, or margin inside active loops.
+
+---
+
+## 6. Authoritative Subsystems & Unidirectional Topology
+
+Fragmenting state across sprawling classes creates hidden circular references, memory leaks, and unpredictable execution orders. The engine must adhere to strict, unidirectional state management.
+
+* **Unidirectional Execution Order:** State flows strictly in sequence:
+  1. Input polling and quantization.
+  2. Kinematic physics integration and CCD substepping.
+  3. Spatial partition rebuild.
+  4. Entity AI and decision updates.
+  5. Audio scheduling.
+  6. Camera decoupling and final GPU render pass.
+* **Centralized Configuration (CONFIG):** All physical constants (gravity, air control, slide friction, jump impulse) and balance parameters live in a single, deeply frozen configuration registry.
+* **Explicit Subsystem Singletons:** Core systems (AudioSys, MapManager, SpatialHashGrid, InputManager) exist as authoritative singletons. Entities are lightweight actors that query these subsystems rather than implementing global environmental logic themselves.
+
+---
+
+## 7. Single-File Integrity & Workspace Discipline
+
+The development architecture reflects the deployment target: a single, friction-free distribution unit.
+
+* **Monolithic Single-File Standard:** All markup, CSS variables, GLSL shaders, audio graph code, and game logic reside in a solitary, unified index.html.
+* **Zero Runtime Dependencies:** No external CDNs or library assets beyond proven, vendor-frozen WebGL wrappers (like core Three.js) and standard system fonts.
+* **Immediate Portability:** The engine must execute flawlessly when opened directly from a local filesystem (file:///), served via a simple previewer, or pushed to an edge CDN. Zero build step failures, zero asset pipeline breakages, and zero CORS restrictions.
+* **Minimal Tooling Scaffolding:** Tooling files (package.json, vite.config.ts) exist solely to provide a local development server, hot reload during prototyping, and standard port binding. They must never dictate or fragment the application's runtime code.
+
+### 7.1 AI Agent Protocol & Anti-Boilerplate Directives
+AI coding agents are notoriously prone to "framework autopilot"—reflexively generating src/ directories, component trees, external .css sheets, and layers of configuration boilerplate that violate single-file architecture. When working in or maintaining this codebase:
+* **Strict Ban on Directory Proliferation:** Never create src/, components/, styles/, or split logic into auxiliary modules. All code belongs directly inside index.html.
+* **Zero Tolerance for Ghost Files:** Reject the addition of unused configuration artifacts (.env.example, tsconfig.json, .gitignore, metadata.json, linter configurations). If a file does not execute code in production or boot the minimal dev server, it does not belong in the repository.
+* **Preserve the Singular Source of Truth:** Any AI agent operating on this project must respect the single-file constraint as an absolute ceiling. Refactoring means optimizing layout, memory, and algorithms within index.html—never scattering code across new files.
+`;
+
+    document.getElementById('raw-container').textContent = RAW_MARKDOWN;
+
+    let activeViewMode = 'overview';
+    const headerLeft = document.getElementById('header-left');
+    const heroBrandRow = document.getElementById('hero-brand-row');
+    let scrollTicking = false;
+    let lastProgress = -1;
+
+    function updateHeaderTransition() {
+      scrollTicking = false;
+      if (activeViewMode === 'raw') {
+        if (lastProgress !== 1) {
+          lastProgress = 1;
+          headerLeft.style.opacity = '1';
+          headerLeft.style.filter = 'none';
+          headerLeft.style.transform = 'none';
+          headerLeft.style.pointerEvents = 'auto';
+        }
+        return;
+      }
+
+      const y = window.scrollY;
+      // Start fade as hero brand row enters under the 60px header (y ~ 30px)
+      // Reach full transparency right as it passes directly under the top bar's title line (y ~ 85px)
+      const progress = y <= 30 ? 0 : (y >= 85 ? 1 : (y - 30) / 55);
+
+      if (Math.abs(progress - lastProgress) > 0.004 || (progress === 0 && lastProgress !== 0) || (progress === 1 && lastProgress !== 1)) {
+        lastProgress = progress;
+        if (progress === 0) {
+          if (heroBrandRow) {
+            heroBrandRow.style.opacity = '1';
+            heroBrandRow.style.pointerEvents = 'auto';
+          }
+          headerLeft.style.opacity = '0';
+          headerLeft.style.filter = 'blur(12px)';
+          headerLeft.style.transform = 'translateY(-4px)';
+          headerLeft.style.pointerEvents = 'none';
+        } else if (progress === 1) {
+          if (heroBrandRow) {
+            heroBrandRow.style.opacity = '0';
+            heroBrandRow.style.pointerEvents = 'none';
+          }
+          headerLeft.style.opacity = '1';
+          headerLeft.style.filter = 'none';
+          headerLeft.style.transform = 'none';
+          headerLeft.style.pointerEvents = 'auto';
+        } else {
+          // Smoothstep S(t) = 3t^2 - 2t^3 creates a natural, non-abrupt ease into transparency
+          const ease = progress * progress * (3 - 2 * progress);
+          const currentBlur = ((1 - ease) * 12).toFixed(1);
+          const currentY = ((1 - ease) * -4).toFixed(1);
+
+          if (heroBrandRow) {
+            heroBrandRow.style.opacity = (1 - ease).toFixed(3);
+            heroBrandRow.style.pointerEvents = ease > 0.85 ? 'none' : 'auto';
+          }
+
+          headerLeft.style.opacity = ease.toFixed(3);
+          headerLeft.style.filter = currentBlur > 0.1 ? 'blur(' + currentBlur + 'px)' : 'none';
+          headerLeft.style.transform = 'translateY(' + currentY + 'px)';
+          headerLeft.style.pointerEvents = ease > 0.8 ? 'auto' : 'none';
+        }
+      }
+    }
+
+    function onScroll() {
+      if (!scrollTicking) {
+        scrollTicking = true;
+        requestAnimationFrame(updateHeaderTransition);
+      }
+    }
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+
+    function switchView(mode) {
+      activeViewMode = mode;
+      const overview = document.getElementById('overview-view');
+      const raw = document.getElementById('raw-view');
+      const rawContainer = document.getElementById('raw-container');
+      const tabOverview = document.getElementById('tab-overview');
+      const tabRaw = document.getElementById('tab-raw');
+
+      if (mode === 'raw') {
+        overview.style.display = 'none';
+        raw.style.display = 'block';
+        rawContainer.style.display = 'block';
+        tabOverview.classList.remove('active');
+        tabRaw.classList.add('active');
+      } else {
+        raw.style.display = 'none';
+        rawContainer.style.display = 'none';
+        overview.style.display = 'block';
+        tabRaw.classList.remove('active');
+        tabOverview.classList.add('active');
+      }
+      lastProgress = -1;
+      updateHeaderTransition();
+    }
+
+    function copyDocument() {
+      navigator.clipboard.writeText(RAW_MARKDOWN).then(() => {
+        const text = document.getElementById('copy-text');
+        const icon = document.getElementById('copy-icon');
+        text.textContent = 'Copied!';
+        if (icon) icon.innerHTML = '&#x2713;';
+        setTimeout(() => {
+          text.textContent = 'Copy Specification';
+          if (icon) icon.innerHTML = '&#x2398;';
+        }, 1800);
+      });
+    }
+
+    // Zero-allocation pre-allocated lookup table for two-digit numbers (00-59)
+    // Eliminates String.prototype.padStart and string allocations in the update loop
+    const PAD2 = [
+      '00','01','02','03','04','05','06','07','08','09',
+      '10','11','12','13','14','15','16','17','18','19',
+      '20','21','22','23','24','25','26','27','28','29',
+      '30','31','32','33','34','35','36','37','38','39',
+      '40','41','42','43','44','45','46','47','48','49',
+      '50','51','52','53','54','55','56','57','58','59'
+    ];
+
+    // Detect actual client local timezone once at initialization (zero runtime overhead)
+    let localTimezoneName = '';
+    try {
+      const parts = new Intl.DateTimeFormat(undefined, { timeZoneName: 'short' }).formatToParts(new Date());
+      const tz = parts.find(p => p.type === 'timeZoneName');
+      localTimezoneName = tz ? tz.value : (Intl.DateTimeFormat().resolvedOptions().timeZone || '');
+    } catch (e) {
+      localTimezoneName = '';
+    }
+
+    const footerTimeElem = document.getElementById('footer-time-val');
+    let lastSecond = -1;
+
+    function tickClock() {
+      const now = new Date();
+      const currentSec = now.getSeconds();
+      if (currentSec !== lastSecond) {
+        lastSecond = currentSec;
+        const y = now.getFullYear();
+        const m = PAD2[now.getMonth() + 1];
+        const d = PAD2[now.getDate()];
+        const h = PAD2[now.getHours()];
+        const min = PAD2[now.getMinutes()];
+        const s = PAD2[currentSec];
+        const tz = localTimezoneName ? ' ' + localTimezoneName : '';
+        if (footerTimeElem) {
+          footerTimeElem.textContent = `${y}-${m}-${d} ${h}:${min}:${s}${tz}`;
+        }
+      }
+      requestAnimationFrame(tickClock);
+    }
+
+    // Initialize state
+    updateHeaderTransition();
+    tickClock();
+  </script>
+</body>
+</html>

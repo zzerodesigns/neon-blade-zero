@@ -17,8 +17,14 @@ We are setting out to:
 5. **Beach Theme**: Add a beach theme next.
 6. **Water Level**: Add a water level/plane to the experience.
 7. **Zero-Gravity Fields**: Implement zero-gravity zones/fields within the environment.
-8. **Third-Person Perspective**: [COMPLETED in v48.8.8WIP5] Create a settings toggle to switch from first-person to a highly-polished, responsive third-person camera. This includes a custom-designed player mannequin mesh with dynamic theme-color glowing highlights, fluid posture transitions, and collision-aware camera raycasting to prevent clipping through obstacles.
+8. **Third-Person Perspective**: [COMPLETED in v48.8.8WIP5] Create a settings toggle to switch from first-person to a highly-polished, responsive third-person camera. This includes a custom-designed player physical mesh with dynamic theme-color glowing highlights, fluid posture transitions, and collision-aware camera raycasting to prevent clipping through obstacles.
 9. **Bug Fixes**: [COMPLETED in v48.8.8] Resolve UI backdrop blur glitches behind Echo Bot score, Golden Buff explosion instant-kill vulnerability, player ragdoll physics & death camera orientation, narrative display cleanup on EX maps, dead bot corpse & burn duration synchronization, passive Blaze explosion damage vulnerability, and complete action/input suppression during the player death sequence.
+10. **Dash Ability**: [COMPLETED in v48.9.0] Integrated Dash ability into Q slot loadout cycling (TELEPORT/DASH), supporting instant impulse forward, hold-charging up to 1.5s with max-charge visual/audio cues, and loadout modal cycling.
+11. **Cinematic Mode**: [COMPLETED in v48.9.1] Add a cinematic mode featuring a zoomed-out/wider POV, widescreen letterboxing (top and bottom black bars), and seamless FOV/camera distance scaling to simulate a dramatic movie aesthetic.
+12. **Flush EX Maps Floating Wall-Run Panels**: [COMPLETED in v48.9.3] Fix the EX maps' connecting floating wall-run panels to be completely flush.
+13. **New Map with Moving & Rotating Platforms**: [COMPLETED in v48.9.4] Create a completely new map, designed from the ground up, incorporating elements from `arena_ex` to experiment with moving and rotating platforms.
+14. **Visual Effects Experiments**: [MOSTLY COMPLETED in v48.9.5] Experimenting with new visual effects (slash visual overlay effect and its UI menu implemented; crosshair update remaining next).
+15. **3D Double Helix Spatial Visual Effect**: Implement a 3D double helix spatial effect featuring two intertwined streams of digital cards with parametric downward movement, binary tile faces, depth attenuation, instanced/GPU rendering, and exposed editor parameters.
 
 ---
 *Created on July 5, 2026, 12:35 PM (Local Time) / July 6, 2:31 AM (Session Time)*
@@ -89,10 +95,10 @@ We are setting out to:
   - **Monolithic Engine Codebase Review**: Performed a full-scale audit of camera references, physics systems, and rendering loops in `index.html`. Identified that `camera.position` serves as both the view anchor and the physical collision/motion volume, rendering standard camera-decoupling high-risk.
   - **Isolated Camera State Pattern (Save, Offset, Render, Restore)**: Designed a zero-overhead camera isolation pipeline that offsets and aligns the rendering viewpoint each frame but fully restores the original, physical coordinates post-render. This ensures 100% compatibility with the physics engine, OBB resolvers, wall running, and AI targeting.
   - **Collision-Aware Camera Raycasting**: Programmed an obstruction-tracing algorithm that casts rays from the player's physical center back to the camera target, checking intersections against all environmental decorations and obstacles to pull the camera in forward of walls and prevent clipping.
-  - **Dynamic Theme-Color Matched Player Mesh**: Formulated a detailed geometric specification for a stylized holographic cyberpunk ninja mannequin, featuring responsive posture/lean transitions and custom glow ribbons that dynamically adapt their hex values to the active aesthetic theme.
+  - **Dynamic Theme-Color Matched Player Mesh**: Formulated a detailed geometric specification for a stylized holographic player character model, featuring responsive posture/lean transitions and custom glow ribbons that dynamically adapt their hex values to the active aesthetic theme.
   - **Pristine Settings UI Integration**: Mapped out the HTML/CSS edits for a new responsive toggle under the "SYSTEM SETTINGS" modal with layout modifications to `.switch-container` to retain a balanced, liquid-glass aesthetic.
   - **Camera Behavior & Mechanics Assessment**: The third-person camera feels smooth, remarkably competent, and stays out of the way during fast movement. However, when pitching straight up or straight down, gimbal/pitch alignment glitches occur where the camera snaps to a random angle around the Y-axis.
-  - **Player Character Model & Theme Shaders**: The animated glow elements on the mannequin are working well. The head currently needs alignment—it should use the `glassEnergyMat` texture if following the central hub aesthetic, but the ultimate vision is a dynamic shader tailored to match EACH of the environment themes.
+  - **Player Character Model & Theme Shaders**: The animated glow elements on the model are working well. The head currently needs alignment—it should use the `glassEnergyMat` texture if following the central hub aesthetic, but the ultimate vision is a dynamic shader tailored to match EACH of the environment themes.
 
 ## Progress Update & Future Roadmap: July 23, 2026, 12:09 PM (Local Time UTC+7) - Base v48.8.8WIP3a
 
@@ -160,4 +166,109 @@ We are setting out to:
   - **Synchronized Burn Duration on Death**: Automatically set `burnTimer = corpseTimer` when an ignited bot transitions to `DEAD` state, ensuring burning status particles and embers remain synchronized with the corpse's 5.0-second fade duration.
   - **Grenade Damage Vulnerability with Passive Blaze**: Updated `applyExplosionForce()` so explosive impact blast damage from grenades/projectiles is passed as non-fire damage (`isFire = false`), allowing grenade explosions to kill the player even when passive Blaze is active (while preserving death protection for pure burn status ticks and environmental fire contact).
   - **Complete Input & Action Suppression on Player Death**: Added strict state guards (`this.isDead`) to `onJumpInput`, `onAttackInput`, `onSecondaryInput`, `onTeleportInput`, and `beginAim`. Updated `checkDeathBreakout()` to return `true` throughout the entire death sequence, completely suppressing all keyboard/mouse slashes, jumps, gadget uses, and movement until the 5-second timer elapses and "PRESS ANY KEY TO CONTINUE" is triggered.
+
+## Progress Update: July 27, 2026, 14:58 (Local Time UTC+7) - Base v48.8.8
+
+- **Dash Ability Integration & Q Slot Loadout Cycling**: [Completed]
+  - **Goal Definition**: Integrated the Dash ability into the primary movement/gadget moveset and updated gadget loadout management.
+  - **Gadget Loadout Menu Enhancement**: Added the standalone `Q` key slot button to the left side of the Gadget Loadout Modal UI (mirroring the HUD layout), with `F`, `R`, `E`, and `PASSIVE` stacked in a column on the right. Restored comfortable `25px` height and padding for the passive `BLAZE` bar in the loadout modal.
+  - **Q Slot Ability Cycling**: Retained `TELEPORT` as default `Q` ability while enabling cycling between `TELEPORT` and `DASH` in the loadout modal and during gameplay via `[TAB] + [Q]`.
+  - **Q Slot Layout & Menu Button Refinement**:
+    - **Flush Q Slot Dimensions**: Set loadout Q slot button dimensions to `80px x 83px` with top alignment (`align-items: flex-start`), sitting 100% flush with the top of the `F/R/E` button row (y = 0) and bottom of the `BLAZE` passive bar (y = 83px) while maintaining its exact proportional aspect ratio (`0.96`).
+    - **Clean HUD Q Display**: Removed the mode sub-label from the HUD Q slot element, leaving a clean display containing only the `Q` key and the active movement ability name (`TELEPORT` / `DASH`).
+    - **Pause Menu Button Renaming**: Renamed `TP MODE` on the pause menu to `MOVE MODE` (toggling between `AIM` and `INSTANT`), reflecting its broader application across all movement skills.
+  - **Dash Impulse Physics, Audio Scaling & Max Charge Visuals**:
+    - Instant mode and left click in Aim mode generate a localized blast impulse directly behind the player (`1.5m` behind view vector), driving the player forward in the aiming direction using `applyExplosionForce` and a directional velocity boost.
+    - Right click hold in Aim mode gradually accumulates charge power over up to 1.5s with particle visual feedback.
+    - When dash charge reaches maximum (1.5s), charging particle visual effects transition from cyan (`0x00ffff`) to vibrant magenta (`0xff00ff`) alongside audio ping feedback, signaling full power before unleash.
+    - **Scaled Dash Impulse Audio**: Adjusted dash impulse audio execution volume to `0.35 * powerMult` (scaling with charge up to ~1.05 at max power), matching the proportional volume-to-force ratio of the fatal slash impulse (`0.4` volume at `20` force).
+
+## Progress Update: July 27, 2026, 21:51 (Local Time UTC+7) - Base v48.9.0
+
+- **Objective 10 (Dash Ability Integration)**: [COMPLETED]
+  - Fully integrated Dash into movement skills, Q slot loadout cycling, HUD UI, and instant/charged physics impulses.
+- **Objective 11 (Cinematic Mode)**: [COMPLETED]
+  - Implemented dynamic cinematic letterboxing with smooth sliding transitions and box-shadow depth.
+  - Implemented dynamic camera transitions scaling FOV (80 to 95) and third-person camera offsets smoothly via `cinematicProgress`.
+  - Achieved seamless transition from first-person to third-person cinematic, allowing the player's character model and glowing accents to smoothly fade in and out via custom `u_opacity` shader uniforms in synchronization with the camera backing out or returning to the eyes.
+
+## Session Log: July 28, 2026, 23:10 (Local Time UTC+7) - Base v48.9.2
+
+- **Objective 12 (Flush EX Maps Floating Wall-Run Panels)**:
+  - Fix the EX maps' connecting floating wall-run panels so they are positioned and aligned completely flush without gaps or uneven edges.
+- **Objective 13 (New Map with Moving & Rotating Platforms)**:
+  - Create a completely new map, designed from the ground up, incorporating architectural elements from `arena_ex`, to experiment with moving and rotating platform mechanics.
+- **Scope**: Goal logged and objectives updated. No code modifications made in this session as requested.
+
+## Progress Update: July 29, 2026, 16:45 (Local Time UTC+7) - Base v48.9.3
+
+- **Objective 12 (Flush EX Maps Floating Wall-Run Panels)**: [COMPLETED in v48.9.3]
+  - **3D Vertex-Level Flush Geometry**: Derived exact joint plane projections (`computeJointVertex`) considering radius $r$, tangent, binormal, spiral vertical climb ($\Delta y$), and step angle $\Delta \theta$, ensuring 100% vertex-level flush alignment along curved spiral wall segments with zero gaps or steps.
+  - **Collision Physics & Wall-Run / Slide Continuity**:
+    - Weighted local transverse axis collision resolution over longitudinal tangent face overlaps in OBB SAT collision math, preventing player snagging at segment joints during wall-running and wall-sliding.
+    - Updated OBB bounding box calculations for custom curved panel meshes to utilize standard unshaped dimensions ($w \times h \times d$), providing continuous, collision-smooth wall surfaces across all joint seams.
+
+## Progress Update: July 29, 2026, 17:09 (Local Time UTC+7) - Base v48.9.4
+
+- **Objective 13 (New Map with Moving & Rotating Platforms)**: [COMPLETED in v48.9.4]
+  - **New Class Architecture**: Introduced `MovingPlatform` class bridging kinematic motion and rigid physics collision resolution natively into the main animation loop (`Math.sin` driven offsets and `rotateOnAxis` operations).
+  - **Dynamic Colliders Pipeline**:
+    - Synced real-time OBB (Oriented Bounding Box) and AABB (Axis-Aligned Bounding Box) re-evaluations mapping to the transforming matrices (`mesh.updateMatrixWorld()`).
+    - Hooked kinematics tracking (`MapState.kinematics`) array directly into `Player.collideWithWalls` allowing unified spatial query interactions mapping moving/rotating faces to SAT (Separating Axis Theorem) resolution.
+  - **Map 'MACHINA' Setup**:
+    - Created a new MapState instance and registered it in the UI cyclic map array.
+    - Designed `LevelBuilder.buildMachina` rendering a center rotating hub, 4 sliding horizontal platforms, 2 pendulum-sweeping long platforms, 4 high-speed vertical elevators, and stable structural outer pillars to encourage high verticality and timing-based parkour traversal.
+
+## Session Log & Progress Update: July 30, 2026, 23:28 (Local Time UTC+7) - Base v48.9.5
+
+- **Objective 14 (Visual Effects Experiments)**: [MOSTLY COMPLETED in v48.9.5]
+  - **Pixel-Grid Slash Visual Overlay**:
+    - Implemented a high-performance additive 2D matrix overlay using instanced mesh rendering (`gridSlashMesh`) to project dynamic digital glyphs over blade swing paths without altering core sword trail logic.
+    - Engineered real-time binary digit scrambling (0s and 1s), dynamic flickering cell dropouts, and randomized per-slash seeds/offsets for organic sci-fi glitch sequences.
+    - Refined spatial boundaries with sine-envelope tapering so cell matrices follow crescent slash curves with sharp tips instead of rectangular block cutoffs.
+  - **Slash Visual Overlay UI & System Settings Integration**:
+    - Created a dedicated "Slash Visuals" tooltip sub-menu in System Settings featuring two-state switches for Grid Visual, Render Mode (Multiplane vs. Flat), Palette Mode (Colorful vs. Dark), and sliders for Grid Density, Persistence, and Glitch Intensity.
+    - Standardized default settings (Grid Visual ON, Flat Mode ON, Dark Palette ON, Grid Density 6/10, Persistence 1.0s, Glitch Intensity 50%).
+    - Integrated Slash Visual Overlay state resetting directly into the System Settings "RESET DEFAULT" handler (`resetSettings()`), ensuring full UI and configuration synchronization.
+  - **Crosshair Redesign & Real-Time Analog Clock Integration (v48.9.6 WIP5)**:
+    - Objective 14 is nearly completed (~90% complete) in v48.9.6 WIP5.
+    - Redesigned crosshair into a multi-layered sci-fi UI overlay with an outer thick ring animating with dynamic sine-wave speed variations, and 3 'X' markers operating as a mathematically correct, real-time analog clock (hour, minute, second hands) synced directly to system time.
+    - Removed the inner stationary ring for improved central clarity.
+  - **Next Scope**:
+    - Resolve the remaining visibility/contrast challenges on varying background surfaces using inverted-color or ethereal visual overlay techniques next session.
+
+## Progress Update: August 17, 2026, 01:15 (Local Time UTC+7) - Base v48.9.9WIP11
+
+- **Objective (Twin Citadels Map Implementation)**: [COMPLETED]
+  - Implemented the full "Twin Citadels" map architecture in `LevelBuilder.buildTwinCitadels` utilizing the exact 107-block allocation defined in `docs/plans/arena_block_structure_designs.md`.
+  - Structured the arena layout into:
+    - **North & South Citadels**: Elevated courtyard platforms (top Y=22) flanked by west/east wing ramparts and towering keep bastions (top Y=48).
+    - **Central Chasm**: Low-ground combat field with tactical cover blocks, approach steps, and a central altar monolith.
+    - **The Great Sky Bridge**: Elevated bridge spans crossing the chasm at Y=36-40 (top Y=50-54) with lateral jump balconies and lower support piers.
+    - **Outer Perimeter Parkour Arcs**: Symmetrical ascending and descending stepped pathways along the east and west walls for high-velocity wall-running and aerial flanking.
+  - Registered `CITADELS` in `MapManager`, UI map selector dropdown, sequential map cycling, `LEVEL_SCRIPTS` narrative popups, and player spawn positioning.
+
+
+- **Objective 15 (3D Double Helix Spatial Visual Effect)**: [Planned / Goal Logged]
+  - **High-Level Objective Summary**:
+    - Implement a 3D double helix spatial effect to serve as a secondary visual element in the game, consisting of two intertwined, vertically spiraling streams of digital cards or billboard quads rotating infinitely around a central vertical axis.
+    - **Parametric Motion & Double Helix Geometry**: Drive movement of both strands using continuous parametric calculations rather than hardcoded keyframes. Position each card in 3D space according to its rotation angle and vertical height along the spiral. Offset the second strand by exactly half the vertical pitch of the primary strand to form the dual helix.
+    - **Continuous Up/Downward Motion & Modulo Wrap-Around**: Drive cards downward along their spiral paths over time, using a modulo wrap-around operation so cards reaching the bottom instantly reset back to the top outside the player's view.
+    - **Depth Attenuation & Visual Cohesion**: Apply depth attenuation (scaling, dimming, or blurring) as cards' Z-coordinates rotate away from the foreground camera plane. Integrate flickering, glitchy binary tiles (0s and 1s) directly onto card faces to align visually with the grid slash overlay.
+    - **Instanced / GPU Performance & Exposed Parameters**: Build the system using instanced rendering or a GPU particle stream to update and draw the double-helix structure efficiently in a single pass. Provide clean exposed parameters for helix radius, vertical pitch, rotation speed, stream card density, and depth-fade intensity for editor tweaking.
+
+## Session Log & Progress Update: August 22, 2026 - Base v49.0.5a
+
+- **Objective 16 (Polyhedral Building Blocks System & Map Architecture)**: [COMPLETED Engine Mechanics / Planned Maps]
+  - **Fundamental Polyhedral Block Engine**:
+    - Added 3 fundamental convex polyhedral block creation methods in `LevelBuilder`:
+      1. **Rhombic Dodecahedron** (`createRhombicDodecahedron`): 12-sided space-filling polyhedron (rhombic faces) enabling zero-air-gap 3D grid lattices, 45°/60° flush angled ramps, and smooth sliding surfaces.
+      2. **Regular Octahedron** (`createOctahedron`): 8-sided triangular polyhedron acting as diagonal nodes in space-frame lattices.
+      3. **Regular Tetrahedron** (`createTetrahedron`): 4-sided triangular polyhedron complementing octahedrons to complete zero-gap Octet Truss structures.
+    - Integrated edge highlighting, OBB bounding colliders, spatial grid insertion, shadow mapping, and dynamic color/theme updating for all polyhedral shapes (`createPolyhedralBlock`).
+  - **Upcoming Map Construction Plans**:
+    - Design and construct new arena-sized maps built from tessellated rhombic dodecahedron lattices and octet truss structures featuring flush sliding ramps, diamond corridors, and complex high-speed parkour environments.
+
+
+
 
